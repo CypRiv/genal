@@ -94,6 +94,7 @@ class PRS:
         nrow_delta=nrow_initial-data.shape[0]
         if nrow_delta>0:
             print(f"{nrow_delta} rows ({nrow_delta/nrow_initial:.3f}%) have been deleted because the IDs provided were not the genomic ones and some of them were not present in the bridge file.")
+            test
 
         
         
