@@ -1,0 +1,82 @@
+import pandas as pd
+import numpy as np
+import warnings
+import time
+import os
+import subprocess
+import scipy.stats as st
+import rpy2.robjects as ro
+from rpy2.robjects import r, pandas2ri
+from rpy2.robjects.conversion import localconverter
+
+class PRS:
+    def __init__(self,data,name="noname",IID="IID",SCORE="SCORE",standardize=True):
+        """
+        Declare a PRS object used to store, transform and analyze data of a Polygenic Risk Score (PRS) in a population.
+        It does not include information related to individual SNPs, only about the aggregate PRS measure.
+        data is a dataframe with each line representing an individual a containing at least the IID, and SCORE columns. It can contains more columns to be used as covariates for certain methods.
+        name="noname" is the name used in the different methods when creating files or printing results and plots.
+        standardize=True to standardize the PRS (recommended)
+        The initialization will create the most common ntiles of the PRS: tertiles, quintiles ... and store them in appropriate variables.
+        This version is meant to be used in the UKB so it only handles person ids (IID) and not family ids (FID)
+        """
+        
+        ## Check the presence of the main columns and throw errors if they are not present. 
+        ## Throw warning if name is not well defined.
+        for column in [IID,SCORE]:
+            if not(column in data.columns):
+                raise ValueError(f"The column {column} is not found in the data!")
+        self.name=name
+        if name=="noname":
+            print("You haven't passed a specific name to this PRS instance. Be careful with methods creating tmp files.")
+            
+        ## Rename the main columns to our standard names
+        data=data.rename(columns={IID:"IID",SCORE:"SCORE"})
+        
+        ## Standardize the PRS
+        if standardize: 
+            data["SCORE"]=(data.SCORE-np.mean(data.SCORE))/np.std(data.SCORE)
+            print("The PRS has been standardized to have a mean of 0 and standard deviation of 1.")
+        
+        ## Create the most common ntiles of the PRS and add their names to the repartition list attribute
+        data["SCORE_tert"]=pd.qcut(data.SCORE,q=3,labels=range(1,4)).astype("Int64")
+        data["SCORE_quart"]=pd.qcut(data.SCORE,q=4,labels=range(1,5)).astype("Int64")
+        data["SCORE_quin"]=pd.qcut(data.SCORE,q=5,labels=range(1,6)).astype("Int64")
+        data["SCORE_dec"]=pd.qcut(data.SCORE,q=10,labels=range(1,11)).astype("Int64")
+        data["SCORE_twent"]=pd.qcut(data.SCORE,q=20,labels=range(1,21)).astype("Int64")
+        data["SCORE_2080"]=pd.qcut(data.SCORE,q=[0,0.20,0.80,1],labels=range(1,4)).astype("Int64")
+        self.repartition_list=["SCORE_tert","SCORE_quart","SCORE_quin","SCORE_dec","SCORE_twent","SCORE_2080"]
+        
+        ## Assign the main attribute: .data
+        self.data=data
+        
+    def ntile(self,array,name,add_to_list=True):
+        """
+        Create a new variable with a custom n-tile repartition of the SCORE.
+        array is an array representing the repartition. For instance, [0,0.33,0.66,1] for tertiles. Can also be an integer, and in that case it's going to be the number of categories, evenly distributed.
+        name is the name to be given to the variable. Be careful that if the name already exists in the data, the corresponding variable values will be replaced.
+        add_to_list=True will add the variable name to the attribute repartition_list representing different repartitions of the SCORE. This list is used in some methods to compare the repartitions.
+        """
+        ## Check if the name argument already exists in the column names.
+        if name in self.data.columns:
+            print("Be careful: this name is already the name of a column and it will be replaced!")
+        ## Add the column in the data
+        self.data[name]=pd.qcut(self.data.SCORE,q=array,labels=range(1,len(array))).astype("Int64")
+        ## Add the name to the list if add_to_list==True
+        if add_to_list: self.repartition_list.append(name)
+            
+          
+    def add_variables(self, data, IID="person_id"):
+        """
+        Add phenotype variables to the PRS data. The data passed as argument is left joined on the PRS data.
+        data: dataframe with an IID column that should correspond to the genomic or the phenotypic IDs. 
+        IID="IID" indicates the name of the column containing the individual IDs.
+        """
+        if not(IID in data.columns):
+            raise ValueError("The column {column} is not found in the data and is mandatory!".format(column=column))
+        
+    
+    
+    #def set_variables(self, df,Pheno, IID="person_id", FID=None):
+        ## Set an attribute wi
+        
