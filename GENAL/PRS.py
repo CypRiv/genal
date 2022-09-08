@@ -72,11 +72,44 @@ class PRS:
         data: dataframe with an IID column that should correspond to the genomic or the phenotypic IDs. 
         IID="IID" indicates the name of the column containing the individual IDs.
         """
+         ## Make sure the IID column passed as argument exists in the dataframe. Drop an eventual column named "IID" if IID!="IID". Rename IID column.
         if not(IID in data.columns):
             raise ValueError("The column {column} is not found in the data and is mandatory!".format(column=column))
+        if IID!="IID":
+            data=data.drop(axis=1,columns=["IID"],errors="ignore")
+        data=data.rename(columns={IID:"IID"})
         
+        ## Determine if the IID column corresponds to genomic IDs or to the new phenotype IDs. If necessary, replace it with the genomic IDs. (We assume the PRS ID column corresponds to genomic IDs.)
+        bridge=pd.read_csv(f"{genal_path}UKB_PROJECTS_BRIDGE.txt",delimiter=" ")
+        Pheno_ID=set(data.IID)
+        nrow_initial=data.shape[0]
+        if len(Pheno_ID.intersection(bridge.IID_old))<len(Pheno_ID.intersection(bridge.IID_new)):
+            bridge["IID"]=bridge.IID_new
+            bridge=bridge[["IID_old","IID"]]
+            data=data.merge(bridge,how="inner",on="IID")
+            data=data.drop(axis=1,columns=["IID"])
+            data=data.rename(columns={"IID_old":"IID"})
     
-    
-    #def set_variables(self, df,Pheno, IID="person_id", FID=None):
-        ## Set an attribute wi
+        ## Compare the number of rows and print the number of deleted ones if any.
+        nrow_delta=nrow_initial-data.shape[0]
+        if nrow_delta>0:
+            print(f"{nrow_delta} rows ({nrow_delta/nrow_initial:.3f}%) have been deleted because the IDs provided were not the genomic ones and some of them were not present in the bridge file.")
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         

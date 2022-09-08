@@ -348,7 +348,7 @@ class GENO:
         ## Compare the number of rows and print the number of deleted ones if any.
         nrow_delta=nrow_initial-data.shape[0]
         if nrow_delta>0:
-            print(f"{nrow_delta} rows ({nrow_delta/nrow_initial:.3f}%) have been deleted in the process due to merging with the bridge file because the IDs provided were not the genomic ones.")
+            print(f"{nrow_delta} rows ({nrow_delta/nrow_initial:.3f}%) have been deleted because the IDs provided were not the genomic ones and some of them were not present in the bridge file.")
         
         ## Set the attributes
         self.phenotype=data
