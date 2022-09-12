@@ -9,6 +9,16 @@ import rpy2.robjects as ro
 from rpy2.robjects import r, pandas2ri
 from rpy2.robjects.conversion import localconverter
 
+## Global paths
+genal_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Softwares/Genal/"
+genal_mr_outcomes_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Resources/GENAL_Outcomes/"
+plink2_path="/gpfs/ysm/project/gf272/plink2"
+plink19_path="/gpfs/ysm/project/gf272/software/plink2"
+prsice_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Softwares/PRSice/"
+liftover_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Softwares/LiftOver/"
+ukb_geno_path="/SAY/standard2/falconelab-CC0841-MEDNEU/UKB_Filtered/"
+ref_3kg_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Resources/Ref/"
+
 class PRS:
     def __init__(self,data,name="noname",IID="IID",SCORE="SCORE",standardize=True):
         """
@@ -46,6 +56,7 @@ class PRS:
         data["SCORE_twent"]=pd.qcut(data.SCORE,q=20,labels=range(1,21)).astype("Int64")
         data["SCORE_2080"]=pd.qcut(data.SCORE,q=[0,0.20,0.80,1],labels=range(1,4)).astype("Int64")
         self.repartition_list=["SCORE_tert","SCORE_quart","SCORE_quin","SCORE_dec","SCORE_twent","SCORE_2080"]
+        print("The following PRS repartitions have been added to the data: tertiles, quartiles, quintiles, deciles, twentiles, 0-20-80-1.")
         
         ## Assign the main attribute: .data
         self.data=data
@@ -79,6 +90,14 @@ class PRS:
             data=data.drop(axis=1,columns=["IID"],errors="ignore")
         data=data.rename(columns={IID:"IID"})
         
+        ## Make sure that none of the columns of the passed dataframe already exists in our data.
+        i=0
+        for column in data.columns:
+            if column in self.data.columns and column != "IID":
+                i=1
+                print(f"A variable {column} already exists in the data, change its name to allow the merge.")
+        if i!=0: raise ValueError("Some variable names were already present in the PRS object data. Please change their names and try again.")
+        
         ## Determine if the IID column corresponds to genomic IDs or to the new phenotype IDs. If necessary, replace it with the genomic IDs. (We assume the PRS ID column corresponds to genomic IDs.)
         bridge=pd.read_csv(f"{genal_path}UKB_PROJECTS_BRIDGE.txt",delimiter=" ")
         Pheno_ID=set(data.IID)
@@ -94,7 +113,11 @@ class PRS:
         nrow_delta=nrow_initial-data.shape[0]
         if nrow_delta>0:
             print(f"{nrow_delta} rows ({nrow_delta/nrow_initial:.3f}%) have been deleted because the IDs provided were not the genomic ones and some of them were not present in the bridge file.")
-            test
+            
+        ## Merge with the existing data
+        self.data=self.data.merge(data,on="IID",how="left")
+        
+            
 
         
         
