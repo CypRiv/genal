@@ -14,7 +14,7 @@ MR <- function(data,path,action,ref_3kg_path,sensitivity,n){
                            pval_col="P")
     gwasvcf::set_bcftools()
     gwasvcf::set_plink("/gpfs/ysm/project/falcone/gf272/software/plink2")
-    ## Try to query_gwas. This can fail especially if the exposure is from a recent GWAS because newly labeled SNPs are not present in the reference panel. If that is the caise and the function fails, we try again by first removing the problematic SNPs from the exposure data.
+    ## Try to query_gwas. This can fail especially if the exposure is from a recent GWAS because newly labeled SNPs are not present in the reference panel. If that is the case and the function fails, we try again by first removing the problematic SNPs from the exposure data.
     t=try(ht_outcome_dat <- gwasvcf::query_gwas(VariantAnnotation::readVcf(path,"hg19"),rsid = clumped_dat$SNP, proxies = "yes",
                                       bfile=paste0(ref_3kg_path,"data_maf0.01_rs_ref")))
     if ("try-error" %in% class(t)){
@@ -36,11 +36,11 @@ MR <- function(data,path,action,ref_3kg_path,sensitivity,n){
     else {
         if (res[3,9] < 0.05){
             res_presso <- run_mr_presso(dat, NbDistribution = n)
-            return (list(res,res_presso))
+            return (list(res,res_presso,dat))
         }
         else {
             res_presso=data.frame(matrix(ncol=0,nrow=0))
-            return (list(res,res_presso))
+            return (list(res,res_presso,dat))
         }
     }
 }

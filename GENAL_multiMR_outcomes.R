@@ -14,7 +14,7 @@ file_exposure=paste0("tmp_GENAL/",param$name,"_clumped.txt")
 Results=data.frame(matrix(ncol=9,nrow=0))
 colnames(Results) <- c("id.exposure","id.outcome","outcome","exposure","method","nsnp","b","se","pval")
 write.table(Results,results_name,sep=",",append=F,col.names=T)
-files_outcome <- list.files(path = path_outcome,pattern=".vcf.gz$")
+files_outcome <- list.files(path = path_outcome,pattern=paste0(param$pattern,"$"))
 
 
 ## Convert the exposure to the correct format for MR

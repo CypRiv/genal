@@ -21,7 +21,7 @@ plink2_path="/gpfs/ysm/project/gf272/plink2"
 plink19_path="/gpfs/ysm/project/gf272/software/plink2"
 prsice_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Softwares/PRSice/"
 liftover_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Softwares/LiftOver/"
-ukb_geno_path="/SAY/standard2/falconelab-CC0841-MEDNEU/UKB_Filtered/"
+ukb_geno_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Resources/UKB_geno_files/"
 ref_3kg_path="/gpfs/gibbs/pi/falcone/LabMembers/Cyprien/Resources/Ref/"
 
 ## Create folders for temporary files and GENAL_MR
@@ -39,6 +39,17 @@ def Combine_GENO(Gs,name="noname",clumped=False):
             C=pd.concat([C,G.data])
     C=C.reset_index(drop=True)
     return(GENO(C,name=name,clumped=clumped))
+
+def delete():
+    """
+    Delete the tmp folder.
+    """
+    if os.path.isdir("tmp_GENAL"):
+        subprocess.run("rm -r tmp_GENAL",shell=True,check=False)
+        print ("The tmp_GENAL folder has been successfully deleted.")
+    else:
+        print("There is no tmp_GENAL folder to delete in the current directory.")
+    
 
 
 class COV:
@@ -73,16 +84,11 @@ class GENO:
         ## Keep only the main columns and rename them to our standard names
         data=data.loc[:,data.columns.isin([CHR,POS,SNP,EA,NEA,BETA,SE,P,EAF])]
         data=data.rename(columns={CHR:"CHR",POS:"POS",SNP:"SNP",EA:"EA",NEA:"NEA",BETA:"BETA",SE:"SE",P:"P",EAF:"EAF"})
-
-                
-        ## Make sure the CHR and POS columns are integer (pandas int) and not float or else
-        for int_col in ["CHR","POS"]:
-            if int_col in data.columns:
-                data[int_col]=data[int_col].astype('Int64')
         
         ## If SNP missing but CHR and POS present: use them to fill in the SNP based on reference data
         ## Perform the same if adjust_snpid==True
         ## If not all snpids are present in the ref data, it will use the original one to fill the missing values
+        ## And if some snpids are still missing, they will be replaced by a standard name: CHR:POS:EA 
         if (("CHR" in data.columns) & ("POS" in data.columns) & ("SNP" not in data.columns)) or adjust_snpids==True:
             for column in ["CHR","POS"]:
                 if not(column in data.columns):
@@ -93,6 +99,9 @@ class GENO:
             if "SNP_original" in data.columns:
                 data["SNP"]=data["SNP"].combine_first(data["SNP_original"])
                 data=data.drop(columns="SNP_original")
+            if ("EA" in data.columns):
+                data["SNP"]=np.where(data.SNP.isna(),data.CHR.astype(str)+":"+data.POS.astype(str)+":"+data.EA.astype(str),
+                                     data.SNP)
             print("The SNP column has been created.")
             
         ## If CHR and/or POS columns missing but SNP present: use SNP to fill them based on reference data
@@ -107,8 +116,9 @@ class GENO:
             data=data.merge(ref[["CHR","POS","SNP"]],on="SNP",how="left")
             print("The coordinates columns (CHR for chromosome and POS for position) have been created.")
             
+            
         ## If NEA column is missing but EA and CHR/POS are present: fill it based on reference data
-        if (("CHR" in data.columns) & ("POS" in data.columns) & ("NEA" not in data.columns)):
+        if (("CHR" in data.columns) & ("POS" in data.columns) & ("NEA" not in data.columns) & ("EA" in data.columns)):
             if "ref" not in locals():
                 ref=pd.read_csv(f"{ref_3kg_path}Bim_ref_UKB_3k.txt",
                                     sep="\t",header=None, names=["CHR","SNP","F","POS","A1","A2"])
@@ -116,11 +126,21 @@ class GENO:
             data["NEA"]=np.where(data["EA"]==data["A1"],data["A2"],np.where(data["EA"]==data["A2"],data["A1"],np.nan))     
             data=data.drop(columns=["A1","A2"])
             print("The NEA (Non Effect Allele) column has been created.")
+
+        ## Make sure the CHR and POS columns are integer (pandas int) and not float or else
+        for int_col in ["CHR","POS"]:
+            if int_col in data.columns:
+                data[int_col]=data[int_col].astype('Int64')
             
         ## If SE column missing but BETA and P present: use them to fill in SE
         if (("P" in data.columns) & ("BETA" in data.columns)& ("SE" not in data.columns)):
             data["SE"]=np.abs(data.BETA/st.norm.ppf(data.P/2))
             print("The SE (Standard Error) column has been created.")
+            
+        ## If P column missing but BETA and SE present: use them to fill in P
+        if (("SE" in data.columns) & ("BETA" in data.columns)& ("P" not in data.columns)):
+            data["P"]=2*(1-st.norm.cdf(np.abs(data.BETA)/data.SE))
+            print("The P (P-value) column has been created.")
                 
         ## Make sure the alleles columns are upper case strings and delete non-letters rows
         for allele_col in ["EA","NEA"]:
@@ -160,12 +180,19 @@ class GENO:
                 print(f"Deleting {n_na}({n_na/nrows*100:.3f}%) rows containing NaN values in columns {columns_na}. If you wish to keep the rows containing NaN values, use keep_na=True.")
         
         ## Check the presence of the main columns and throw warnings if they are not present
-        for column in [CHR,POS,SNP,EA,NEA,BETA,SE,P]:
+        for column in ["CHR","POS","SNP","EA","NEA","BETA","SE","P"]:
             if not(column in data.columns):
                 print(f"Warning: the data doesn't include a {column} column. This may become an issue later on.")
         self.name=name
         if name=="noname":
             print("You haven't passed a specific name to this GENO instance. Be careful with methods creating tmp files.")
+            
+        ## Check whether some SNPs are present more than once, based on SNP, and throw warning if that's the case.
+        if "SNP" in data.columns:
+            dup_snp=data.SNP.duplicated().sum()
+            if dup_snp>0:
+                print(f"Warning: {dup_snp} SNPs are duplicated based on the SNP column. This can lead to errors in analyses.")
+        
         
         ## Guess if the data is clumped or not if no clumped argument is passed
         if (P in data.columns) and (clumped==""):
@@ -187,6 +214,7 @@ class GENO:
         ram=subprocess.run(["grep MemTotal /proc/meminfo"],shell=True,capture_output=True,text=True,check=True)
         ram=[int(s) for s in ram.stdout.split() if s.isdigit()][0]
         self.ram=round((ram/1000),-3)-1000
+        
 
     def copy(self):
         """
@@ -215,8 +243,12 @@ class GENO:
         r=ro.r
         r['source'](f'{genal_path}GENAL_tovcf.R')
         tovcf_r=ro.globalenv['tovcf']
-        if clumped or not hasattr(self,"data_clumped"): tovcf_r(self.data_clumped,path,name)
-        else: tovcf_r(self.data,path,name)
+        if clumped: 
+            tovcf_r(self.data_clumped,path,name)
+            print("Saving the clumped data to vcf format.")
+        else: 
+            tovcf_r(self.data,path,name)
+            print("Saving the unclumped data to vcf format.")
         
         ## Check the existence of the .vcf file and convert it to .vcf.gz/.vcf.gz.tbi if specified
         if os.path.isfile(path):
@@ -230,13 +262,13 @@ class GENO:
         
      
     
-    def association_test(self,covar=True):
+    def association_test(self,covar=True,standardize=True):
         """
         Perform single-SNP association testing for the clumped_data against the phenotype set with the set_phenotype() method.
         Requires extract_ukb method to be called before.
         Replace the BETA, SE and P columns but does not modify the phenotype attribute.
         covar=True to adjust the association tests with the standard covariates: sex, age, PC1-4
-        
+        standardize=True to standardize a quantitative phenotype before association testing (this is recommended to make the results more understandable).
         """
         ##Check that a phenotype has been set with the set_phenotype function.
         if not(hasattr(self,"phenotype")):
@@ -255,6 +287,8 @@ class GENO:
         if self.phenotype.type=="binary":
             fam[5]=fam[5]+1
             fam[5]=fam[5].astype("Int64")
+        if (self.phenotype.type=="quant") & (standardize==True):
+            fam[5]=(fam[5]-fam[5].mean())/fam[5].std()
         fam[5]=fam[5].fillna(-9)
         fam.to_csv(f"tmp_GENAL/{self.name}_merge_allchr.fam",header=None,index=False,sep=" ")
         
@@ -269,7 +303,7 @@ class GENO:
         assoc=pd.read_csv(f"tmp_GENAL/{self.name}.assoc.{method}",delimiter="\s+")
         assoc["BETA"]=np.log(assoc.OR) if self.phenotype.type=="binary" else assoc.BETA
         data=self.data_clumped
-        data=data.drop(axis=1,columns=["BETA",'CHR','P']).merge(assoc,how="inner",on="SNP")
+        data=data.drop(axis=1,columns=["BETA",'CHR','P'],errors="ignore").merge(assoc,how="inner",on="SNP")
         data["BETA"]=np.where(data.EA==data.A1,data.BETA,np.where(data.NEA==data.A1,-data.BETA,np.nan))
         data["SE"]=np.abs(data.BETA/st.norm.ppf(data.P/2))
         data=data.drop(axis=1,columns=["A1","TEST","NMISS","OR","STAT","BP"],errors="ignore")
@@ -278,6 +312,7 @@ class GENO:
         delta_nrow=nrow_previous-data.shape[0]
         if delta_nrow>0 : print (f"{delta_nrow} rows were deleted due to the plink effective allele not found in the EA or NEA columns.") 
         self.data_clumped=data
+        return 
        
 
             
@@ -354,21 +389,16 @@ class GENO:
         self.phenotype=data
         self.phenotype.type=PHENO_type
         
+   
     
-    def delete(self):
+    def MR_all_outcomes(self,action=2,cpus=8,mem_per_cpu=30000,path_outcomes=genal_mr_outcomes_path,pattern=".vcf.gz"):
         """
-        Delete the tmp folder.
-        """
-        subprocess.run("rm -r tmp_GENAL",shell=True,check=False)
-        print ("The tmp_GENAL folder has been successfully deleted")
-    
-    
-    def MR_all_outcomes(self,action=2,cpus=8,mem_per_cpu=30000):
-        """
-        Perform MR with the data_clumped as exposure against all the standard outcomes located in Cyprien/Resources/GENAL_Outcomes. The process is batch scripted and the results written to a .csv file in the local directory. To check the process and analyze the results, use MR_all_outcomes_result.
+        Perform MR with the data_clumped as exposure against all the standard outcomes located in Cyprien/Resources/GENAL_Outcomes, or a user-defined path to a folder containing outcome files (.vcf or .vcf.gz). The process is batch scripted and the results written to a .csv file in the local directory. To check the process and analyze the results, use MR_all_outcomes_result.
         action=2: how to treat palindromes in the harmonizing step between exposure and outcome data. =1 doesn't attempt to flip them, =2 use EAF to attempt to flip them (conservative, default), =3 remove all palindromic SNPs (very conservative).
         cpus=8: number of cpu cores used for the batschscript. 
         mem_per_cpu: quantity of ram (in mega) used PER cpu core.
+        path_outcomes=genal_mr_outcomes_path: the path to the folder containing all the outcomes
+        pattern=".vcf.gz": the extension of the outcome files (either .vcf or .vcf.gz)
         """
         ## Check the existence of the required columns
         for column in ["SNP","BETA","SE","EAF","EA","NEA","P"]:
@@ -390,8 +420,8 @@ class GENO:
         ## Write the local path as well as the parameters passed as arguments to a txt file that will be used by the R script.
         param_file=f"tmp_GENAL/MR_all_outcomes.param"
         df_param=pd.DataFrame(data={"path":[os.getcwd()],"name":self.name,"action":[action],"cpus":[cpus],
-                                    "genal_mr_outcomes_path":genal_mr_outcomes_path,"plink19_path":plink19_path,
-                                   "ref_3kg_path":ref_3kg_path})
+                                    "genal_mr_outcomes_path":path_outcomes,"plink19_path":plink19_path,
+                                   "ref_3kg_path":ref_3kg_path,"pattern":pattern})
         df_param.to_csv(param_file,index=False,sep="\t")
                                     
         ## Change the first line of the R script so it reads the correct param file.
@@ -421,12 +451,12 @@ class GENO:
     
     
     
-    def MR_all_outcomes_result(self,p_value=0.05,results="p"):
+    def MR_all_outcomes_results(self,p_value=0.05,results="p"):
         """Function to check the status of the batchscript launched by MR_all_outcomes. 
         If it has ended properly, load the results and return the significant ones in a table.
         result="p" to return only results with p<p_value as specificed by the p_value argument, "all" for all of them
         """
-        ##Get our jobs in queue and check if the name corresponding to the prs regress job is listed.
+        ##Get our jobs in queue and check if the name corresponds to the prs regress job is listed.
         bash_name=f"MR_all_{self.name}"
         status=subprocess.run(["squeue","--me"],capture_output=True,text=True).stdout
         ##If still running: print the time it has been running as well as the last line of the job status file.
@@ -512,15 +542,23 @@ class GENO:
             ## Convert the output of the GENAL_MR.R script back to python and adjust it depending on sensitivity parameter
             if sensitivity:
                 res_p=ro.conversion.rpy2py(res[0])
+                ## If the MR_Presso was run:
                 if res_p.loc["3","pval"]<0.05:
                     res_sensi_p=ro.conversion.rpy2py(res[1][0][0])
                     MRpresso_P=res[1][0][1][0][1][0]
                     res_sensi_p["MRpresso_P"]=MRpresso_P
                     res_sensi_p["exposure"]=self.name
                     res_sensi_p["outcome"]=res_p.loc["3","outcome"]
-                    if type(res_sensi_p.iloc[1,4])=="int":
+                    ## If the MR_Presso was significant:
+                    if not np.isnan(res_sensi_p.iloc[1,4]):
                         res_sensi_p["Distortion_P"]=res[1][0][1][2][2][0]
                         res_sensi_p["N_outliers"]=len(res[1][0][1][2][0])
+                        
+                        ## Determine the SNP names of the outliers
+                        dat=ro.conversion.rpy2py(res[2])
+                        ids=res[1][0][1][2][0]
+                        Outliers=dat.iloc[ids-1].SNP.values
+                        
                     else:
                         res_sensi_p["Distortion_P"]=np.nan
                         res_sensi_p["N_outliers"]=np.nan
@@ -532,8 +570,9 @@ class GENO:
             res_p=res_p.drop(columns=["id.exposure","id.outcome"])
             res_p["exposure"]=self.name
             results=pd.concat([results,res_p])
-                
-        if sensitivity: return (results,results_sensi)
+            
+
+        if sensitivity: return (results,results_sensi,Outliers)
         else: return results
         
     
@@ -597,11 +636,12 @@ class GENO:
         """
         Standardize the Betas and adjust the SE column accordingly.
         """
-        for column in ["BETA","P"]:
+        for column in ["BETA","SE"]:
             if not(column in self.data.columns):
                 raise ValueError("The column {column} is not found in the data!".format(column=column))
         self.data["BETA"]=(self.data.BETA-np.mean(self.data.BETA))/np.std(self.data.BETA)
         self.data["SE"]=np.abs(self.data.BETA/st.norm.ppf(self.data.P/2))
+        print("The Beta column has been standardized and the SE column has been adjusted.")
 
         
     def sort_group(self,method="lowest_p"):
@@ -636,7 +676,7 @@ class GENO:
         ## Declare the plink command. Call the create_bashscript function and run it in parallel (1 job per chromosome).
         command="{} --bfile {}plinkfiltered_${{SLURM_ARRAY_TASK_ID}} --extract tmp_GENAL/{}_list.txt --max-alleles 2 " \
         "--make-bed --out tmp_GENAL/{}_chr${{SLURM_ARRAY_TASK_ID}}".format(plink2_path,ukb_geno_path,self.name, bash_name)
-        create_bashscript(job_name=bash_name, bash_output_name=f"tmp_GENAL/{bash_name}", ntasks=1, cpus=1, mem_per_cpu=10000, 
+        create_bashscript(job_name=bash_name, bash_output_name=f"tmp_GENAL/{bash_name}", ntasks=1, cpus=5, mem_per_cpu=50000, 
                           time="06:00:00",bash_filename=bash_script_name, command=command)
         subprocess.run(["sbatch", "--array", "1-22", f"{bash_script_name}"],check=True, text=True)
         
@@ -646,12 +686,24 @@ class GENO:
         create_bedlist(f"tmp_GENAL/{bedlist_name}", f"tmp_GENAL/{bash_name}")    
         bash_script_name=f"tmp_GENAL/{self.name}_merge.sh"
         bash_name=f"{self.name}_merge"
-        command = "{} --merge-list tmp_GENAL/{} --make-bed --out tmp_GENAL/{}_allchr".format(plink19_path,bedlist_name, bash_name)
+        command_merge = "{} --merge-list tmp_GENAL/{} --make-bed --out tmp_GENAL/{}_allchr".format(plink19_path,bedlist_name, bash_name)
         create_bashscript(job_name=bash_name, bash_output_name=f"tmp_GENAL/{bash_name}", ntasks=1, cpus=5, mem_per_cpu=50000, 
-                          time="06:00:00",bash_filename=bash_script_name, command=command)
+                          time="06:00:00",bash_filename=bash_script_name, command=command_merge)
         subprocess.run(["sbatch", "--array", "1-22", f"{bash_script_name}"],check=True,text=True)
         while bash_name in subprocess.run(["squeue","--me"],capture_output=True,text=True).stdout:
             time.sleep(1)
+        ## Check for the most common error that can occur in merging: multiallelic variants. If the error is present, rerun the merge excluding them.
+        if "variants with 3+ alleles present" in open(f"tmp_GENAL/{bash_name}_allchr.log").read():
+            snps_to_exclude=pd.read_csv(f"tmp_GENAL/{self.name}_merge_allchr-merge.missnp",header=None)
+            for i in range(22):
+                if os.path.isfile(f"tmp_GENAL/{self.name}_extract_chr{i}.bim"):
+                    bim=pd.read_csv(f"tmp_GENAL/{self.name}_extract_chr{i}.bim",sep="\t",header=None)
+                    if len(set(bim[1]).intersection(set(snps_to_exclude[0]))) > 0:
+                        command_extract=f"{plink19_path} --bfile tmp_GENAL/{self.name}_extract_chr{i} --exclude tmp_GENAL/{self.name}_merge_allchr-merge.missnp --make-bed --out tmp_GENAL/{self.name}_extract_chr{i}"
+                        subprocess.run(command_extract, shell=True,capture_output=True,text=True,check=False)
+            subprocess.run(["sbatch", "--array", "1-22", f"{bash_script_name}"],check=True,text=True)
+            while bash_name in subprocess.run(["squeue","--me"],capture_output=True,text=True).stdout:
+                time.sleep(1)
         
         ## Report the number of SNPs not found in UKB data
         delta_nrow=nrow-int(subprocess.check_output(['wc', '-l', f"tmp_GENAL/{bash_name}_allchr.bim"]).split()[0])
@@ -659,11 +711,12 @@ class GENO:
         return
 
         
-    def prs(self,weighted=True,maf=None,software="plink"):
+    def prs(self,weighted=True,maf=None,phenotypic_ids=True,software="plink"):
         """Compute a PRS with PRSice in UKB data on already clumped data
         If the P column is not present in the clumped data, creates a P=1 columns
         weighted=False will put all betas to 1 to create an unweighted PRS 
         maf will threshold by minor allele frequency (only available with software="prsice"
+        phenotypic_ids=True will add a column with phenotypic ID to facilitate the merge with penotype datasets
         software="plink" to choose which software to use as the results can vary, either "plink" or "prsice"
         """
         
@@ -761,9 +814,9 @@ class GENO:
         alternate_control=True if the control group is smaller than the case group (unlikely)
         fastscore=True to compute only at the main thresholds (and not in between)
         maf=None will threshold by minor allele frequency before performing the search
-        error1_code=2 allows to control the number of times PRSice should be rerun excluding duplicates. In many cases that will be 2 (default), but sometimes, only 1 time is necessary (then set erro_1_code=1), or not at all (=0)
+        error_1_code=2 allows to control the number of times PRSice should be rerun excluding duplicates. In many cases that will be 2 (default), but sometimes, only 1 time is necessary (then set error_1_code=1), or not at all (=0)
         step=5e-5 is the length of the step the software takes when iterating over the P theresholds, the lower the more precise but the more computationally intensive
-        lower=5e-8 and upper=0.5 indicate the bounds of the lookup over the P thresholds. One can start by taking big steps on a big interval and then rerun the function with smaller steps on a smaller interval around the most significant threshold to obtain a precise result.
+        lower=5e-8 and upper=0.5 indicate the bounds of the lookup over the P thresholds. A common practice is to start by taking big steps on a big interval and then rerun the function with smaller steps on a smaller interval around the most significant threshold to obtain a precise result.
         
         """
         
@@ -880,10 +933,10 @@ class GENO:
         """Perform a liftover from build 37 to 38 (possible to add other lifts later)
         Doesn't change the attributes. 
         The full data in build 38 is saved to the file name_38
-        If extraction_file==True, also print a CHR POS SNP space delimited file for extraction in All of Us
+        If extraction_file==True, also print a CHR POS SNP space delimited file for extraction in All of Us (WES data)
         If clumped==True, lift only the clumped data, otherwise the main data
         """
-        ##Check that the mandatory columns are present and create the tmp folder
+        ##Check that the mandatory columns are present, make sure the type is right, and create the tmp folder
         for column in ["CHR","POS"]:
             if not(column in self.data.columns):
                 raise ValueError("The column {column} is not found in the data!".format(column=column))
