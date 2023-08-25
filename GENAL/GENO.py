@@ -43,6 +43,10 @@ def Combine_GENO(Gs,name="noname",clumped=False, skip_checks=False):
     C=C.reset_index(drop=True)
     return(GENO(C,name=name,clumped=clumped, skip_checks=skip_checks))
 
+
+
+
+
 def delete_tmp():
     """
     Delete the tmp folder.
