@@ -11,7 +11,8 @@ tovcf <- function(data,path,name){
                   snp=data$SNP,
                   effect=data$BETA, 
                   se=data$SE,
-                  pval=data$P, ea_af=data$EAF,
+                  pval=data$P, 
+                      ea_af=data$EAF,
                       name=name)
     writeVcf(out, file=path)
     
