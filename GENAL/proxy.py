@@ -21,7 +21,7 @@ from .config import *
 
 def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     """
-    Given a dataframe of data (coming from GENO.data) and a dataframe of potential proxies (output from find_proxies), extract the best proxies from df as well as the SNPs in snps_to_extract. (Suited for outcome data.)
+    Given a dataframe df (coming from GENO.data) and a dataframe of potential proxies (output from find_proxies), extract the best proxies from df as well as the SNPs in snps_to_extract. (Suited for outcome data.)
     df: dataframe of SNP information with the usual GENO columns (SNP,BETA,SE,EAF,EA,NEA) - EAF is not necessary
     ld: dataframe of proxies (output from find_proxies)
     snps_present: list of SNPs to extract in addition to the proxies
@@ -71,7 +71,7 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
 def apply_proxies(df, ld, searchspace=np.empty(0)):
     """
     Given a dataframe (coming from GENO.data or GENO.data_clumped attributes) and a dataframe of proxies (output from find_proxies), replace the SNPs in df with their best proxies, if it exists. (Suited for exposure data.)
-    searchspace=[]: list of SNPs to restrict the list of potential proxies. By default, include all the proxies found. Using a searchspace can be done either at the find_proxies step or at this step, but it is way faster to use it here.
+    searchspace=[]: list of SNPs to restrict the list of potential proxies. By default, include all the proxies found. Using a searchspace can be done either at the find_proxies step or at this step, but it is much faster to use it here.
     df: dataframe of SNP information with the usual GENO columns (SNP,BETA,SE,EAF,EA,NEA) - EAF is not necessary
     ld: dataframe of proxies (output from find_proxies)
     """

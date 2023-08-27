@@ -6,6 +6,7 @@ import datetime
 import pysam
 import os
 import subprocess
+from collections import Counter
 from tqdm import tqdm
 import scipy.stats as st
 from pandas.api.types import is_numeric_dtype
@@ -14,18 +15,17 @@ from rpy2.robjects.conversion import localconverter
 from GENAL import PRS
 import glob
 import copy
-from pyliftover import LiftOver
-import wget
-import gzip
-import shutil
-from concurrent.futures import ThreadPoolExecutor
 #import dask.array as da
 #import dask.dataframe as dd
 #import h5py
+from functools import partial
 
 from .config import *
 from .proxy import *
 from .MR import *
+from .MR_tools import *
+from .clump import *
+from .lift import *
 
 ## Create folders for temporary files and GENAL_MR
 if not os.path.exists("tmp_GENAL"):
@@ -42,10 +42,6 @@ def Combine_GENO(Gs,name="noname",clumped=False, skip_checks=False):
             C=pd.concat([C,G.data])
     C=C.reset_index(drop=True)
     return(GENO(C,name=name,clumped=clumped, skip_checks=skip_checks))
-
-
-
-
 
 def delete_tmp():
     """
@@ -75,227 +71,326 @@ class COV:
 
 
 class GENO:
-    def __init__(self, df, name="noname", CHR="CHR",POS="POS",SNP="SNP",EA="EA",NEA="NEA",BETA="BETA",SE="SE",P="P",EAF="EAF", adjust_snpids=False, adjust_coordinates=False, keep_na=False, keep_multi=False, keep_dups=False, ref_panel="multi",  effect_column="", clumped="", ref_df=None, skip_checks=False, keep_columns=False):
+    REF_DATASETS = ["multi","eur","sas","eas","amr"]
+    REF_PANELS = ["EUR","SAS","EAS","AMR"]
+    
+    def __init__(self, df, name="noname", CHR="CHR",POS="POS",SNP="SNP",EA="EA",NEA="NEA",BETA="BETA",SE="SE",P="P",EAF="EAF", fill_snpids=None, fill_coordinates=None, keep_na=False, keep_multi=False, keep_dups=False, reference_panel="multi",  effect_column=None, clumped=None, reference_df=None, skip_checks=False, keep_columns=False):
         """Declare a GENO object used to store and transform data from a GWAS or derived from a GWAS. It does not include information related to individuals, only related to SNPs.
         To declare a GENO object, one needs a dataframe where each line is a SNP. Column names are specified by passing the corresponding arguments: CHR for chromosome, POS for genomic position, SNP for rsID, EA for effect allele, NEA for non-effect allele, BETA for the effect column, SE for standard error, P for p-value, EAF for effect allele frequency.
         The presence of all columns is not required to declare a GENO object, but certain methods require some of them.
-        If you wish to update the rsID from CHR and POS based on a 1k genome reference, use adjust_snpid=True.
-        If you wish to update the CHR and/or POS from rsID based on a 1k genome reference, use adjust_coordinates=True.
+        If you wish to update the rsID from CHR and POS based on a 1k genome reference, use fill_snpid=True.
+        If you wish to update the CHR and/or POS from rsID based on a 1k genome reference, use fill_coordinates=True.
         If you wish to keep the NA values in the data, use keep_na=True, otherwise they will be deleted.
         GENO will try to determine whether the effect column are Betas or Odds Ratios and log-transform appropriately. If you want to override this guessing, specify effect_column with "BETA" or "OR" values.
         GENO will try to determine whether the data is clumped or not. If you want to override this guessing, specify clumped argument (True or False).
         keep_multi=False to remove multiallelic SNPs. 
         keep_dups=False to delete rows with duplicated SNP ids and keep the first line.
-        ref_panel="multi" The reference panel to use for SNP adjustments. "multi" uses a multi-ancestry reference panel. Otherwise, "eur", "amr", "sas", "eas" according to the 1k genome classification. "multi" contains the largest amount of SNPs.
-        ref_df=None A dataframe to use as reference panel. Must use the same column names as GENO objects. If provided, ref_panel argument is not considered.
+        reference_panel="multi" The reference panel to use for SNP adjustments. "eur", "amr", "sas", "eas" according to the 1k genome classification. "multi" combines the reference panels and contains the largest number of SNPs.
+        reference_df=None A dataframe to use as reference panel. Must use the same column names as GENO objects. If provided, ref_panel argument is not considered.
         skip_checks=False To skip all formatting checks if value is True.
         keep_columns=False Will delete all columns which are not included in (CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF). Can avoid inconsistencies in some methods.
         """
-        data=df.copy()
+        #self.check_arguments() todo
         
+        self.data=df.copy()
+
         ## Skip checks
         if not skip_checks:
-            ## Keep only the main columns and rename them to our standard names
-            if not keep_columns:
-                data=data.loc[:,data.columns.isin([CHR,POS,SNP,EA,NEA,BETA,SE,P,EAF])]
-            data.rename(columns={CHR:"CHR", POS:"POS", SNP:"SNP", EA:"EA", NEA:"NEA", BETA:"BETA", SE:"SE", P:"P", EAF:"EAF"}, inplace=True)
+            
+            ## Keep only the main columns and rename them to the standard names
+            self.adjust_column_names(CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns)
 
-            ## Make sure the CHR and POS columns are integer (pandas int) and not float or else
+            ## Check that the CHR and POS columns are integers (pandas int) and not float or else
             for int_col in ["CHR", "POS"]:
-                if int_col in data.columns:
-                    nrows = data.shape[0]
-                    data[int_col] = pd.to_numeric(data[int_col], errors="coerce")
-                    n_nonint = data[int_col].isna().sum()
-                    data.dropna(subset=[int_col], inplace=True)
-                    data[int_col] = data[int_col].astype('Int64')
-                    if n_nonint > 0:
-                        print(f"Deleting {n_nonint}({n_nonint/nrows*100:.3f}%) rows with non-digit values in the {int_col} column. If you want to keep these rows, change the non-digit values to digit values.")
+                if int_col in self.data.columns:
+                    self.check_int_column(int_col)
 
-            ## Check the ref argument
-            ref_panel=ref_panel.lower()
-            if ref_panel not in ["multi","eur","sas","eas","amr"]:
-                raise ValueError("The ref_panel argument can only take values in ('multi','eur','sas','eas','amr') depending on the reference panel to be used.")
-            if ref_df is not None:
-                print("Using ref_df passed as argument.")
-                ref=ref_df
-
-            ## If SNP missing but CHR and POS present: use them to fill in the SNP based on reference data
-            ## Perform the same if adjust_snpid==True
-            ## If not all snpids are present in the ref data, it will use the original one to fill the missing values
-            ## And if some snpids are still missing, they will be replaced by a standard name: CHR:POS:EA 
-            if (("CHR" in data.columns) & ("POS" in data.columns) & ("SNP" not in data.columns)) or adjust_snpids==True:
-                for column in ["CHR","POS"]:
-                    if not(column in data.columns):
-                        raise ValueError(f"The column {column} is not found in the data and is mandatory to adjust rsID!")
-                if "ref" not in locals():
-                    ref = pd.read_hdf(f"{ref_3kg_path}{ref_panel}.h5", key="data")
-                    ref.columns = ["CHR","SNP","POS","A1","A2"]
-
-                data.rename(columns={"SNP":"SNP_original"}, inplace=True, errors="ignore")
-                data=data.merge(ref[["CHR","POS","SNP"]],on=["CHR","POS"],how="left")
-                if "SNP_original" in data.columns:
-                    data["SNP"]=data["SNP"].combine_first(data["SNP_original"])
-                    data.drop(columns="SNP_original", inplace=True)
-                if ("EA" in data.columns):
-                    data["SNP"] = np.where(data.SNP.isna(), data.CHR.astype(str) + ":" + data.POS.astype(str) + ":" + data.EA.astype(str), data.SNP)
-                print("The SNP column has been created.")
-
-            ## If CHR and/or POS columns missing but SNP present: use SNP to fill them based on reference data
-            ## Perform the same if adjust_coordinates==True
-            if ((("CHR" not in data.columns) | ("POS" not in data.columns)) & ("SNP" in data.columns)) or adjust_coordinates==True:
-                if "ref" not in locals():
-                    ref = pd.read_hdf(f"{ref_3kg_path}{ref_panel}.h5", key="data")
-                    ref.columns = ["CHR","SNP","POS","A1","A2"]
-                for column in ["CHR","POS"]:
-                    if column in data.columns:
-                        data.drop(columns=column, inplace=True)
-                data = data.merge(ref[["CHR","POS","SNP"]],on="SNP",how="left")
-                data["CHR"] = data["CHR"].astype('Int64')
-                data["POS"] = data["POS"].astype('Int64')
-                print("The coordinates columns (CHR for chromosome and POS for position) have been created.")
-
-
+            ## If SNP missing but CHR and POS present (or fill_snpid=True): fill the SNP column based on reference data 
+            if ((("CHR" in self.data.columns) & ("POS" in self.data.columns) & ("SNP" not in self.data.columns)) or fill_snpids==True) and (not fill_snpids==False):
+                self.fill_snpids(self.get_reference_panel(reference_panel, reference_df))
+                
+            ## If CHR and/or POS columns missing and SNP present (or fill_coordinates=True): fill CHR/POS based on reference data
+            if (((("CHR" not in self.data.columns) | ("POS" not in self.data.columns)) & ("SNP" in self.data.columns)) or fill_coordinates==True) and (not fill_coordinates==False):
+                self.fill_coordinates(self.get_reference_panel(reference_panel, reference_df))
+            
             ## If NEA column is missing but EA and CHR/POS are present: fill it based on reference data
-            if (("CHR" in data.columns) & ("POS" in data.columns) & ("NEA" not in data.columns) & ("EA" in data.columns)):
-                if "ref" not in locals():
-                    ref = pd.read_hdf(f"{ref_3kg_path}{ref_panel}.h5", key="data")
-                    ref.columns = ["CHR","SNP","POS","A1","A2"]
-                data = data.merge(ref[["CHR","POS","A1","A2"]],on=["CHR","POS"],how="left")
-                data["NEA"] = np.where(data["EA"]==data["A1"], data["A2"], np.where(data["EA"]==data["A2"], data["A1"],np.nan))     
-                data.drop(columns=["A1","A2"], inplace=True)
-                print("The NEA (Non Effect Allele) column has been created.")
+            if (("CHR" in self.data.columns) & ("POS" in self.data.columns) & ("NEA" not in self.data.columns) & ("EA" in self.data.columns)):
+                self.fill_nea(self.get_reference_panel(reference_panel, reference_df))
 
             ## If NEA and EA columns are missing but CHR/POS are present: fill them based on reference data
-            if (("CHR" in data.columns) & ("POS" in data.columns) & ("NEA" not in data.columns) & ("EA" not in data.columns)):
-                if "BETA" in data.columns:
-                    print("Warning: You have specified an effect (BETA) column but no effect allele (EA) column. An effect estimate is only meaningful if paired with the allele corresponding to the effect.")
-                else:
-                    if "ref" not in locals():
-                        ref = pd.read_hdf(f"{ref_3kg_path}{ref_panel}.h5", key="data")
-                        ref.columns = ["CHR","SNP","POS","A1","A2"]
-                    data=data.merge(ref[["CHR","POS","A1","A2"]],on=["CHR","POS"],how="left")
-                    data.rename(columns={"A1":"EA","A2":"NEA"}, inplace=True)
-                    print("Added alleles columns: effect (EA) and non-effect allele (NEA).")
+            if (("CHR" in self.data.columns) & ("POS" in self.data.columns) & ("NEA" not in self.data.columns) & ("EA" not in self.data.columns)):
+                self.fill_ea_nea(self.get_reference_panel(reference_panel, reference_df))
 
+            ## Transform the effect column to Beta estimates if necessary
+            if "BETA" in self.data.columns:
+                self.check_beta_column(effect_column)
 
-            ## Make sure the P column is numeric 
-            if "P" in data.columns:
-                try:
-                    data["P"] = pd.to_numeric(data["P"])
-                except ValueError:
-                    raise Exception(f"The P-value column is not numeric.")
+            ## Make sure the P column has appropriate values.
+            if "P" in self.data.columns:
+                self.check_p_column()
+                
+            ## If one of SE or P column missing but the other and BETA are present: fill it
+            self.fill_se_p()
 
-            ## If SE column missing but BETA and P present: use them to fill in SE
-            if (("P" in data.columns) & ("BETA" in data.columns)& ("SE" not in data.columns)):
-                data["SE"] = np.abs(data.BETA/st.norm.ppf(data.P/2))
-                print("The SE (Standard Error) column has been created.")
-
-            ## If P column missing but BETA and SE present: use them to fill in P
-            if (("SE" in data.columns) & ("BETA" in data.columns)& ("P" not in data.columns)):
-                data["P"] = 2*(1-st.norm.cdf(np.abs(data.BETA)/data.SE))
-                print("The P (P-value) column has been created.")
-
-            ## Guess if effect column is OR or BETA if no effect_column argument is passed
-            if "BETA" in data.columns:
-                if effect_column=="":
-                    median=np.median(data.BETA)
-                    if np.abs(median-1)<np.abs(median):
-                        effect_column="OR"
-                        print("The BETA column looks like Odds Ratios. Use effect_column='BETA' if it is a column of Betas.")
-                    else:
-                        effect_column="BETA"
-                        print("The BETA column looks like Betas. Use effect_column='OR' if it is a column of Odds Ratios.")
-
-                ## Log transform the effect column if appropriate
-                if effect_column not in ["BETA","OR"]:
-                    raise ValueError("The argument effect_column accepts only 'BETA' or 'OR' as values!")
-                if effect_column=="OR":
-                    data["BETA"]=np.log(data["BETA"])
-                    print("The BETA column has been log-transformed to obtain Betas.")
-
-            ## NA handling: if keep_na==False: return the number of rows with missing values and delete them.
-            if keep_na==False:
-                nrow=data.shape[0]
-                columns_na=data.columns[data.isna().any()].tolist()
-                data.dropna(inplace=True)
-                n_na=nrow-data.shape[0]
-                if n_na>0:
-                    print(f"Deleting {n_na}({n_na/nrow*100:.3f}%) rows containing NaN values in columns {columns_na}. Use keep_na=True to keep the rows containing NaN values.")
-
-            ## Make sure the alleles columns are upper case strings and delete non-letters rows. Also delete multiallelic SNPs.
+            ## Make sure the alleles columns are upper case strings and delete non-letters rows. Also delete multiallelic SNPs unless keep_multi=True.
             for allele_col in ["EA","NEA"]:
-                if allele_col in data.columns:
-                    data[allele_col]=data[allele_col].astype(str).str.upper()
-                    nrow=data.shape[0]
-                    data = data[data[allele_col].str.isalpha()]
-                    n_nonletters=nrow-data.shape[0]
-                    if n_nonletters>0:
-                        print(f"Deleting {n_nonletters}({n_nonletters/nrow*100:.3f}%) rows containing non letters values in alleles column.")
-                    if not keep_multi:
-                        nrow=data.shape[0]
-                        data=data[data[allele_col].str.len()==1]
-                        n_multi=nrow-data.shape[0]
-                        if n_multi>0:
-                            print(f"Deleting {n_multi}({n_multi/nrow*100:.3f}%) rows containing multiallelic SNPs ({allele_col} column). Use keep_multi=True to keep them.")
-                            
+                if allele_col in self.data.columns:
+                    self.check_allele_column(allele_col, keep_multi)    
                     
+            ## Check whether some SNPs are present more than once based on the SNP column. Delete them if keep_dups=False.
+            if "SNP" in self.data.columns and not keep_dups:
+                self.check_snp_column()
+         
             ## Check the presence of the main columns and throw warnings if they are not present
             for column in ["CHR","POS","SNP","EA","NEA","BETA","SE","P"]:
-                if not(column in data.columns):
-                    print(f"Warning: the data doesn't include a {column} column. This may become an issue later on.")
-
-            ## Check whether some SNPs are present more than once, based on SNP, and throw warning if that's the case.
-            if "SNP" in data.columns:
-                dup_snp=data.SNP.duplicated().sum()
-                if dup_snp>0:
-                    print(f"Warning: {dup_snp} SNPs are duplicated based on the SNP column. This can lead to errors in analyses.")
-                    if not keep_dups:
-                        data=data.groupby("SNP").first()
-                        data.reset_index(drop=False, inplace=True)
-                        print(f"{dup_snp} duplicated SNPs have been removed. Use keep_dups=True to keep them.")
-
-            ## Guess if the data is clumped or not if no clumped argument is passed
-            ## Verify that the p-value column has appropriate values
-            p_max = data["P"].max()
-            if p_max > 1:
-                print("The p-value column has values above 1. Deleting corresponding rows.")
-                nrow = data.shape[0]
-                data = data[data.P<=1]
-                n_diff = nrow-data.shape[0]
-                if n_diff > 0:
-                    print(f"{n_diff} ({n_diff/nrow*100:.3f}%) have been deleted due to containing P-values above 1.")
-            if ("P" in data.columns) and (clumped==""):
-                if p_max<0.1:
-                    print("This data looks clumped. Use clumped=False if it is not.")
-                    clumped=True
-                else:
-                    print("This data looks not clumped. Use clumped=True if it is.")
-                    clumped=False
+                if not(column in self.data.columns):
+                    print(f"Warning: the data doesn't include a {column} column. This may become an issue later on.")       
                     
-            ## Reset index
-            data.reset_index(drop=True, inplace=True)
-            
-        ##Name
-        self.name=name
-        if name=="noname":
-            print("You haven't passed a specific name to this GENO instance. It is recommended if you are working with several GENO objects.")
+            ## NA handling: if keep_na==False: return the number of rows with missing values and delete them.
+            if keep_na==False:
+                self.remove_na()
                 
-        ## Assign the main attribute: .data
-        self.data=data
+            ## Reset index
+            self.data.reset_index(drop=True, inplace=True)
+            
+        ##Initialize attributes
+        self.init_attributes(name, clumped)
         
-        self.outcome = [] #Initialize the outcome attribute
-        
+        return
+
+    def init_attributes(self, name, clumped):
+        """
+        Initialize the name and outcome attributes.
+        Guess if the data is clumped or not and set the data_clumped attribute accordingly.
+        Initialize the ram and cpus attributes.
+        """
+        self.name = name
+        if name == "noname":
+            print("You haven't passed a specific name to GENO. It is recommended if you are working with several GENO objects.")
+        self.outcome = []
+        # Guess if clumped or not
+        if clumped is None:
+            if self.data["P"].max()<0.1:
+                print("This data looks clumped. Use clumped=False if it is not.")
+                clumped=True
+            else:
+                print("This data looks not clumped. Use clumped=True if it is.")
+                clumped=False
         ## If the data is already clumped (clumped=True): also assign the data to self.data_clumped
         if clumped==True:
-            self.data_clumped=data
-                
+            self.data_clumped=self.data
         ## Set the maximal amount of ram/cpu to be used by the methods and dask chunksize
-        ram=subprocess.run(["grep MemTotal /proc/meminfo"],shell=True,capture_output=True,text=True,check=True)
-        ram=[int(s) for s in ram.stdout.split() if s.isdigit()][0]
-        self.ram=round((ram/1000),-3)-1000
-        self.cpus=os.cpu_count()
-        self.chunksize=round((self.ram*0.8*1024**2) / (1000*self.cpus) / 100000)*100000
+        ram = subprocess.run(["grep MemTotal /proc/meminfo"], shell=True, capture_output=True, text=True, check=True)
+        ram = [int(s) for s in ram.stdout.split() if s.isdigit()][0]
+        self.ram = round((ram/1000),-3)-1000
+        self.cpus = os.cpu_count()
+        self.chunksize = round((self.ram*0.8*1024**2) / (1000*self.cpus) / 100000)*100000
+        return
+
+    def check_snp_column(self):
+        """
+        Remove the duplicates in the SNP column.
+        """
+        duplicates = self.data.duplicated(subset=["SNP"], keep="first")
+        self.data = self.data[~duplicates]
+        n_del = duplicates.sum()
+        if n_del > 0:
+            print(f"{n_del}({n_del/self.data.shape[0]*100:.3f}%) duplicated SNPs have been removed. Use keep_dups=True to keep them.")  
+        return
         
+    def check_allele_column(self, allele_col, keep_multi):
+        """
+        Verify that the corresponding allele column is upper case strings. Delete strings which are not formed with A, T, C, G letters. 
+        Delete multiallelic SNPs unless keep_multi=True.
+        """
+        self.data[allele_col] = self.data[allele_col].astype(str).str.upper()
+        nrows = self.data.shape[0]
+        self.data = self.data[self.data[allele_col].str.contains('^[ATCG]+$')]
+        n_del = nrows-self.data.shape[0]
+        if n_del>0:
+            print(f"Deleting {n_del}({n_del/nrows*100:.3f}%) rows containing values different than strings formed with A, T, C, G letters in column {allele_col}.")
+        if not keep_multi:
+            nrows = self.data.shape[0]
+            self.data = self.data[self.data[allele_col].str.len()==1]
+            n_del = nrows-self.data.shape[0]
+            if n_del>0:
+                print(f"Deleting {n_del}({n_del/nrows*100:.3f}%) rows containing multiallelic SNPs in {allele_col} column. Use keep_multi=True to keep them.")
+        return
+        
+    def remove_na(self):
+        """
+        Identify the columns containing NA values. Delete corresponding rows.
+        """
+        nrows = self.data.shape[0]
+        columns_na = self.data.columns[self.data.isna().any()].tolist()
+        self.data.dropna(inplace=True)
+        n_del = nrows - self.data.shape[0]
+        if n_del>0:
+            print(f"Deleted {n_del}({n_del/nrows*100:.3f}%) rows containing NaN values in columns {columns_na}. Use keep_na=True to keep the rows containing NaN values.")
+        return
+        
+    def check_beta_column(self, effect_column=None):
+        """
+        If the BETA column is a column of odds ratios, log-transform it.
+        If no effect_column argument is specified, guess if the BETA column are beta estimates or odds ratios.
+        """
+        if effect_column is None:
+            median=np.median(self.data.BETA)
+            if 0.5 < median < 1.5:
+                effect_column="OR"
+                print("The BETA column looks like Odds Ratios. Use effect_column='BETA' if it is a column of Beta estimates.")
+            else:
+                effect_column="BETA"
+                print("The BETA column looks like Betas. Use effect_column='OR' if it is a column of Odds Ratios.")
+
+        ## Log transform the effect column if appropriate
+        if effect_column not in ["BETA","OR"]:
+            raise ValueError("The argument effect_column accepts only 'BETA' or 'OR' as values.")
+        if effect_column=="OR":
+            self.data["BETA"]=np.log(self.data["BETA"])
+            self.data.drop(columns="SE", errors="ignore")
+            print("The BETA column has been log-transformed to obtain Beta estimates.")
+        return
+        
+    def fill_se_p(self):
+        """
+        If one column among P, SE is missing but the other and BETA are present, fill it.
+        """
+        # If SE is missing
+        if (("P" in self.data.columns) & ("BETA" in self.data.columns) & ("SE" not in self.data.columns)):
+            self.data["SE"] = np.where(self.data["P"]<1, 
+                                       np.abs(self.data.BETA/st.norm.ppf(self.data.P/2)), 
+                                       0)
+            print("The SE (Standard Error) column has been created.")
+        # If P is missing
+        if (("SE" in self.data.columns) & ("BETA" in self.data.columns) & ("P" not in self.data.columns)):
+            self.data["P"] = np.where(self.data["SE"]>0, 2*(1-st.norm.cdf(np.abs(self.data.BETA)/self.data.SE)), 1)
+            print("The P (P-value) column has been created.")
+        return
+        
+    def check_p_column(self):
+        """
+        Verify that the P column contains numeric values in the range [0,1]. Delete rows with non-appropriate values. 
+        Based on the maximal p-value, guess if the data is clumped or not.
+        """
+        nrows = self.data.shape[0]
+        self.data["P"] = pd.to_numeric(self.data["P"], errors="coerce")
+        self.data.dropna(subset=["P"], inplace=True)
+        self.data = self.data[(self.data['P'] >= 0) & (self.data['P'] <= 1)]
+        n_del = nrows - self.data.shape[0]
+        if n_del > 0:
+            print(f"Deleting {n_del}({n_del/nrows*100:.3f}%) rows due to 'P' column values being non numeric or out of range [0,1].")
+        return
+        
+    def fill_ea_nea(self, reference_panel_df):
+        """
+        Fill in the EA and NEA columns based on reference data.
+        """
+        if "BETA" in self.data.columns:
+            print("Warning: You have specified an effect (BETA) column but no effect allele (EA) column. An effect estimate is only meaningful if paired with its corresponding allele.")
+        self.data = self.data.merge(reference_panel_df[["CHR","POS","A1","A2"]],on=["CHR","POS"],how="left")
+        self.data.rename(columns={"A1":"EA","A2":"NEA"}, inplace=True)
+        print("Added alleles columns: effect (EA) and non-effect allele (NEA).")
+        return
+        
+    def fill_nea(self, reference_panel_df):
+        """
+        Fill in the NEA column based on reference data.
+        """
+        self.data = self.data.merge(reference_panel_df[["CHR","POS","A1","A2"]], on=["CHR","POS"], how="left")
+        conditions = [
+            self.data["EA"] == self.data["A1"],
+            self.data["EA"] == self.data["A2"]]
+        choices = [self.data["A2"], self.data["A1"]]
+        self.data["NEA"] = np.select(conditions, choices, default=np.nan)
+        self.data.drop(columns=["A1","A2"], inplace=True)
+        print("The NEA (Non Effect Allele) column has been created.")
+        return
+        
+    def fill_coordinates(self, reference_panel_df):
+        """
+        Fill in the CHR/POS columns based on reference data.
+        """
+        if not "SNP" in self.data.columns:
+            raise ValueError(f"The SNP column is not found in the data and is mandatory to fill coordinates!")
+        self.data.drop(columns=["CHR", "POS"], inplace=True, errors="ignore")
+        self.data = self.data.merge(reference_panel_df[["CHR","POS","SNP"]],on="SNP",how="left")
+        self.data["CHR"] = self.data["CHR"].astype('Int32')
+        self.data["POS"] = self.data["POS"].astype('Int32')
+        print("The coordinates columns (CHR for chromosome and POS for position) have been created.") 
+        return
+ 
+    def fill_snpids(self, reference_panel_df):
+        """
+        Fill in the SNP column based on reference data.
+        If not all SNPids are present in the reference panel, the original ones will be used to fill the missing values.
+        If some SNPids are still missing, they will be replaced by a standard name: CHR:POS:EA 
+        """
+        for column in ["CHR","POS"]:
+            if not(column in self.data.columns):
+                raise ValueError(f"The column {column} is not found in the data and is mandatory to fill snpID!")
+        self.data.rename(columns={"SNP":"SNP_original"}, inplace=True, errors="ignore")
+        self.data = self.data.merge(reference_panel_df[["CHR","POS","SNP"]], on=["CHR","POS"], how="left")
+        if "SNP_original" in self.data.columns:
+            self.data["SNP"]=self.data["SNP"].combine_first(self.data["SNP_original"])
+            self.data.drop(columns="SNP_original", inplace=True)
+        if ("EA" in self.data.columns):
+            missing_snp_condition = self.data["SNP"].isna()
+            self.data.loc[missing_snp_condition, "SNP"] = (
+                self.data.loc[missing_snp_condition, "CHR"].astype(str) + ":" + 
+                self.data.loc[missing_snp_condition, "POS"].astype(str) + ":" + 
+                self.data.loc[missing_snp_condition, "EA"].astype(str)
+            )
+        print("The SNP column has been created.")
+        return
+
+    def get_reference_panel(self, reference_panel="multi", reference_df=None):
+        """
+        Return the reference panel dataframe. 
+        First, try to use the reference_df argument if passed. Otherwise, load it with the panel specified in reference_panel.
+        """
+        if not hasattr(self, "reference_panel"):
+            if reference_df is not None:
+                print("Using reference_df passed as argument as the reference panel.")
+                self.reference_panel = reference_df
+            else:
+                reference_panel = reference_panel.lower()
+                if reference_panel not in self.REF_DATASETS:
+                    raise ValueError(f"The reference_panel argument can only take values in {self.REF_DATASETS} depending on the reference panel to be used.")
+                self.reference_panel = pd.read_hdf(f"{ref_3kg_path}{reference_panel}.h5", key="data")
+                self.reference_panel.columns = ["CHR","SNP","POS","A1","A2"]
+                print(f"Loading the {reference_panel} reference panel.")
+        return self.reference_panel
+    
+    def check_int_column(self, int_col):
+        """
+        Set the type of the int_col column to Int64 and delete rows with non-integer values.
+        """
+        nrows = self.data.shape[0]
+        self.data[int_col] = pd.to_numeric(self.data[int_col], errors="coerce")
+        self.data.dropna(subset=[int_col], inplace=True)
+        self.data = self.data[self.data[int_col].apply(lambda x: x == int(x))]
+        self.data[int_col] = self.data[int_col].astype('Int32')
+        n_del = nrows - self.data.shape[0]
+        if n_del > 0:
+            print(f"Deleting {n_del}({n_del/nrows*100:.3f}%) rows with non-integer values in the {int_col} column.")
+        return
+
+    def adjust_column_names(self, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns):
+        """
+        Rename columns to the standard names making sure that there are no duplicated names.
+        Delete other columns if keep_columns=False
+        """
+        rename_dict = {CHR:"CHR", POS:"POS", SNP:"SNP", EA:"EA", NEA:"NEA", BETA:"BETA", SE:"SE", P:"P", EAF:"EAF"}
+        if not keep_columns:
+            self.data = self.data.loc[:,self.data.columns.isin([CHR,POS,SNP,EA,NEA,BETA,SE,P,EAF])]
+        self.data.rename(columns = rename_dict, inplace=True)
+        #Check duplicated column names
+        column_counts = Counter(self.data.columns)
+        duplicated_columns = [col for col, count in column_counts.items() if (count > 1) and (col in rename_dict.values())]
+        if duplicated_columns:
+            raise ValueError(f"The resulting dataframe has duplicated columns. Make sure your dataframe does not have a different column named as {duplicated_columns}.")
+        return
 
     def copy(self):
         """
@@ -307,7 +402,7 @@ class GENO:
         return Copy
         
     
-    def vcf(self,clumped=False,name="",gz=False):
+    def vcf(self,name="",clumped=False,gz=False):
         """
         Save the current data to vcf and vcf.gz/vcf.gz.tbi in the current directory to be used as MR outcome. 
         Delete rows with non-ATCG values in EA or NEA columns.
@@ -624,9 +719,7 @@ class GENO:
         outcome: can be a GENO object (from a GWAS) or a filepath of the following types: .h5 or .hdf5 (output of the .save() attribute);
         kb=5000: width of the genomic window to look for proxies
         r2=0.6: minimum linkage disequilibrium value with the main SNP for a proxy to be included 
-        window_snps=5000: compute the LD value for SNPs that are not more than x SNPs apart from the main SNP
-        Save the results (Tables and plots) in a folder MR_{self.name}.
-        
+        window_snps=5000: compute the LD value for SNPs that are not more than x SNPs apart from the main SNP        
         """   
         ## Check that data_clumped attribute exists
         if not(hasattr(self,"data_clumped")):
@@ -667,7 +760,7 @@ class GENO:
         exposure_snps = set(self.data_clumped.SNP.values)
         snps_present = exposure_snps & outcome_snps
         print(f"{len(snps_present)} SNPs out of {len(exposure_snps)} are present in the outcome data.")
-        if proxy:
+        if proxy and (len(exposure_snps) - len(snps_present) > 0):
             snps_absent = exposure_snps - snps_present
             print(f"Searching proxies for {len(snps_absent)} SNPs...")
             ld = find_proxies(snps_absent, ancestry=ancestry, kb=kb,r2=r2, window_snps=window_snps, threads=self.cpus) #Find proxies for absent SNPs
@@ -683,22 +776,28 @@ class GENO:
         
         return
     
-    def MR_python (self, action = 2, eaf_threshold=0.42, sensitivity=False,n=10000):
+    def MR_python (self, methods = ["IVW","WM","Egger"], action = 2, eaf_threshold=0.42, nboot = 10000):
         """
         Run a Mendelian Randomization with the clumped_data as exposure and the outcome(s) queried with the query_outcome() method.
+        methods = ["IVW"]: a list of MR methods to run. Possible choices are "IVW": inverse variance-weighted; "WM": weighted median; "Egger": egger regression
         action=2: Determines how to treat palindromes in the harmonizing step between exposure and outcome data. 
             =1: Doesn't attempt to flip them (= Assume all alleles are coded on the forward strand)
             =2: Use allele frequencies (EAF) to attempt to flip them (conservative, default)
             =3: Remove all palindromic SNPs (very conservative).
         eaf_threshold=0.42: Maximal effect allele frequency accepted when attempting to flip palindromic SNPs (only relevant if action=2)
-        sensitivity=False to determine if MRPresso is run in case of a significant inverse variance weighted result. If sensitivity=True, the function returns 2 dataframes with the second one being the MRPresso results.
-        n=10000 is the number of MRPresso permutations performed. This only applies if sensitivity=True
-        
+        nboot = 10000: number of bootstrap replications (for methods WM)
+
+        return: a table with the MR results
         %%To do: implement cases when NEA is absent from exposure and/or outcome
         """  
         ## Check that action argument is a correct input
         if (action not in [1,2,3]):
             raise ValueError("The action argument only takes 1,2 or 3 as value")
+            
+        ## Check the methods argument
+        valid_methods = ["IVW", "WM", "Egger"]
+        if not all(m in valid_methods for m in methods):
+            raise ValueError(f"The list of methods can only contain strings in {valid_methods}")
             
         ## Check that query_outcome has been called
         if not hasattr(self, "outcome"):
@@ -716,12 +815,22 @@ class GENO:
                 print("Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3).")
                 action = 3
         
-        df = harmonize_MR(df_exposure, df_outcome, action = action, eaf_threshold = eaf_threshold)
-        df_mr = harmonize_MR[["EA_e","NEA_e","EA_o","NEA_o"]]
-        
-        
-            
-        return df
+        df_harmonized = harmonize_MR(df_exposure, df_outcome, action = action, eaf_threshold = eaf_threshold)
+        df_mr = df_harmonized[["BETA_e","SE_e","BETA_o","SE_o"]].dropna()
+                
+        ## Mapping the methods passed as argument to the corresponding functions and freeze arguments
+        function_map = {"IVW": partial(mr_ivw, df_mr), "WM": partial(mr_weighted_median, df_mr, nboot), "Egger": partial(mr_egger_regression, df_mr)}
+        results = []
+        for method in methods:
+            func = function_map.get(method, None)
+            result = func()
+            results.extend(result)
+        res = pd.DataFrame(results)
+        res["exposure"] = self.name
+        res["outcome"] = self.outcome[2]
+        res = res[["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]
+ 
+        return res
             
             
     
@@ -816,46 +925,26 @@ class GENO:
        
 
             
-    def clump(self,kb=250, r2=0.1,p1=5e-8,p2=0.01):
+    def clump(self, kb=250, r2=0.1, p1=5e-8, p2=0.01, reference_panel="EUR"):
         """ Clump the data in .data and assign it to the .data_clumped attribute. The clumping is done with plink.
         kb sets in thousands the window for the clumping
         r2 sets the linkage disequilibrium threshold 
         p1 sets the p-value used during the clumping (the SNPs above this threshold are not considered)
         p2 sets the p-value used after the clumping to further filter the clumped SNPs (set p2<p1 to not use this
+        reference_panel="EUR" The reference population to get linkage disequilibrium values. Takes values in "EUR", "SAS", "AFR", "EAS", "AMR".
         """
-        ## Check the existence of the required columns. Create the tmp file if necessary.
-        for column in ["SNP","P"]:
-            if not(column in self.data.columns):
-                raise ValueError("The column {column} is not found in the data!".format(column=column))
-        if not os.path.exists("tmp_GENAL"):
-            os.makedirs("tmp_GENAL")
+        #Check input 
+        reference_panel = reference_panel.upper()
+        if reference_panel not in self.REF_PANELS:
+            raise ValueError(f"The reference_panel argument can only take values in {self.REF_PANELS} depending on the reference panel to be used.")
+            
+        print(f"Clumping using {reference_panel} population as reference.")
+        clumped_data = clump_data(self.data, plink19_path, ref_3kg_path + reference_panel, kb, r2, p1, p2, self.name, self.ram)
         
-        ## Write only the necessary column to file. Call plink with the correct arguments.
-        self.data[["SNP","P"]].to_csv(f"tmp_GENAL/{self.name}_to_clump.txt",index=False,sep="\t")
-        output=subprocess.run([f"{plink19_path} \
-        --memory {self.ram} \
-        --bfile {ref_3kg_path}EUR \
-        --clump tmp_GENAL/{self.name}_to_clump.txt --clump-kb {kb} --clump-r2 {r2} --clump-p1 {p1} \
-        --clump-p2 {p2} --out tmp_GENAL/{self.name}"], shell=True,capture_output=True,text=True,check=True)
-        
-        ## Print common outcomes. If no SNP were found: exit the function. 
-        if "more top variant IDs missing" in output.stderr:
-            n_missing=output.stderr.split('more top variant IDs missing')[0].split('\n')[-1]
-            print(f"Warning: {n_missing}top variant IDs missing")
-        if "No significant --clump results." in output.stderr:
-            print("No SNPs remaining after clumping.")
-            return
-        clumped_message=output.stdout.split("--clump: ")[1].split("\n")[0]
-        print(clumped_message)
-        
-        ## Get the list of clumped SNPs. Take the corresponding data subset from .data and attribute it to .data_clumped and return it too.
-        with open(f"tmp_GENAL/{self.name}.list", 'wb') as f:
-            subprocess.run([f"awk '{{print $3}}' tmp_GENAL/{self.name}.clumped"],shell=True,text=True,check=True,stdout=f)
-        plink_clumped=pd.read_csv(f"tmp_GENAL/{self.name}.list",sep=" ")
-        clumped_data=self.data[self.data["SNP"].isin(plink_clumped["SNP"])]
-        clumped_data.reset_index(drop=True, inplace=True)
-        self.data_clumped=clumped_data
-        return clumped_data
+        if clumped_data is not None:
+            self.data_clumped = clumped_data
+            print("The clumped data is stored in the data_clumped attribute.")
+        return 
 
     
     def standardize(self):
@@ -1062,137 +1151,9 @@ class GENO:
             else:
                 print("The PRS computation was not successfull.")
                 return output.stdout
-            
-        
 
-    
-    def prs_regress(self, weighted=True,clumped=False,model="add",alternate_control=False,fastscore=False,error_1_code=2,
-                   step=5e-5,lower=5e-8,upper=0.5,maf=None,cpus=4,cpus_batch=8):
-        """Run PRSice in UKB data with regression against the phenotype defined with the set_phenotype function and search for the ideal p-value threshold.
-        The function launches a batchscript. The result can be retrieved from prs_regress_result function once the computation is done. prs_regress_result can also be used to monitor the progress of the batchscript.
-        weighted=False will put all betas to 1 to create an unweighted PRS 
-        By default, perform the search starting with the unclumped data, but it is possible to do it on the clumped data with clumped==True.
-        model="add" is the genetic model used for regression: add for additive, dom for dominant, rec for recessive, het for heterozygous
-        alternate_control=True if the control group is smaller than the case group (unlikely)
-        fastscore=True to compute only at the main thresholds (and not in between)
-        maf=None will threshold by minor allele frequency before performing the search
-        error_1_code=2 allows to control the number of times PRSice should be rerun excluding duplicates. In many cases that will be 2 (default), but sometimes, only 1 time is necessary (then set error_1_code=1), or not at all (=0)
-        step=5e-5 is the length of the step the software takes when iterating over the P theresholds, the lower the more precise but the more computationally intensive
-        lower=5e-8 and upper=0.5 indicate the bounds of the lookup over the P thresholds. A common practice is to start by taking big steps on a big interval and then rerun the function with smaller steps on a smaller interval around the most significant threshold to obtain a precise result.
-        cpus=4 is the number of threads used by PRSice locally
-        cpus_batch=8 is the number of threads used by PRSice from the batch script
-        
-        """
-        
-        ##Check that a phenotype has been set with the set_phenotype function.
-        if not(hasattr(self,"phenotype")):
-            raise ValueError("You first need to set a phenotype with .set_phenotype(data,PHENO,PHENO_type,IID)!") 
-        
-        ## Set the BETAs to 1 if weighted==False
-        data_to_prs=self.data.copy()
-        if weighted==False:
-            data_to_prs["BETA"]=1
-            print("Computing an unweighted prs.")
-            
-        ## Check the mandatory columns
-        for column in ["SNP","P","EA","NEA","BETA"]:
-            if column not in data_to_prs.columns:
-                raise ValueError("The column {column} is not found in the data!".format(column=column))
-                
-        ## For a binary trait: code it in 1/2 to comply with PRSice requirements and put the columns to Int64 format.
-        phenotype_to_prs=self.phenotype.copy()
-        if self.phenotype.type=="binary":
-            phenotype_to_prs["PHENO"]+=1
-            phenotype_to_prs["PHENO"]=phenotype_to_prs.PHENO.astype("Int64")
-            
-        ## Go the tmp folder, write the data and phenotype to_csv
-        if not os.path.exists("tmp_GENAL"):
-            os.makedirs("tmp_GENAL")
-        data_to_prs=data_to_prs.loc[:,data_to_prs.columns.isin(["SNP","P","EA","NEA","BETA","EAF"])]
-        data_to_prs.to_csv(f"tmp_GENAL/To_prs_{self.name}.txt",sep="\t",index=False,header=True)
-        phenotype_to_prs.to_csv(f"tmp_GENAL/PHENO_{self.name}.txt",sep="\t",index=False,header=True)
-        
-        ## Call PRSice. Add arguments if binary trait, if fastscore, if maf threshold. 
-        current_path=os.getcwd()+"/tmp_GENAL"
-        command=f'Rscript {prsice_path}PRSice.R \
-        --dir {prsice_path} \
-        --prsice {prsice_path}PRSice_linux \
-        --base {current_path}/To_prs_{self.name}.txt --A1 EA --A2 NEA --pvalue P --snp SNP --stat BETA \
-        --target {ukb_geno_path}plinkfiltered_# \
-        --type bed --out {current_path}/prs_regress_{self.name} --beta \
-        --missing SET_ZERO --score avg \
-        --seed 33 --no-clump --thread {cpus} --memory 90Gb \
-        --bar-levels 5e-08,1e-05,5e-05,0.001,0.05,1 --lower {lower} --upper {upper} --interval {step} \
-        --model {model} \
-        --pheno {current_path}/PHENO_{self.name}.txt --pheno-col PHENO'
-        
-        if self.phenotype.type=="binary":
-            command=command+" --binary-target T"
-        else:
-            command=command+" --binary-target F"
-        if fastscore:
-            command=command+" --fastscore"
-        if maf!=None:
-            if "EAF" not in data_to_prs.columns:
-                print("A minor allele frequency column must be present in the data in order to use the maf threshold.")
-            else:
-                command=command+f" --base-maf EAF:{maf}"
-                
-        ## Handles a common PRSice error: duplicated SNP ID which requires to extract the SNP list from the first run
-        if error_1_code>0:
-            output=subprocess.run(command, shell=True,capture_output=True,text=True,check=False)
-            if "duplicated SNP ID detected out of" in output.stderr:
-                print("Rerunning PRSice after excluding the duplicated SNPs")
-                command=command+f" --extract {current_path}/prs_regress_{self.name}.valid"
-                if error_1_code>1:
-                    output2=subprocess.run(command, shell=True,capture_output=True,text=True,check=False)
-                    if "duplicated SNP ID detected out of" in output2.stderr:
-                        print("Rerunning PRSice after excluding the duplicated SNPs (2)")
-            
-        ## Declare the name of the job, the name of the .sh file, cancel an existing job if it has the same name and launch the script.
-        bash_name=f"prs_regress_{self.name}"
-        bash_script_name=f"prs_regress_{self.name}.sh"
-        
-        if bash_name[:18] in subprocess.run(["squeue","--me"],capture_output=True,text=True).stdout:
-            print("Canceling a job with the same name. If it was not intentional, be careful not to call this function several times in a row. Call prs_regress_result to inspect the progression of the job.")
-            subprocess.run(f"scancel --name={bash_name}",shell=True,check=True)
-            
-        #If we change the specs, don't forget to change the ram and threads in the PRSice command
-        os.chdir("tmp_GENAL")
-        create_bashscript(partition="pi_falcone", job_name=bash_name, bash_output_name=bash_name, ntasks=1, cpus=cpus_batch, mem_per_cpu=50000, bash_filename=bash_script_name, command=command)
-        subprocess.run(["sbatch", f"{bash_script_name}"],check=True,text=True)
-        os.chdir("..")
-
-        return 
-    
-    def prs_regress_result(self):
-        """Function to check the status of the batchscript launched by prs_regress. 
-        If it has ended properly, load the results in a PRS format.
-        """
-        ##Get our jobs in queue and check if the name corresponding to the prs regress job is listed.
-        bash_name=f"prs_regress_{self.name}"
-        summary_name=f"tmp_GENAL/prs_regress_{self.name}.summary"
-        status=subprocess.run(["squeue","--me"],capture_output=True,text=True).stdout
-        ##If the job is still in queue: print the time it has been running as well as the last line of the job status file.
-        if bash_name[:18] in status:
-            m=status.split(bash_name+" ")[1].split("R    ")[1].split(":")
-            print(f"The job is still running. It has been running for: {m[0][-3:]+':'+m[1][:3]}")
-            out=subprocess.run(f"tail -n 1 tmp_GENAL/{bash_name}",shell=True,capture_output=True,text=True,check=True)
-            update_string=out.stdout.split('\n')[-1]
-            print(f"Progression update: {update_string}")
-        ##If not: if the summary file doesn't exist --> the job was not successful. If it exists --> job was successful, summary file is loaded and printed, result file is loaded and returned.
-        else:
-            if not os.path.isfile(summary_name):
-                print("The prs_regress job has ended but was not successful. Refer to the .log file to see the error.")
-            elif os.path.isfile(summary_name):
-                print ("The job has ended and was successfull!")
-                summary=pd.read_csv(summary_name,sep="\t")
-                print (f"The p-value threshold selected is {summary.Threshold.values[0]}, it corresponds to {summary.Num_SNP.values[0]} SNPs, and it reached a regression P-value of {summary.P.values[0]:.3f} against the phenotype.")
-                df_score=pd.read_csv(f"tmp_GENAL/prs_regress_{self.name}.best",sep=" ")
-                df_score=df_score[["FID","IID","PRS"]].rename(columns={PRS:"SCORE"})
-                return df_score
                     
-    def lift(self,clumped=True,start="hg19",end="hg38",replace=False,extraction_file=False, chain_file="", name=""):
+    def lift(self, clumped=True, start="hg19",end="hg38", replace=False, extraction_file=False, chain_file="", name="", liftover=False, liftover_path=""):
         """Perform a liftover from a genetic build to another.
         If the chain file required to do the liftover is not present, download it first. It is also possible to manually provide the path to the chain file.
         start="hg19": current build of the data
@@ -1203,157 +1164,19 @@ class GENO:
         chain_file="": path to a local chain file to be used for the lift. If provided, the start and end arguments are not considered.
         name="": can be used to specify a filename or filepath (without extension) to save the lifted dataframe. If not provided, will be saved in the current folder as [name]_lifted.txt
         """
-        ##Check that the mandatory columns are present, make sure the type is right, and create the tmp folder
-        for column in ["CHR","POS"]:
-            if not(column in self.data.columns):
-                raise ValueError("The column {column} is not found in the data!".format(column=column))
-            
-        if not os.path.exists("tmp_GENAL"):
-            os.makedirs("tmp_GENAL")     
-            
-        # Loading the appropriate chain file.
-        if chain_file!="": #If user provides path to a local chain path
-            print("You provided a path to a local chain path. This will be used for the lift.")
-            if not os.path.isfile(chain_file):
-                raise ValueError("The path you provided does not lead to a file.")
-            else:
-                lo = LiftOver(chain_file)
-        else: #Interpret the start and end build
-            chain_name=f"{start.lower()}To{end.capitalize()}.over.chain"
-            chain_path=f"{genal_tools_path}chain_files/"
-            if os.path.isfile(f"{chain_path}{chain_name}"): #If file already exists
-                print(f"Found chain file to lift from {start} to {end}.")
-            else: #If not: attempts to download it
-                print(f"The chain file to lift from {start} to {end} was not found. Attempting to download it...")
-                url = f"https://hgdownload.soe.ucsc.edu/goldenPath/{start.lower()}/liftOver/{chain_name}.gz"
-                try: #Attempts to download
-                    wget.download(url,out=chain_path) 
-                except Exception as e:
-                    print(f"The download was unsuccessful: {e}")
-                    print(f"You can manually download the appropriate chain file at http://hgdownload.cse.ucsc.edu/downloads.html#liftover and specify its local path with the chain_file argument.")
-                print(f"The download was successful. Unzipping...")
-                with gzip.open(f'{chain_path}{chain_name}.gz', 'rb') as f_in:
-                    with open(f'{chain_path}{chain_name}', 'wb') as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-            lo = LiftOver(f"{chain_path}{chain_name}")
-
         #Selecting data to lift
         if clumped==False or not(hasattr(self,"data_clumped")):
-            if replace:
-                print("Lifting the unclumped data inplace. The .data attribute will be modified.")
-                data=self.data
-            else:
-                print("Lifting the unclumped data. The .data argument won't be modified. Use replace=True to lift inplace.")
-                data=self.data.copy()
+            data = self.data if replace else self.data.copy()
         elif clumped==True:
-            if replace:
-                print("Lifting the clumped data inplace. The .data_clumped attribute will be modified.")
-                data=self.data_clumped
-            else:
-                print("Lifting the clumped data. The .data_clumped attribute won't be modified. Use replace=True to lift inplace.")
-                data=self.data_clumped.copy()
-              
-        #Deleting NAs in CHR and POS columns
-        nrows=data.shape[0]
-        data.dropna(subset=["CHR","POS"],inplace=True)
-        data.reset_index(drop=True,inplace=True)
-        n_na=nrows-data.dropna().shape[0]
-        if n_na>0:
-            print(f"Excluding {n_na}({n_na/nrows*100:.3f}%) SNPs containing NaN values in columns CHR or POS.")
-        
-        #Lifting
-        if nrows>500000:
-            print("Your data is large, this can take a few minutes...")
-        def convert_coordinate_wrapper(args):
-            return lo.convert_coordinate(f'chr{args[0]}', args[1], '-')
-        with ThreadPoolExecutor() as executor:
-            args = data[['CHR', 'POS']].to_records(index=False)
-            results = list(tqdm(executor.map(convert_coordinate_wrapper, args), total=len(args)))
-        data['POS'] = [res[0][1] if res else np.nan for res in results]
-        nrows=data.shape[0]
-        data.dropna(subset=["POS"],inplace=True)
-        data['POS'] = data['POS'].astype("Int64")
-        data.reset_index(drop=True,inplace=True)
-        n_na=nrows-data.dropna().shape[0]
-        print(f"Lift completed. {n_na}({n_na/nrows*100:.3f}%) SNPs could not been lifted.")
-        
-        ## Save files: whole data and also the extraction file to be used in All of Us if extraction_file=True
-        data.to_csv(f"{self.name + '_lifted' if name == '' else name}.txt",sep="\t",header=True,index=False)
-        print(f"Lifted list of SNPs saved to {self.name + '_lifted' if name == '' else name}.txt")
-        if extraction_file:
-            if not("SNP" in data.columns):
-                data["SNP"]=data.CHR.astype(str)+":"+data.POS.astype(str)
-            data[["CHR","POS","SNP"]].to_csv(f"{self.name+ '_lifted' if name == '' else name}_extraction.txt", sep=" ",header=False,index=False)
-            print(f"Extraction file saved to {self.name+ '_lifted' if name == '' else name}_extraction.txt")
+            data = self.data_clumped if replace else self.data_clumped.copy()
             
+        print(f"Lifting the {'' if clumped else 'un'}clumped data{' inplace' if replace else ''}. The .data{'_clumped' if clumped else ''} attribute will {'' if replace else 'not'} be modified. Use replace={'False' if replace else 'True'} to {'leave it as is' if replace else 'lift inplace'}.")
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            data = lift_data(data, start="hg19",end="hg38", replace=False, extraction_file=False, chain_file=chain_file, name=f"{self.name if name == '' else name}" , genal_tools_path = genal_tools_path)
         return data
                 
-            
-    def lift_old(self,clumped=True,extraction_file=False):
-        """Perform a liftover from build 37 to 38 (possible to add other lifts later)
-        Doesn't change the attributes. 
-        The full data in build 38 is saved to the file name_38
-        If extraction_file==True, also print a CHR POS SNP space delimited file for extraction in All of Us (WES data)
-        If clumped==True, lift only the clumped data, otherwise the main data
-        """
-        ##Check that the mandatory columns are present, make sure the type is right, and create the tmp folder
-        for column in ["CHR","POS"]:
-            if not(column in self.data.columns):
-                raise ValueError("The column {column} is not found in the data!".format(column=column))
-        if not os.path.exists("tmp_GENAL"):
-            os.makedirs("tmp_GENAL")
-        
-        ## Decide whether to lift the clumped data or the base data based on argument clumped and the presence of attribute data_clumped. Write the correct data in the format needed by liftOver.
-        if clumped==False or not(hasattr(self,"data_clumped")):
-            print("Lifting the unclumped data.")
-            data=self.data.copy()
-            data["CHR"]="chr"+data.CHR.astype(str)
-            data[["CHR","POS","POS"]].to_csv(f"tmp_GENAL/{self.name}.prelift",sep=" ",index=False,header=False)
-        elif clumped==True:
-            print("Lifting the clumped data.")
-            data=self.data_clumped.copy()
-            data["CHR"]="chr"+data.CHR.astype(str)
-            data[["CHR","POS","POS"]].to_csv(f"tmp_GENAL/{self.name}.prelift",sep=" ",index=False,header=False)
-            
-            
-        ## Call the liftOver software.
-        command=f'{liftover_path}liftOver tmp_GENAL/{self.name}.prelift \
-        {liftover_path}hg19ToHg38.over.chain \
-        tmp_GENAL/{self.name}.postlift tmp_GENAL/unMapped'
-        output=subprocess.run(command, shell=True,capture_output=True,text=True,check=True)
-        
-        ## Read the output, print the number of unlifted SNPs and remove them from the prelift data. 
-        df_post=pd.read_csv(f"tmp_GENAL/{self.name}.postlift",sep="\t",header=None)
-        unMapped = open('tmp_GENAL/unMapped', 'r')
-        Lines = unMapped.readlines()
-        if len(Lines)>0:
-            print(f"{int(len(Lines)/2)} SNPs could not been lifted.")
-        indices=list()
-        for i in range(1,len(Lines),2):
-            c=Lines[i].strip()
-            (chrom,pos,pos)=c.split("\t")
-            indices.append(str(chrom)+":"+str(pos))
-        data["SNP_IDS"]=data.CHR.astype(str)+":"+data.POS.astype(str)
-        data=data[~(data.SNP_IDS.isin(indices))].drop(columns="SNP_IDS").reset_index(drop=True)
-        
-        ## Merge prelift and postlift data. Unknown chr from the output of liftOver are assigned the value 99. SNPs mapped to unknown chr are deleted from the final data and their number printed.
-        data["POS"]=df_post[1].astype(int)
-        data["CHR"]=df_post[0].str.split("chr",expand=True)[1].str.split("_",expand=True)[0].replace({"X":99,"Un":99}).astype(int)
-        nrow_before=data.shape[0]
-        data=data[data.CHR!=99]
-        nrow_diff=nrow_before-data.shape[0]
-        if nrow_diff>0:
-            print(f"{nrow_diff} SNPs were lifted to an unknown chromosome and deleted from the final files.")
-        
-        ## Save files: whole data and also the extraction file to be used in All of Us if extraction_file=True
-        data.to_csv(f"{self.name}_38.txt",sep="\t",header=True,index=False)
-        if extraction_file:
-            if not("SNP" in data.columns):
-                data["SNP"]=data.CHR.astype(str)+":"+data.POS.astype(str)
-            data[["CHR","POS","SNP"]].to_csv(f"{self.name}_38_extraction.txt",sep=" ",header=False,index=False)
-        return data
-
-
         
 def create_bashscript(job_name,bash_output_name,bash_filename,command,
                       partition="day",time="20:00:00",cpus=1,mem_per_cpu=50000,ntasks=1):
