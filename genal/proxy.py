@@ -1,23 +1,13 @@
 import pandas as pd
 import numpy as np
-import warnings
-import time
-import datetime
-import pysam
 import os
 import subprocess
-from tqdm import tqdm
-import scipy.stats as st
-from pandas.api.types import is_numeric_dtype
-import rpy2.robjects as ro
-from rpy2.robjects.conversion import localconverter
-import glob
-import copy
 
 from io import StringIO
 
-from .config import *
+from .tools import *
 
+## TO DO: accept lists of CHR/POS instead of SNP names for these functions
 
 def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     """
@@ -28,7 +18,8 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     snps_df: optional, list of SNPs to choose the proxy from. Should be the list of SNPs in df. Can be provided to avoid recomputing it.
     """
     if len(snps_df) == 0: snps_df = df.SNP.values
-    ld = ld[ld.SNP_B.isin(snps_df)] ##The proxies should be present in df
+    ld = ld[ld.SNP_B.isin(snps_df)] ##The proxies have to be present in df
+    ld = ld[ld['SNP_A'] != ld['SNP_B']] #Delete original SNPs
     ld = ld.reindex(ld['R'].abs().sort_values(ascending=False).index) #Sort by r2
     ld = ld.groupby("SNP_A").first().reset_index(drop=False) #Select the best proxy for each SNP
     snps_to_query = set(snps_to_extract) | set(ld.SNP_B.values)
@@ -78,6 +69,7 @@ def apply_proxies(df, ld, searchspace=np.empty(0)):
     if len(searchspace) != 0: ## Filter by searchspace
         print ("Filtering the potential proxies with the searchspace provided.")
         ld = ld[ld.SNP_B.isin(searchspace)]
+    ld = ld[ld['SNP_A'] != ld['SNP_B']] #Delete original SNPs
     ld = ld.reindex(ld['R'].abs().sort_values(ascending=False).index) #Sort by r2
     ld = ld.groupby("SNP_A").first().reset_index(drop=False) #Select the best proxy for each SNP
     output = df.merge(ld,how="left",left_on="SNP",right_on="SNP_A") #Merge
@@ -115,12 +107,12 @@ def apply_proxies(df, ld, searchspace=np.empty(0)):
     
     return output
 
-def find_proxies(snp_list, searchspace=np.empty(0), ancestry="EUR", kb=5000,r2=0.6, window_snps=5000, threads=1):
+def find_proxies(snp_list, searchspace=np.empty(0), reference_panel="eur", kb=5000,r2=0.6, window_snps=5000, threads=1):
     """
     Given a list of SNPs, return a table of proxies.
     snp_list: list of rsids
     searchspace=[]: list of SNPs to include in the search. By default, include the whole reference panel.
-    ancestry="EUR"
+    reference_panel="eur" The reference population to get linkage disequilibrium values and find proxies. Takes values in "EUR", "SAS", "AFR", "EAS", "AMR". It is also possible to provide a path leading to a specific bed/bim/fam reference panel.
     kb=5000: width of the genomic window to look for proxies
     r2=0.6: minimum linkage disequilibrium value with the main SNP for a proxy to be included 
     window_snps=5000: compute the LD value for SNPs that are not more than x SNPs apart from the main SNP
@@ -132,7 +124,7 @@ def find_proxies(snp_list, searchspace=np.empty(0), ancestry="EUR", kb=5000,r2=0
     snp_list=np.array(list(snp_list)) #To array
     #searchspace=np.array(list(searchspace)) #To array
     if len(searchspace) == 0: ## Write the searchspace if not empty
-        print("Searching proxies in the whole reference data.")
+        #print("Searching proxies in the whole reference data.")
         extract_arg=""
     else:
         print("Searching proxies in the searchspace provided.")
@@ -145,7 +137,7 @@ def find_proxies(snp_list, searchspace=np.empty(0), ancestry="EUR", kb=5000,r2=0
         extract_arg="--extract tmp_GENAL/searchspace.txt"
     np.savetxt("tmp_GENAL/snps_to_proxy.txt",snp_list, fmt="%s", delimiter=' ') ## Write the snp_list
     ## declare plink command
-    command=f"{plink19_path} --bfile {ref_3kg_path}{ancestry} {extract_arg} --keep-allele-order --r in-phase with-freqs gz --ld-snp-list tmp_GENAL/snps_to_proxy.txt --ld-window-kb {kb} --ld-window-r2 {r2} --ld-window {window_snps} --out tmp_GENAL/proxy.targets --threads {threads}"
+    command=f"{get_plink19_path()} --bfile {get_reference_panel_path(reference_panel)} {extract_arg} --keep-allele-order --r in-phase with-freqs gz --ld-snp-list tmp_GENAL/snps_to_proxy.txt --ld-window-kb {kb} --ld-window-r2 {r2} --ld-window {window_snps} --out tmp_GENAL/proxy.targets --threads {threads}"
     output=subprocess.run(command,shell=True,capture_output=True,text=True,check=True) ## execute
     
     ## read output
@@ -156,7 +148,7 @@ def find_proxies(snp_list, searchspace=np.empty(0), ancestry="EUR", kb=5000,r2=0
     # Cleaning 
     ld['PHASE'] = ld['PHASE'].str.replace("/", "")
     ld = ld[ld['PHASE'].apply(len) == 4] #Delete multiallelic SNPs
-    ld = ld[ld['SNP_A'] != ld['SNP_B']] #Delete original SNPs
+    #ld = ld[ld['SNP_A'] != ld['SNP_B']] #Delete original SNPs
     ld = ld.reset_index(drop=True)
     temp = pd.DataFrame(ld['PHASE'].apply(list).to_list(), columns=['A1', 'B1', 'A2', 'B2']) #Split the 'PHASE' column into separate characters
     ld = pd.concat([ld, temp], axis=1)

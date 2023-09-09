@@ -2,7 +2,10 @@ import os
 import subprocess
 import pandas as pd
 
-def clump_data(data, plink19_path, reference_panel_path, kb=250, r2=0.1, p1=5e-8, p2=0.01, name="noname", ram = 10000):
+from .geno_tools import *
+from .tools import *
+
+def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=250, r2=0.1, p1=5e-8, p2=0.01, name="noname", ram = 10000, checks=[]):
         """ Clump the data in data and return it. The clumping is done with plink.
         data is a pandas dataframe with the standard GENO column names (at least SNP and P)
         name is the name used for the files created in the tmp_GENAL folder
@@ -13,19 +16,32 @@ def clump_data(data, plink19_path, reference_panel_path, kb=250, r2=0.1, p1=5e-8
         r2=0.1 sets the linkage disequilibrium threshold 
         p1=5e-8 sets the p-value used during the clumping (the SNPs above this threshold are not considered)
         p2=0.01 sets the p-value used after the clumping to further filter the clumped SNPs (set p2<p1 to not use this
+        checks=list: list of column checks already performed on the data ("SNP", "P") to avoid repeating them.
         """
-        ## Check the existence of the required columns. Create the tmp file if necessary.
+        ## Check the existence of the required columns and make sure the values are valid. Delete invalid values.
         for column in ["SNP","P"]:
             if not(column in data.columns):
                 raise ValueError(f"The column {column} is not found in the data")
+        
+        if "SNP" not in checks:
+            data = check_snp_column(data)
+            checks.append("SNP")
+        if "P" not in checks:
+            data = check_p_column(data)
+            nrows = data.shape[0]
+            data.dropna(subset = ["SNP","P"], inplace=True)
+            n_del = nrows - data.shape[0]
+            if n_del > 0:
+                print(f"{n_del}({n_del/nrows*100:.3f}%) rows with NA values in columns SNP or P have been deleted.")
+            checks.append("P")
+        ## Create the tmp file if necessary.
         if not os.path.exists("tmp_GENAL"):
             os.makedirs("tmp_GENAL")
-
         ## Write only the necessary column to file. Call plink with the correct arguments.
         data[["SNP","P"]].to_csv(f"tmp_GENAL/{name}_to_clump.txt", index=False, sep="\t")
         output=subprocess.run([f"{plink19_path} \
         --memory {ram} \
-        --bfile {reference_panel_path} \
+        --bfile {get_reference_panel_path(reference_panel)} \
         --clump tmp_GENAL/{name}_to_clump.txt --clump-kb {kb} --clump-r2 {r2} --clump-p1 {p1} \
         --clump-p2 {p2} --out tmp_GENAL/{name}"], shell=True, capture_output=True, text=True, check=True)
         
@@ -45,4 +61,4 @@ def clump_data(data, plink19_path, reference_panel_path, kb=250, r2=0.1, p1=5e-8
         plink_clumped=pd.read_csv(f"tmp_GENAL/{name}.list",sep=" ")
         clumped_data=data[data["SNP"].isin(plink_clumped["SNP"])]
         clumped_data.reset_index(drop=True, inplace=True)
-        return clumped_data
+        return clumped_data, checks
