@@ -33,7 +33,7 @@ Navigate to the path where you wish to install GENAL. Download it there:
 git clone https://github.com/Vlaati/GENAL
 ```
 
-Optional: install bash kernel if you plan to use it:   
+Optional: install bash kernel:   
 ```
 conda install -c conda-forge bash_kernel 
 python -m bash_kernel.install
