@@ -16,35 +16,72 @@ from .association import *
 from .extract_prs import *
 
 # Add proxying function (input is df + searchspace and returns proxied df)
+# Get proxies (simply return a list of proxies)
 # Multi-MR with python MR
-# Don't forget to change the init to put .genal folder and rewrite it only if not present
 # Warning that users might not have shell (for the .ram attribute)
+# Phenoscanner
 
 
 class GENO:
+    """
+    The GENO object is intended to handle data from a GWAS or derived from a GWAS with 
+    information such as SNP name, position on the genome, SNP-trait effects, and 
+    corresponding effect allele, population allele frequency.
+    
+    Attributes:
+        name (str): Name for the object
+        data (pd.DataFrame): Main DataFrame containing SNP data.
+        data_clumped (pd.DataFrame, optional): DataFrame of clumped data. It is initialized after running the 'clump' method, or by using clumped=True during initialization.
+        phenotype ((pd.DataFrame, str)): Tuple of a DataFrame of phenotype data where each row represents an individual and a string representing the type of the trait column. It is initiliazed after running the 'set_phenotype' method.
+        MR_data ((pd.DataFrame, pd.DataFrame, str)): Tuple of a DataFrame containing associations with an exposure, a DataFrame containing associations with an outcome, and the name of the outcome. It is initialized after running the 'query_outcome' method. 
+        ram (int): Amount of memory available 
+        cpus (int): Number of cpus available
+        checks (list): List of checks that have been performed on the main DataFrame.
+        reference_panel (pd.DataFrame): DataFrame containing SNP data for a reference population. It is used to adjust SNP information and is initialized the first time it is required.
+        
+    Methods:
+        clump: Clump the main data and assigns the result to data_clumped
+        prs: Compute Polygenic Risk Score on genomic data
+        set_phenotype: assigns a DataFrame with individual-level data and a phenotype trait to the phenotype attribute.
+        association_test: compute SNP-trait effect estimates, standard errors and p-values.
+        query_outcome: extract SNPs from outcome data with proxying and initializes the MR_data attribute.
+        MR: perform Mendelian Randomization between SNP-exposure data and SNP-outcome data.
+        MRpresso: perform the MR-PRESSO algorithm for horizontal pleiotropy correction between SNP-exposure data and SNP-outcome data.
+        lift: lift SNP data from a genomic build to another.
+        
+    """
     
     def __init__(self, df, name="noname", CHR="CHR",POS="POS",SNP="SNP",EA="EA",NEA="NEA",BETA="BETA",SE="SE",P="P",EAF="EAF", preprocessing=1, reference_panel="eur", clumped=None, effect_column=None, keep_columns=None, keep_multi=None, keep_dups=None, fill_snpids=None, fill_coordinates=None):
-        """Declare a GENO object used to store and transform Single Nucleotide Polymorphisms (SNP) data. It is intended to handle data from a GWAS or derived from a GWAS with information such as SNP name, position on the genome, SNP-trait effects and corresponding effect allele, population allele frequency.
-        df: a pandas dataframe where each line is a SNP. Column names are specified by passing the corresponding arguments. The presence of all columns is not required to declare a GENO object, but certain methods require some of them. 
-        CHR = "CHR": name of the chromosome column
-        POS = "POS": name of the genomic position column
-        SNP = "SNP": name of the rsID column 
-        EA = "EA": name of the effect allele column
-        NEA = "NEA": name of the non-effect allele column
-        BETA = "BETA": name of the effect estimate column
-        SE = "SE": name of the effect standard error column
-        P = "P": name of the p-value column
-        EAF = "EAF": name of the effect allele frequency column. 
-        preprocessing = 1. Standard level of preprocessing to apply to all processing steps. 0: the dataframe is not modified; 1: missing columns are added based on reference data and invalid values set to nan but no rows are deleted; 2: missing columns are added and rows with missing, duplicated or invalid values are deleted. Other arguments allow for more customization (fill_nipids, fill_coordinates, keep_multi, keep_dups, keep_columns).
-        reference_panel = "eur". The reference panel to use for SNP adjustments. Takes value in "eur", "amr", "sas", "eas", "multi" following the 1k genome classification. "multi" combines the reference panels from the four ancestries and contains the largest number of SNPs. Can also be: a dataframe with columns ["CHR","SNP","POS","A1","A2"] to use as reference panel. Or a path to a .bim file to use as reference. 
-        clumped = None. genal will try to determine whether the data is clumped or not. If you want to override this guess, specify if True (data is clumped) or False (data is not clumped).
-        effect_column = None. genal will try to determine whether the effect column are Betas or Odds Ratios and log-transform appropriately. If you want to override this guessing, specify "BETA" or "OR".
-        keep_columns = None. False: All columns which are not included in (CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF) will be deleted (Can avoid inconsistencies in some methods). True: These columns will be kept. None: defers to the preprocessing value (0,1: True; 2: False).
-        keep_multi = None: False: multiallelic SNPs will be removed. True: These rows will be kept. None: defers to the preprocessing value (0,1: True; 2: False).
-        keep_dups = None. False: rows with duplicated SNP ids will be deleted and only the first line conserved. True: These rows will be kept. None: defers to the preprocessing value (0,1: True; 2: False).
-        fill_snpids = None. True: The SNP (rsID) column will be created or replaced based on CHR/POS columns and a reference genome. False: Do not attempt to update the rsID column. None: Create the SNP column if absent and CHR/POS columns are present and preprocessing = 1,2.
-        fill_coordinates = None. True: The CHR and/or POS will be created or replaced based on SNP column and a reference genome. False: Do not attempt to update the CHR/POS columns. None: Create the CHR/POS columns if absent and SNP column is present and preprocessing = 1,2.
+         """
+        Initializes the GENO object used to store and transform Single Nucleotide Polymorphisms (SNP) data.
+        
+        Args:
+            df (pd.DataFrame): DataFrame where each row represents a SNP.
+            name (str, optional): Name for the object. Defaults to "noname".
+            CHR (str, optional): Column name for chromosome. Defaults to "CHR".
+            POS (str, optional): Column name for genomic position. Defaults to "POS".
+            SNP (str, optional): Column name for SNP identifier. Defaults to "SNP".
+            EA (str, optional): Column name for effect allele. Defaults to "EA".
+            NEA (str, optional): Column name for non-effect allele. Defaults to "NEA".
+            BETA (str, optional): Column name for effect estimate. Defaults to "BETA".
+            SE (str, optional): Column name for effect standard error. Defaults to "SE".
+            P (str, optional): Column name for p-value. Defaults to "P".
+            EAF (str, optional): Column name for effect allele frequency. Defaults to "EAF".
+            preprocessing (int, optional): Level of preprocessing to apply. Options include:
+                - 0: The dataframe is not modified.
+                - 1: Missing columns are added based on reference data and invalid values set to NaN, but no rows are deleted.
+                - 2: Missing columns are added, and rows with missing, duplicated, or invalid values are deleted.
+                Defaults to 1.
+            reference_panel (str or pd.DataFrame, optional): Reference panel for SNP adjustments. Can be a string representing ancestry classification ("eur", "afr", "eas", "sas", "amr") or a DataFrame with ["CHR","SNP","POS","A1","A2"] columns or a path to a .bim file. Defaults to "eur".
+            clumped (bool, optional): Specifies if the data is already clumped. If None, the method tries to determine this. Defaults to None.
+            effect_column (str, optional): Specifies the type of effect column ("BETA" or "OR"). If None, the method tries to determine it. Odds Ratios will be log-transformed and the standard error adjusted. Defaults to None.
+            keep_columns (bool, optional): Determines if non-main columns should be kept. If None, defers to preprocessing value. Defaults to None.
+            keep_multi (bool, optional): Determines if multiallelic SNPs should be kept. If None, defers to preprocessing value. Defaults to None.
+            keep_dups (bool, optional): Determines if rows with duplicate SNP IDs should be kept. If None, defers to preprocessing value. Defaults to None.
+            fill_snpids (bool, optional): Decides if the SNP (rsID) column should be created or replaced based on CHR/POS columns and a reference genome. If None, defers to preprocessing value. Defaults to None.
+            fill_coordinates (bool, optional): Decides if CHR and/or POS should be created or replaced based on SNP column and a reference genome. If None, defers to preprocessing value. Defaults to None.
         """
+        
         #Check arguments and apply preprocessing logic.
         keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates = check_arguments(df, preprocessing, reference_panel, clumped, effect_column, keep_columns, fill_snpids, fill_coordinates, keep_multi, keep_dups)
         
@@ -168,33 +205,58 @@ class GENO:
             else:
                 self.reference_panel = load_reference_panel(reference_panel)
         return self.reference_panel
-
-    def copy(self):
+    
+    def clump(self, kb=250, r2=0.1, p1=5e-8, p2=0.01, reference_panel="eur"):
+        """ Clump the data in .data and assign it to the .data_clumped attribute. The clumping is done with plink.
+        kb=250. clumping window in thousands SNPs
+        r2=0.1. linkage disequilibrium threshold (between 0 and 1)
+        p1=5e-8. p-value used during the clumping (the SNPs above this threshold are not considered)
+        p2=0.01 p-value used after the clumping to further filter the clumped SNPs (if p2<p1, it won't be considered)
+        reference_panel="eur" The reference population to get linkage disequilibrium values. Takes values in "eur", "sas", "afr", "eas", "amr". It is also possible to provide a path leading to a specific bed/bim/fam reference panel.
         """
-        Return a deep copy of the GENO instance.
+        #Check input 
+        clumped_data, checks = clump_data(self.data, reference_panel, get_plink19_path(), kb, r2, p1, p2, self.name, self.ram, self.checks) 
+        self.checks = checks
+        if clumped_data is not None:
+            self.data_clumped = clumped_data
+            print("The clumped data is stored in the .data_clumped attribute.")
+        return 
+      
+    def extract_snps(self, clumped=True, path=""):
         """
-        Copy=copy.deepcopy(self)
-        return Copy
-        
-    def save (self,path="",fmt="h5",sep="\t", header=True, clumped=True):
+        Extract the list of SNPs present in .data (or in .data_clumped if clumped=True) from the provided files. 
+        path: path to the genomic files. If the files are split by chromosomes, replace the chromosome number by '$'. For instance path = ukb_chr$_file. The provided path is saved and if you call this function again, you don't need to specify the path (provided you want to use the same genomic files).
+        #slurm=False: if True, the extraction and merge jobs will be launched as batch scripts
+        The output is a bed/bim/fam triple called {name}_extract_allchr including the SNPs from the UKB.
         """
-        Save to a .h5 file in the "data" field (default) at the location specified by path or current folder if not.
-        path: path of the folder to save the file
-        fmt: format to use. Can be either .h5 (default), .csv, .txt
-        sep: delimiter to use (only for .csv and .txt), default is \t
-        header=True: to save the column names or not (only for .csv and .txt)
-        clumped=False to save the full data, or the clumped data (=True)
-        %To Do: add .vcf and .vcf.gz
-        """
-        if clumped:
-            if not(hasattr(self,"data_clumped")):
-                raise ValueError("clumped=True was used but the data is not clumped. \
-                \n Use .clump() first, or clumped=False.")
-            else:
-                save_data(self.data_clumped, name = self.name+"_clumped", path=path, fmt=fmt, sep=sep, header=header)
-        else:
-            save_data(self.data, name = self.name, path=path, fmt=fmt, sep=sep, header=header)        
+        snp_list = self.data_clumped["SNP"] if clumped else self.data["SNP"]
+        extract_snps_func(snp_list, self.name, path)
         return
+    
+    def prs(self, name =None, clumped = True, weighted=True, path = None):
+        """Compute a PRS and save it to a .csv file in the current directory.
+        name = None. Name or path of the saved prs file. If not given, use the name of the GENO object.
+        clumped = True. To use the data contained in the .data_clumped attribute (after using the .clump() method or clump=True when initializing the GENO object.) False to use the unclumped data (in the .data attribute)
+        weighted=True to perform a PRS weighted by the BETA column estimates. False for an unweighted PRS (equivalent to BETAs == 1)
+        path = None. Can be used to provide a path to a bed/bim/fam set of genetic files to use for PRS calculation. If not provided, will use the genetic data extracted with the .extract_snps method.
+        """
+        ## Verify that the data has been clumped (or at least assigned to the data_clumped attribute)
+        if not(hasattr(self,"data_clumped")) and clumped:
+            raise ValueError("clumped = True argument but the data is not clumped. \ \n Use .clump() first to clump the data or use clumped = False to perform PRS on the unclumped data.")
+        if clumped:
+            print("Using clumped data for PRS calculation.")
+            prs_data = prs_func(self.data_clumped, weighted, path, checks=self.checks, ram=self.ram, name=self.name)       
+        else:
+            print("Using unclumped data for PRS calculation.")
+            prs_data = prs_func(self.data, weighted, path, checks=self.checks, ram=self.ram, name=self.name)
+
+        if name is None:
+            prs_filename = f"{self.name}_prs.csv"
+        else:
+            prs_filename = os.path.splitext(name)[0] + ".csv"
+        prs_data.to_csv(prs_filename, index=False, header=True)
+        print (f"PRS data saved to {prs_filename}")
+        return prs_data
     
     def set_phenotype(self, data, IID=None, PHENO=None, PHENO_type='', alternate_control=False):
         """ Set an attribute .phenotype which is a dataframe containing individual IDs and phenotype columns. This is required to run single-SNP association tests with the association_test method.
@@ -250,7 +312,7 @@ class GENO:
                 \n Use .clump() first, or clumped=True when declaring the GENO.")
         
         exposure, outcome, name = query_outcome_func(self.data_clumped, outcome, name, proxy, reference_panel, kb, r2, window_snps, self.cpus)     
-        self.outcome = (exposure, outcome, name) 
+        self.MR_data = (exposure, outcome, name) 
         return
     
     def MR (self, methods = ["IVW","IVW-FE","UWR", "WM","WM-pen","Simple-median","Sign","Egger","Egger-boot"], action = 2, heterogeneity = False, eaf_threshold=0.42, nboot = 10000, penk = 20):
@@ -268,10 +330,10 @@ class GENO:
         %%To do: implement cases when NEA is absent from exposure and/or outcome
         """  
         ## Check that query_outcome has been called
-        if not hasattr(self, "outcome"):
+        if not hasattr(self, "MR_data"):
             raise ValueError("You must first call query_outcome() before running MR.")
                                
-        return MR_func(self.outcome, methods, action , heterogeneity, eaf_threshold, nboot, penk, self.name, self.cpus)  
+        return MR_func(self.MR_data, methods, action , heterogeneity, eaf_threshold, nboot, penk, self.name, self.cpus)  
     
     def MRpresso(self, action = 2, eaf_threshold=0.42, n_iterations = 10000, outlier_test = True, distortion_test = True, significance_p = 0.05, cpus = 1):
         """
@@ -297,85 +359,7 @@ class GENO:
             raise ValueError("You must first call query_outcome() before running MR.")
 
         return mrpresso_func(self.outcome, action, eaf_threshold, n_iterations, outlier_test, distortion_test, significance_p, self.cpus)
-            
-    def clump(self, kb=250, r2=0.1, p1=5e-8, p2=0.01, reference_panel="eur"):
-        """ Clump the data in .data and assign it to the .data_clumped attribute. The clumping is done with plink.
-        kb=250. clumping window in thousands SNPs
-        r2=0.1. linkage disequilibrium threshold (between 0 and 1)
-        p1=5e-8. p-value used during the clumping (the SNPs above this threshold are not considered)
-        p2=0.01 p-value used after the clumping to further filter the clumped SNPs (if p2<p1, it won't be considered)
-        reference_panel="eur" The reference population to get linkage disequilibrium values. Takes values in "eur", "sas", "afr", "eas", "amr". It is also possible to provide a path leading to a specific bed/bim/fam reference panel.
-        """
-        #Check input 
-        clumped_data, checks = clump_data(self.data, reference_panel, get_plink19_path(), kb, r2, p1, p2, self.name, self.ram, self.checks) 
-        self.checks = checks
-        if clumped_data is not None:
-            self.data_clumped = clumped_data
-            print("The clumped data is stored in the .data_clumped attribute.")
-        return 
 
-    
-    def standardize(self):
-        """
-        Standardize the Betas and adjust the SE column accordingly.
-        """
-        for column in ["BETA","SE"]:
-            if not(column in self.data.columns):
-                raise ValueError("The column {column} is not found in the data!".format(column=column))
-        self.data["BETA"]=(self.data.BETA-np.mean(self.data.BETA))/np.std(self.data.BETA)
-        self.data["SE"]=np.abs(self.data.BETA/st.norm.ppf(self.data.P/2))
-        print("The Beta column has been standardized and the SE column has been adjusted.")
-
-        
-    def sort_group(self,method="lowest_p"):
-        """
-        Ways to handle duplicate SNPs if the instance is a combination of different GENOs.
-        method="lowest_p" to keep the lowest P for each SNP. 
-        """
-        if method=="lowest_p":
-            self.data=self.data.sort_values(by=["P"])
-            self.data=self.data.groupby(by=["SNP"]).first().reset_index(drop=False)
-        return
-
-            
-    def extract_snps(self, clumped=True, path=""):
-        """
-        Extract the list of SNPs present in .data (or in .data_clumped if clumped=True) from the provided files. 
-        path: path to the genomic files. If the files are split by chromosomes, replace the chromosome number by '$'. For instance path = ukb_chr$_file. The provided path is saved and if you call this function again, you don't need to specify the path (provided you want to use the same genomic files).
-        #slurm=False: if True, the extraction and merge jobs will be launched as batch scripts
-        The output is a bed/bim/fam triple called {name}_extract_allchr including the SNPs from the UKB.
-        """
-        snp_list = self.data_clumped["SNP"] if clumped else self.data["SNP"]
-        extract_snps_func(snp_list, self.name, path)
-        return
-
-        
-    def prs(self, name =None, clumped = True, weighted=True, path = None):
-        """Compute a PRS and save it to a .csv file in the current directory.
-        name = None. Name or path of the saved prs file. If not given, use the name of the GENO object.
-        clumped = True. To use the data contained in the .data_clumped attribute (after using the .clump() method or clump=True when initializing the GENO object.) False to use the unclumped data (in the .data attribute)
-        weighted=True to perform a PRS weighted by the BETA column estimates. False for an unweighted PRS (equivalent to BETAs == 1)
-        path = None. Can be used to provide a path to a bed/bim/fam set of genetic files to use for PRS calculation. If not provided, will use the genetic data extracted with the .extract_snps method.
-        """
-        ## Verify that the data has been clumped (or at least assigned to the data_clumped attribute)
-        if not(hasattr(self,"data_clumped")) and clumped:
-            raise ValueError("clumped = True argument but the data is not clumped. \ \n Use .clump() first to clump the data or use clumped = False to perform PRS on the unclumped data.")
-        if clumped:
-            print("Using clumped data for PRS calculation.")
-            prs_data = prs_func(self.data_clumped, weighted, path, checks=self.checks, ram=self.ram, name=self.name)       
-        else:
-            print("Using unclumped data for PRS calculation.")
-            prs_data = prs_func(self.data, weighted, path, checks=self.checks, ram=self.ram, name=self.name)
-
-        if name is None:
-            prs_filename = f"{self.name}_prs.csv"
-        else:
-            prs_filename = os.path.splitext(name)[0] + ".csv"
-        prs_data.to_csv(prs_filename, index=False, header=True)
-        print (f"PRS data saved to {prs_filename}")
-        return prs_data
-
-                    
     def lift(self, clumped=True, start="hg19",end="hg38", replace=False, extraction_file=False, chain_file="", name=None, liftover=False, liftover_path=""):
         """Perform a liftover from a genetic build to another.
         If the chain file required to do the liftover is not present, download it first. It is also possible to manually provide the path to the chain file.
@@ -398,6 +382,52 @@ class GENO:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             data = lift_data(data, start=start, end=end, replace=replace, extraction_file=extraction_file, chain_file=chain_file, name=f"{self.name if name is None else name}")
-        return data
-                
-
+        return data   
+    
+    def standardize(self):
+        """
+        Standardize the Betas and adjust the SE column accordingly.
+        """
+        for column in ["BETA","SE"]:
+            if not(column in self.data.columns):
+                raise ValueError("The column {column} is not found in the data!".format(column=column))
+        self.data["BETA"]=(self.data.BETA-np.mean(self.data.BETA))/np.std(self.data.BETA)
+        self.data["SE"]=np.abs(self.data.BETA/st.norm.ppf(self.data.P/2))
+        print("The Beta column has been standardized and the SE column has been adjusted.")
+        
+    def sort_group(self,method="lowest_p"):
+        """
+        Ways to handle duplicate SNPs if the instance is a combination of different GENOs.
+        method="lowest_p" to keep the lowest P for each SNP. 
+        """
+        if method=="lowest_p":
+            self.data=self.data.sort_values(by=["P"])
+            self.data=self.data.groupby(by=["SNP"]).first().reset_index(drop=False)
+        return
+    
+    def copy(self):
+        """
+        Return a deep copy of the GENO instance.
+        """
+        Copy=copy.deepcopy(self)
+        return Copy
+        
+    def save (self,path="",fmt="h5",sep="\t", header=True, clumped=True):
+        """
+        Save to a .h5 file in the "data" field (default) at the location specified by path or current folder if not.
+        path: path of the folder to save the file
+        fmt: format to use. Can be either .h5 (default), .csv, .txt
+        sep: delimiter to use (only for .csv and .txt), default is \t
+        header=True: to save the column names or not (only for .csv and .txt)
+        clumped=False to save the full data, or the clumped data (=True)
+        %To Do: add .vcf and .vcf.gz
+        """
+        if clumped:
+            if not(hasattr(self,"data_clumped")):
+                raise ValueError("clumped=True was used but the data is not clumped. \
+                \n Use .clump() first, or clumped=False.")
+            else:
+                save_data(self.data_clumped, name = self.name+"_clumped", path=path, fmt=fmt, sep=sep, header=header)
+        else:
+            save_data(self.data, name = self.name, path=path, fmt=fmt, sep=sep, header=header)        
+        return
