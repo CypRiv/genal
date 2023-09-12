@@ -9,127 +9,252 @@ from .tools import *
 
 
 def association_test_func(data, covar_list, standardize, name, data_pheno, pheno_type):
-    
-    
-    ## Check that extract_snps has been called.
+    """
+    Conduct single-SNP association tests against a phenotype.
+
+    This function performs a series of operations:
+        1. Checks for necessary preliminary steps.
+        2. Updates the FAM file with the phenotype data.
+        3. Creates a covariate file if required.
+        4. Runs a PLINK association test.
+        5. Processes the results and returns them.
+
+    Args:
+        data (pd.DataFrame): Genetic data with the standard GENO columns.
+        covar_list (list): List of column names in the data_pheno DataFrame to use as covariates.
+        standardize (bool): Flag indicating if the phenotype needs standardization.
+        name (str): Prefix for the filenames used during the process.
+        data_pheno (pd.DataFrame): Phenotype data with at least an IID and PHENO columns.
+        pheno_type (str): Type of phenotype ('binary' or 'quant').
+
+    Returns:
+        pd.DataFrame: Processed results of the association test.
+
+    This function corresponds to the following GENO method: :meth:`GENO.association_test`.
+    """
+
+    # Check necessary files are available
     genetic_path = os.path.join("tmp_GENAL", f"{name}_allchr")
     if not check_bfiles(genetic_path):
-        raise FileNotFoundError("You first need to run the extract_snps() method before performing association tests.")
+        raise FileNotFoundError("Run the extract_snps() method before performing association tests.")
         
-    ## Set the phenotype in the FAM file and adjusts depending whether it's binary or continuous
-    fam=pd.read_csv(genetic_path + ".fam",header=None,delimiter=" ")
-    data_pheno_trait=data_pheno[["IID","PHENO"]].rename(columns={"IID":0}).copy()
-    fam=fam.merge(data_pheno_trait,how="left",on=0)
-    fam[5]=fam.PHENO
-    fam=fam.drop(axis=1,columns="PHENO")
-    if pheno_type=="binary":
-        fam[5]=fam[5]+1
-        fam[5]=fam[5].astype("Int64")
-    if (pheno_type=="quant") & (standardize==True):
-        print("Standardizing the phenotype to approximate a normal distribution. Use standardize = False if you do not want to standardize.")
-        fam[5]=(fam[5]-fam[5].mean())/fam[5].std()
-    fam[5]=fam[5].fillna(-9)
-    fam.to_csv(genetic_path + ".fam",header=None,index=False,sep=" ")
+    # Update phenotype in the FAM file
+    fam = _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize)
     
-    ## Set the covariate file
+    # Prepare covariate file if covariates are provided
+    covar, covar_filename = _handle_covariates(covar_list, data_pheno, name)
+        
+    # Execute PLINK association test
+    output, method = _run_plink_assoc_test(genetic_path, name, pheno_type, covar, covar_filename, covar_list)
+    
+    # Process and return results
+    return _process_results(output, method, data, pheno_type)
+
+def _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize):
+    """Helper function to prepare the FAM file with phenotype data."""
+    # Read the FAM file
+    fam = pd.read_csv(genetic_path + ".fam", header=None, delimiter=" ")
+    # Extract relevant phenotype data
+    data_pheno_trait = data_pheno[["IID","PHENO"]].rename(columns={"IID":0}).copy()
+    # Merge phenotype data with the FAM dataframe
+    fam = fam.merge(data_pheno_trait, how="left", on=0)
+    fam[5] = fam.PHENO
+    fam = fam.drop(axis=1, columns="PHENO")
+    
+    # Update phenotype values based on its type
+    if pheno_type == "binary":
+        fam[5] = fam[5] + 1
+        fam[5] = fam[5].astype("Int64")
+    if (pheno_type == "quant") & (standardize == True):
+        # Standardizing for quantitative phenotypes
+        print("Standardizing the phenotype to approximate a normal distribution. Use standardize = False if you do not want to standardize.")
+        fam[5] = (fam[5] - fam[5].mean()) / fam[5].std()
+    fam[5] = fam[5].fillna(-9)
+    fam.to_csv(genetic_path + ".fam", header=None, index=False, sep=" ")
+    return fam
+
+def _handle_covariates(covar_list, data_pheno, name):
+    """Helper function to prepare the covariate file."""
     if len(covar_list) > 0:
+        # Ensure all covariates are present in phenotype data
         for col in covar_list:
             if col not in data_pheno.columns:
                 raise TypeError(f"The {col} column is not found in the .phenotype dataframe.")
-        data_pheno = data_pheno[["IID", "IID"]+covar_list]
+        # Select required columns and rename columns
+        data_pheno = data_pheno[["IID", "IID"] + covar_list]
         data_pheno = data_pheno.rename(columns={data_pheno.columns[1]: "FID"})
+        # Remove rows with NA values and print their number
+        nrows = data_pheno.shape[0]
+        data_pheno.dropna(inplace=True)
+        removed_rows = nrows - data_pheno.shape[0]
+        if removed_rows > 0:
+            print(f"{removed_rows} rows contain NA values in the phenotype data and will be excluded from the association tests.")
+         
+        # Define the covariate filename
         covar_filename = os.path.join("tmp_GENAL", f"{name}_covar.cov")
-        data_pheno.to_csv(covar_filename, sep = " ", header = True, index = False)
+        data_pheno.to_csv(covar_filename, sep=" ", header=True, index=False)
         covar = True
     else:
         covar = False
-        
-    ## Run plink association test with the correct arguments corresponding to the type of the phenotype (binary vs continuous) and adding covar arguments if adjusting for covariates
-    method= "logistic" if pheno_type=="binary" else "linear"
-    covar_argument=f"--covar {covar_filename} --hide-covar" if covar==True else ""
-    print(f"Running single-SNP {method} regression tests {f'adjusting for: {covar_list}' if covar==True else 'without covariates'}.")
-    output = os.path.join("tmp_GENAL", name)
-    command=f"{get_plink19_path()} --bfile {genetic_path} --{method} {covar_argument} --out {output}"
-    subprocess.run(command,shell=True,capture_output=True,text=True,check=True)
+        covar_filename = None
+    return covar, covar_filename
 
-    ## Read the results; log-transform OR if logistic; merge with clumped data to update BETA and P columns; flip the betas if the A1 allele from plink match the NEA and not the EA allele from the base data ; update SE column ; drop and print the number of SNPs removed due to A1 from plink matching neither EA nor NEA from the base data
-    results_path = output+f".assoc."+method
-    assoc=pd.read_csv(results_path,delimiter="\s+")
-    assoc["BETA"]=np.log(assoc.OR) if pheno_type=="binary" else assoc.BETA
-    data=data.drop(axis=1,columns=["BETA",'CHR','P'],errors="ignore").merge(assoc,how="inner",on="SNP")
-    data["BETA"]=np.where(data.EA==data.A1,data.BETA,np.where(data.NEA==data.A1,-data.BETA,np.nan))
-    data["SE"]=np.abs(data.BETA/st.norm.ppf(data.P/2))
-    data=data.drop(axis=1,columns=["A1","TEST","NMISS","OR","STAT","BP"],errors="ignore")
-    nrow_previous=data.shape[0]
-    data=data.dropna(subset="BETA")
-    delta_nrow=nrow_previous-data.shape[0]
-    if delta_nrow>0 : print (f"{delta_nrow} rows were deleted due to a mismatch between the effect allele and the allele columns of the genetic data.") 
+def _run_plink_assoc_test(genetic_path, name, pheno_type, covar, covar_filename, covar_list):
+    """Helper function to execute the PLINK association test."""
+    method = "logistic" if pheno_type == "binary" else "linear"
+    print(f"Running single-SNP {method} regression tests on {genetic_path} data {f'with adjustment for: {covar_list}' if covar else 'without covariate adjustments'}.")
+    # Formulate the covariate argument for the PLINK command
+    covar_argument = f"--covar {covar_filename} --hide-covar" if covar == True else ""
+    output = os.path.join("tmp_GENAL", name)
+    # Construct and run the PLINK command
+    command = f"{get_plink19_path()} --bfile {genetic_path} --{method} {covar_argument} --out {output}"
+    subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
+    return output, method
+
+def _process_results(output, method, data, pheno_type):
+    """Helper function to process results after the PLINK association test."""
+    # Path to PLINK results
+    results_path = output + f".assoc." + method
+    assoc = pd.read_csv(results_path, delimiter="\s+")
+    
+    # If logistic regression, log-transform the odds ratio
+    assoc["BETA"] = np.log(assoc.OR) if pheno_type == "binary" else assoc.BETA
+    # Merge results with the clumped data
+    data = data.drop(axis=1, columns=["BETA", 'CHR', 'P'], errors="ignore").merge(assoc, how="inner", on="SNP")
+    
+    # Adjust beta values based on allele match
+    data["BETA"] = np.where(data.EA == data.A1, data.BETA, np.where(data.NEA == data.A1, -data.BETA, np.nan))
+    
+    # Calculate and set standard error values
+    data["SE"] = np.abs(data.BETA / st.norm.ppf(data.P / 2))
+    # Drop unnecessary columns
+    data = data.drop(axis=1, columns=["A1", "TEST", "NMISS", "OR", "STAT", "BP"], errors="ignore")
+    
+    # Remove rows with mismatches in allele columns and notify the user
+    nrow_previous = data.shape[0]
+    data = data.dropna(subset="BETA")
+    delta_nrow = nrow_previous - data.shape[0]
+    if delta_nrow > 0: 
+        print(f"{delta_nrow} rows removed due to allele discrepancies between the main data and the genetic data.")
     return data
     
 
-
+    
+    
 def set_phenotype_func(data, PHENO, PHENO_type, IID, alternate_control):
-    """ Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.
-        data: pandas dataframe containing at least an individual IDs column and one phenotype column 
-        IID: name of the individual IDs column in data
-        PHENO: name of the phenotype column in data
-        PHENO_type="" The function will try to guess if the phenotype is binary or quantitative. To avoid the guessing, specify "quant" or "binary". If binary, the function will code it as 0 for controls, 1 for cases.
-        alternate_control=False. The function assumes that for a binary trait, the controls are coded with the most frequent value. If that is not the case, use = True.
     """
-    ## Make sure the columns passed as arguments exist in the dataframe. If there exists columns whose name matches our standard name for PHENO and IID and which are different from the ones passed as arguments, drop them. Rename IID and PHENO to our standard names.
-    for column in [PHENO,IID]:
+    Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.
+
+    Args:
+        data (pd.DataFrame): Contains at least an individual IDs column and one phenotype column.
+        IID (str): Name of the individual IDs column in data.
+        PHENO (str): Name of the phenotype column in data.
+        PHENO_type (str, optional): Type of the phenotype column. Either "quant" for quantitative (continuous) or "binary".The function tries to infer the type if not provided.
+        alternate_control (bool): Assumes that for a binary trait, the controls are coded with the most frequent value. Use True to reverse the assumption.
+
+    Returns:
+        pd.DataFrame: The modified data.
+        str: The inferred or provided PHENO_type.
+
+    Raises:
+        ValueError: For inconsistencies in the provided data or arguments.
+
+    This function corresponds to the following GENO method: :meth:`GENO.set_phenotype`.
+    """
+    
+    _validate_columns_existence(data, PHENO, IID)
+    data = _standardize_column_names(data, PHENO, IID)
+    PHENO_type = _determine_phenotype_type(data, PHENO_type)
+    data = _validate_and_process_phenotype(data, PHENO, PHENO_type, alternate_control)
+    _report_na_values(data)
+
+    print("The phenotype data is stored in the .phenotype attribute.")
+    return data, PHENO_type
+
+def _validate_columns_existence(data, PHENO, IID):
+    """Checks if columns exist and raises errors if not."""
+    for column in [PHENO, IID]:
+        # Raise an error if the column name is not provided
         if column is None:
-            raise ValueError(f"You need to provide a name for the {column} variable.")
-        if not(column in data.columns):
-            raise ValueError(f"The column {column} is not found in the data and is mandatory!")
-    if PHENO!="PHENO":    
-        data=data.drop(axis=1,columns=["PHENO"],errors="ignore")
-    if IID!="IID":
-        data=data.drop(axis=1,columns=["IID"],errors="ignore")
-    data=data.rename(columns={IID:"IID",PHENO:"PHENO"})
+            raise ValueError(f"Please provide a name for the {column} variable.")
+        # Raise an error if the column does not exist in the data
+        if column not in data.columns:
+            raise ValueError(f"The column '{column}' is not present in the dataset. This column is required!")
 
-    ## Guess the type of the phenotype
-    if (PHENO_type==""):
-        if len(np.unique(data.PHENO.dropna()))==2:
-            PHENO_type="binary"
-            print("The PHENO column looks like a binary trait. If that is not the case, use PHENO_type='quant'")
-        else:
-            PHENO_type="quant"
-            print("The PHENO column looks like a quantitative trait. If that is not the case, use PHENO_type='binary'")
+def _standardize_column_names(data, PHENO, IID):
+    """Standardizes the column names to 'IID' and 'PHENO'."""
+    # Drop redundant columns if they exist and rename the target columns to standard names
+    if PHENO != "PHENO":    
+        data.drop(axis=1, columns=["PHENO"], errors="ignore", inplace=True)
+    if IID != "IID":
+        data.drop(axis=1, columns=["IID"], errors="ignore", inplace=True)
+    data.rename(columns={IID: "IID", PHENO: "PHENO"}, inplace=True)
+    return data
 
-    ## Verify that the binary trait is indeed binary and code it in 0/1 by guessing the control/cases. If the guess is wrong, can be changed using alternate_control=True
-    ## Verify that the quantitative trait is numeric
-    if PHENO_type=="binary":
-        if len(np.unique(data.PHENO.dropna())) != 2:
-            raise ValueError(f"The {PHENO} column is not binary, it contains more than 2 distinct values!")
-        code_control=data.PHENO.value_counts().index[0]
-        code_case=data.PHENO.value_counts().index[1]
-        print(f"We are assuming the value coding for controls in the PHENO column is {code_control}. If that is not the case, use alternate_control=True")
-        if alternate_control==False:
-            data=data.replace({"PHENO":{code_control:0,code_case:1}}) 
+def _determine_phenotype_type(data, PHENO_type):
+    """Guesses or validates the phenotype type."""
+    # If phenotype type is not given, deduce it based on the unique values in the column
+    if PHENO_type is None:
+        if len(np.unique(data.PHENO.dropna())) == 2:
+            print("Detected a binary phenotype in the 'PHENO' column. Specify 'PHENO_type=\"quant\"' if this is incorrect.")
+            return "binary"
         else:
-            data=data.replace({"PHENO":{code_control:1,code_case:0}})
-    elif PHENO_type=="quant":
-        if not is_numeric_dtype(data.PHENO):
-            raise ValueError(f"The {PHENO} column is not numeric!")
+            print("Detected a quantitative phenotype in the 'PHENO' column. Specify 'PHENO_type=\"binary\"' if this is incorrect.")
+            return "quant"
     else:
-        raise ValueError(f"The only passible values for the argument PHENO_type are 'binary' or 'quant'")
+        if not PHENO_type in ["binary", "quant"]:
+            raise ValueError(f"The only possible values for the PHENO_type argument are 'binary' or 'quant'")
+    return PHENO_type
 
-    ## Report the number of NAs in both columns.
+def _validate_and_process_phenotype(data, PHENO, PHENO_type, alternate_control):
+    """Validates the phenotype and processes it accordingly."""
+    # Process the phenotype based on its type
+    if PHENO_type == "binary":
+        _process_binary_phenotype(data, PHENO, alternate_control)
+    elif PHENO_type == "quant":
+        _validate_quantitative_phenotype(data, PHENO)
+    else:
+        raise ValueError("Accepted values for 'PHENO_type' are 'binary' or 'quant'.")
+    return data
+
+def _process_binary_phenotype(data, PHENO, alternate_control):
+    """Processes a binary phenotype."""
+    # Ensure that the phenotype is binary
+    if len(np.unique(data.PHENO.dropna())) != 2:
+        raise ValueError(f"The '{PHENO}' column is not binary as it contains more than two distinct values.")
+
+    code_control = data.PHENO.value_counts().index[0]
+    code_case = data.PHENO.value_counts().index[1]
+    print(f"Identified {code_control} as the control code in 'PHENO'. Set 'alternate_control=True' to inverse this interpretation.")
+    
+    # Update the control and case codings based on user preference
+    if not alternate_control:
+        data.replace({"PHENO": {code_control: 0, code_case: 1}}, inplace=True) 
+    else:
+        data.replace({"PHENO": {code_control: 1, code_case: 0}}, inplace=True)
+
+def _validate_quantitative_phenotype(data, PHENO):
+    """Validates a quantitative phenotype."""
+    # Ensure that the phenotype is numeric
+    if not is_numeric_dtype(data.PHENO):
+        raise ValueError(f"The '{PHENO}' column must contain numeric values for a quantitative phenotype.")
+
+def _report_na_values(data):
+    """Reports the number of NA values in 'IID' and 'PHENO' columns."""
     nrows = data.shape[0]
     n_nan_id = data.IID.isna().sum()
     n_nan_pheno = data.PHENO.isna().sum()
+
+    # Report NA values in ID and PHENO columns, if they exist
     if n_nan_id > 0:
-        print(f"The phenotype dataframe contains {n_nan_id}({n_nan_id/nrows*100:.3f}%) NA values in the ID column. These rows will be dropped during association testing.")
+        print(f"Detected {n_nan_id} NA values in the 'ID' column, accounting for {n_nan_id/nrows*100:.3f}% of entries. These will be omitted during analyses.")
     if n_nan_pheno > 0:
-        print(f"The phenotype dataframe contains {n_nan_pheno}({n_nan_pheno/nrows*100:.3f}%) NA values in the PHENO column. These rows will be dropped during association testing.")
-        
-    print("The phenotype data is stored in the .phenotype attribute.")
-    return data, PHENO_type
+        print(f"Detected {n_nan_pheno} NA values in the 'PHENO' column, accounting for {n_nan_pheno/nrows*100:.3f}% of entries. These will be omitted during analyses.")
     
     
     
     
+
     
     
     

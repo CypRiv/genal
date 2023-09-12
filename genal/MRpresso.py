@@ -16,18 +16,23 @@ from functools import partial
 def mr_presso(data, BETA_e_columns = ["BETA_e"], n_iterations = 1000, outlier_test = True, distortion_test = True, significance_p = 0.05, cpus = 5):
     """
     Perform the MR-PRESSO algorithm for detection of horizontal pleiotropy.
-    data: dataframe with at least 4 columns: BETA_o (outcome), SE_o, BETA_e (exposure), SE_e
-    n_iterations: number of steps performed (random data generation)
-    outlier_test: identification of outlier SNPs responsible for horizontal pleiotropy (performed if global test p_value < significance_p)
-    distortion_test: testing of significant distortion in the causal estimates before and after outlier removal (performed if global test p_value < significance_p)
-    significance_p: statistical significance threshold for the detection of horizontal pleiotropy (both for the global test and outlier identification)
-   
-    return: [mod_table, GlobalTest, OutlierTest, DistortionTest]
-        mod_table: table with the original (before outlier removal) and outlier-corrected (after outlier removal) inverse variance-weighted MR results 
-        GlobalTest: p-value of the global MR-PRESSO test indicating the presence of horizontal pleiotropy
-        OutlierTest: table assigning one p-value to each SNP representing the likelihood of this SNP being responsible for the global pleiotropy (set to nan if global test p_value > significance_p)
-        DistortionTest: p-value for the distortion test 
+
+    Args:
+        data (pd.DataFrame): DataFrame with at least 4 columns: BETA_o (outcome), SE_o, BETA_e (exposure), SE_e.
+        BETA_e_columns (list): List of exposure beta columns.
+        n_iterations (int): Number of steps performed (random data generation).
+        outlier_test (bool): If True, identifies outlier SNPs responsible for horizontal pleiotropy.
+        distortion_test (bool): If True, tests significant distortion in the causal estimates.
+        significance_p (float): Statistical significance threshold for the detection of horizontal pleiotropy.
+        cpus (int): Number of CPUs to use for parallel processing.
+
+    Returns:
+        mod_table (pd.DataFrame): DataFrame with the original and outlier-corrected inverse variance-weighted MR results.
+        GlobalTest (dict): Dictionary with p-value of the global MR-PRESSO test.
+        OutlierTest (pd.DataFrame): DataFrame with p-value for each SNP for the outlier test.
+        BiasTest (dict): Dictionary with results of the distortion test.
     """
+
 
     # Transforming the data
     data = data[["BETA_o", *BETA_e_columns, "SE_o", "SE_e"]].dropna()
@@ -54,13 +59,15 @@ def mr_presso(data, BETA_e_columns = ["BETA_e"], n_iterations = 1000, outlier_te
     Random_data_e = np.vstack([r[1] for r in results])
     Random_data_o = np.vstack([r[2] for r in results])
 
+    global_p = np.sum([r > RSSobs[0] for r in RSSexp]) / n_iterations
+    global_p_str = global_p if global_p > 1/n_iterations else f"< {1/n_iterations:.1e}"
     if outlier_test:
-        GlobalTest = {'RSSobs': RSSobs[0], 'Global_test_p': np.sum([r > RSSobs[0] for r in RSSexp]) / n_iterations}
+        GlobalTest = {'RSSobs': RSSobs[0], 'Global_test_p': global_p_str}
     else:
-        GlobalTest = {'RSSobs': RSSobs, 'Global_test_p': np.sum([r > RSSobs for r in RSSexp]) / n_iterations}
+        GlobalTest = {'RSSobs': RSSobs, 'Global_test_p': global_p_str}
 
     # 3- Computing the single IV outlier test
-    if GlobalTest['Pvalue'] < significance_p and outlier_test:
+    if global_p < significance_p and outlier_test:
         print("Performing the Outlier test.") 
         
         if len(BETA_e_columns) == 1:
