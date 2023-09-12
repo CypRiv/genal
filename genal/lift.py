@@ -9,104 +9,131 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .tools import *
 
-def lift_data(data, start="hg19",end="hg38", replace=False, extraction_file=False, chain_file="", name=""):
-    """Perform a liftover from a genetic build to another.
-    If the chain file required to do the liftover is not present, download it first. It is also possible to manually provide the path to the chain file.
-    If the number of SNPs to be lifted is large (> a few millions), it is faster to use the lift_data_liftover function.
-    start="hg19": current build of the data
-    end="hg38": build to be lifted to
-    replace=False: whether to change the dataframe inplace or return a new one
-    extraction_file==True, also print a CHR POS SNP space delimited file for extraction in All of Us (WES data)
-    chain_file="": path to a local chain file to be used for the lift. If provided, the start and end arguments are not considered.
-    name="": can be used to specify a filename or filepath (without extension) to save the lifted dataframe. If not provided, will be saved in the current folder as [name]_lifted.txt
+
+def lift_data(data, start="hg19", end="hg38", extraction_file=False, chain_file=None, name=""):
     """
-    ##Check that the mandatory columns are present, make sure the type is right, and create the tmp folder
-    for column in ["CHR","POS"]:
-        if not(column in data.columns):
-            raise ValueError("The column {column} is not found in the data!".format(column=column))
+    Perform a liftover from one genetic build to another. If the chain file required for the liftover is not present, it will be downloaded. It's also possible to manually provide the path to the chain file. 
+    If the dataset is large, it is suggested to use an alternate method (e.g., `lift_data_liftover`). 
+    
+    Args:
+        data (pd.DataFrame): The input data containing at least "CHR" and "POS" columns.
+        start (str, optional): The current build of the data. Defaults to "hg19".
+        end (str, optional): The target build for liftover. Defaults to "hg38".
+        extraction_file (bool, optional): If True, also prints a CHR POS SNP space-delimited file for extraction. Defaults to False.
+        chain_file (str, optional): Path to a local chain file for the lift. Overrides the start and end arguments if provided.
+        name (str, optional): Specify a filename or filepath (without extension) for saving. If not provided, uses [name]_lifted.txt.
 
+    Raises:
+        ValueError: If required columns are missing or if provided chain file path is incorrect.
+
+    Returns:
+        pd.DataFrame: Lifted data.
+        
+    Notes:
+        Function for the :meth:`GENO.lift` method.
+    """
+    
+    # Ensure mandatory columns are present in the input data
+    for column in ["CHR", "POS"]:
+        if column not in data.columns:
+            raise ValueError(f"The column {column} is not found in the data!")
+
+    # Create temporary directory if it doesn't exist
     if not os.path.exists("tmp_GENAL"):
-        os.makedirs("tmp_GENAL")     
+        try:
+            os.makedirs("tmp_GENAL")
+        except OSError:
+            raise OSError("Unable to create the 'tmp_GENAL' directory. Check permissions.")
+    
+    # Prepare chain file and get LiftOver object
+    lo = prepare_chain_file(chain_file, start, end)
+    
+    # Perform liftover
+    data = lift_coordinates(data, lo)
+    
+    # Handle post-liftover operations
+    data = post_lift_operations(data, name, extraction_file)
+    
+    return data
 
-    # Loading the appropriate chain file.
-    if chain_file!="": #If user provides path to a local chain path
-        print("You provided a path to a local chain path. This will be used for the lift.")
+def prepare_chain_file(chain_file, start, end):
+    """Handle chain file loading, downloading if necessary. Return LiftOver object."""
+    if chain_file is not None:  # If a local chain file is provided
         if not os.path.isfile(chain_file):
-            raise ValueError("The path you provided does not lead to a file.")
-        else:
-            lo = LiftOver(chain_file)
-    else: #Interpret the start and end build
-        chain_name=f"{start.lower()}To{end.capitalize()}.over.chain"
+            raise ValueError("The provided path does not lead to a valid file.")
+        print("You provided a path to a local chain path which will be used for the lift.")
+        lo = LiftOver(chain_file)
+    else:  # Use the specified start and end builds to identify chain file
+        # Construct chain filename
+        chain_name = f"{start.lower()}To{end.capitalize()}.over.chain"
         config = read_config()
         ref_path = config["paths"]["ref_path"]
         chains_folder_path = os.path.join(ref_path, "chain_files")
-        if not os.path.exists(chains_folder_path): #Create the directory if necessary
-            os.makedirs(chains_folder_path)
+
+        # Ensure directory for chain files exists
+        if not os.path.exists(chains_folder_path):
+            try:
+                os.makedirs(chains_folder_path)
+            except OSError:
+                raise OSError("Unable to create the 'tmp_GENAL' directory. Check permissions.")
+
+        # Check for the chain file locally or download it if necessary
         chain_path = os.path.join(chains_folder_path, chain_name)
-        if os.path.isfile(chain_path): #If file already exists
-            print(f"Found chain file to lift from {start} to {end}.")
-        else: #If not: attempts to download it
-            print(f"The chain file to lift from {start} to {end} was not found. Attempting to download it to {chains_folder_path} (You can change this with set_reference_folder(path).)")
+        if not os.path.isfile(chain_path):
+            # Download the chain file
             url = f"https://hgdownload.soe.ucsc.edu/goldenPath/{start.lower()}/liftOver/{chain_name}.gz"
-            try: #Attempts to download
-                wget.download(url,out=chains_folder_path) 
+            try:
+                wget.download(url, out=chains_folder_path)
+                # Decompress the downloaded file
+                print(f"The download was successful. Unzipping...")
+                with gzip.open(f'{chain_path}.gz', 'rb') as f_in, open(chain_path, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
             except Exception as e:
                 print(f"The download was unsuccessful: {e}")
-                print (f"You can manually download the appropriate chain file at http://hgdownload.cse.ucsc.edu/downloads.html#liftover and specify its local path with the chain_file argument.")
-                raise FileNotFoundError(f"Chain file not found.")
-            print(f"The download was successful. Unzipping...")
-            with gzip.open(f'{chain_path}.gz', 'rb') as f_in:
-                with open(chain_path, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+                print("Consider downloading the chain file manually from the UCSC website and providing its path via the chain_file argument.")
+                raise FileNotFoundError("Chain file not found.")
         lo = LiftOver(chain_path)
+    return lo
 
-    #Deleting NAs in CHR and POS columns
-    nrows=data.shape[0]
-    data.dropna(subset=["CHR","POS"],inplace=True)
-    data.reset_index(drop=True,inplace=True)
-    n_na=nrows-data.dropna().shape[0]
-    if n_na>0:
-        print(f"Excluding {n_na}({n_na/nrows*100:.3f}%) SNPs containing NaN values in columns CHR or POS.")
+def lift_coordinates(data, lo):
+    """Perform liftover on data using LiftOver object after handling missing values."""
+    # Handle missing values in key columns
+    nrows = data.shape[0]
+    data.dropna(subset=["CHR", "POS"], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    n_na = nrows - data.shape[0]
+    if n_na:
+        print(f"Excluded {n_na} SNPs ({n_na/nrows*100:.3f}%) with NaN values in CHR or POS columns.")
 
-    #Lifting
-    if nrows>1000000:
-        print("Your data is large, this can take a few minutes...")
-    
-   # print("top")
-   # def convert_coordinate_wrapper(i):
-   #     return lo.convert_coordinate(f'chr{data.loc[i,"CHR"]}', data.loc[i,"POS"], '-')
-   # with ThreadPoolExecutor() as executor: 
-   #     results = list(tqdm(executor.map(convert_coordinate_wrapper, range(len(data))), total=len(data)))
-    
-    
-    def convert_coordinate_wrapper(args):
+    # Perform the lift
+    def convert_coordinate(args):
         return lo.convert_coordinate(f'chr{args[0]}', args[1], '-')
+    
     args = data[['CHR', 'POS']].to_records(index=False)
-    with ThreadPoolExecutor() as executor: 
-        results = list(executor.map(convert_coordinate_wrapper, args))
+    results = list(ThreadPoolExecutor().map(convert_coordinate, args))
     
     data['POS'] = [res[0][1] if res else np.nan for res in results]
-    nrows=data.shape[0]
-    data.dropna(subset=["POS"],inplace=True)
+    nrows = data.shape[0]
+    data.dropna(subset=["POS"], inplace=True)
     data['POS'] = data['POS'].astype("Int32")
-    data.reset_index(drop=True,inplace=True)
-    n_na=nrows-data.dropna().shape[0]
-    if n_na > 0:
-        print(f"Lift completed. {n_na}({n_na/nrows*100:.3f}%) SNPs could not been lifted.")
+    data.reset_index(drop=True, inplace=True)
+    n_na = nrows - data.shape[0]
+    if n_na:
+        print(f"{n_na} SNPs ({n_na/nrows*100:.3f}%) could not be lifted.")
     else:
-        print("Lift completed. All the SNPs have been lifted.")
+        print("All SNPs have been lifted successfully.")
+    return data
 
-    ## Save files: whole data and also the extraction file if extraction_file=True
-    data.to_csv(f"{name + '_lifted'}.txt",sep="\t",header=True,index=False)
+def post_lift_operations(data, name, extraction_file):
+    """Handle post-liftover operations like reporting, and saving results."""
+    data.to_csv(f"{name + '_lifted'}.txt", sep="\t", header=True, index=False)
     print(f"Lifted list of SNPs saved to {name + '_lifted'}.txt")
     if extraction_file:
         if not("SNP" in data.columns):
-            data["SNP"]=data.CHR.astype(str)+":"+data.POS.astype(str)
-        data[["CHR","POS","SNP"]].to_csv(f"{name+ '_lifted'}_extraction.txt", sep=" ", header=False, index=False)
+            data["SNP"] = data["CHR"].astype(str) + ":" + data["POS"].astype(str)
+        data[["CHR", "POS", "SNP"]].to_csv(f"{name + '_lifted'}_extraction.txt", sep=" ", header=False, index=False)
         print(f"Extraction file saved to {name+ '_lifted'}_extraction.txt")
-
     return data
-
 
 
 
