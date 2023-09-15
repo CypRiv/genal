@@ -14,7 +14,7 @@ def remove_na(data):
     data.dropna(inplace=True)
     n_del = nrows - data.shape[0]
     if n_del>0:
-        print(f"Deleted {n_del}({n_del/nrows*100:.3f}%) rows containing NA values in columns {columns_na}. Use preprocessing = 1 to keep the rows containing NaN values.")
+        print(f"Deleted {n_del}({n_del/nrows*100:.3f}%) rows containing NA values in columns {columns_na}. Use preprocessing = 1 to keep the rows containing NA values.")
     return data
 
 def check_snp_column(data):
@@ -44,7 +44,7 @@ def check_allele_column(data, allele_col, keep_multi):
         multi_count = multi_condition.sum()
         if multi_count > 0:
             data.loc[multi_condition, allele_col] = np.nan
-            print(f"{multi_count}({multi_count/nrows*100:.3f}%) rows containing multiallelic values in the {allele_col} column and are set to nan. Use keep_multi=True to keep them.")
+            print(f"{multi_count}({multi_count/nrows*100:.3f}%) rows containing multiallelic values in the {allele_col} column are set to nan. Use keep_multi=True to keep them.")
     return data
 
 def fill_se_p(data):
@@ -151,7 +151,7 @@ def fill_snpids_func(data, reference_panel_df):
             data.loc[missing_snp_condition, "POS"].astype(str) + ":" + 
             data.loc[missing_snp_condition, "EA"].astype(str)
         )
-        print_statement = f" and their name set to CHR:POS:EA."
+        print_statement = f" and their name set to CHR:POS:EA"
         
     print(f"The SNP column (rsID) has been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data{print_statement if standard_name_condition else ''}.")
     return data
@@ -172,14 +172,19 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
     Delete other columns if keep_columns=False, keep them if True.
     """
     rename_dict = {CHR:"CHR", POS:"POS", SNP:"SNP", EA:"EA", NEA:"NEA", BETA:"BETA", SE:"SE", P:"P", EAF:"EAF"}
+    for key, value in rename_dict.items():
+        if key != value and key not in data.columns:
+            raise TypeError(f"Column {key} is not found in the dataframe.")
     if not keep_columns:
-        data = data.loc[:,data.columns.isin([CHR,POS,SNP,EA,NEA,BETA,SE,P,EAF])]
+        cols_to_keep = [CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF]
+        cols_to_drop = [col for col in data.columns if col not in cols_to_keep]
+        data.drop(columns=cols_to_drop, inplace=True)
     data.rename(columns = rename_dict, inplace=True)
     #Check duplicated column names
     column_counts = Counter(data.columns)
     duplicated_columns = [col for col, count in column_counts.items() if (count > 1) and (col in rename_dict.values())]
     if duplicated_columns:
-        raise ValueError(f"After adjusting the column names, the resulting dataframe has duplicated columns. Make sure your dataframe does not have a different column named as {duplicated_columns}.")
+        raise ValueError(f"After adjusting the column names, the resulting dataframe has duplicated columns. Make sure your dataframe does not have a different column named {duplicated_columns}.")
     return data
 
 def check_arguments(df, preprocessing, reference_panel, clumped, effect_column, keep_columns, 

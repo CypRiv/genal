@@ -267,16 +267,16 @@ class GENO:
         # Check if the object already has a reference panel set
         if not hasattr(self, "reference_panel"):
 
-            # If the provided reference_panel is a DataFrame, verify its structure
+            # If the provided reference_panel is a DataFrame, verify its structure and dtypes
             if isinstance(reference_panel, pd.DataFrame):
                 required_cols = ["CHR", "SNP", "POS", "A1", "A2"]
 
                 for col in required_cols:
                     if col not in reference_panel.columns:
-                        raise ValueError(f"The {col} column is not present in the reference_panel provided and is necessary.")
+                        raise ValueError(f"The {col} column is not present in the reference_panel provided and is necessary.")   
 
                 print("Using the provided reference_panel dataframe as the reference panel.")
-                self.reference_panel = reference_panel
+                self.reference_panel = reference_panel.copy()
             else:
                 # Load the reference panel based on the provided string identifier
                 self.reference_panel = load_reference_panel(reference_panel)
@@ -503,22 +503,22 @@ class GENO:
 
         Args:
             methods (list, optional): List of MR methods to run. Possible options include:
-                - "IVW": inverse variance-weighted with random effects and under-dispersion correction
-                - "IVW-FE": inverse variance-weighted with fixed effects
-                - "IVW-RE": inverse variance-weighted with random effects and without under-dispersion correction
-                - "UWR": unweighted regression
-                - "WM": weighted median (bootstrapped standard errors)
-                - "WM-pen": penalised weighted median (bootstrapped standard errors)
-                - "Simple-median": simple median (bootstrapped standard errors)
-                - "Sign": sign concordance test
-                - "Egger": egger regression
-                - "Egger-boot": egger regression with bootstrapped standard errors
-              Default is ["IVW","IVW-FE","UWR","WM","WM-pen","Simple-median","Sign","Egger","Egger-boot"].
+                "IVW": inverse variance-weighted with random effects and under-dispersion correction
+                "IVW-FE": inverse variance-weighted with fixed effects
+                "IVW-RE": inverse variance-weighted with random effects and without under-dispersion correction
+                "UWR": unweighted regression
+                "WM": weighted median (bootstrapped standard errors)
+                "WM-pen": penalised weighted median (bootstrapped standard errors)
+                "Simple-median": simple median (bootstrapped standard errors)
+                "Sign": sign concordance test
+                "Egger": egger regression
+                "Egger-boot": egger regression with bootstrapped standard errors
+                Default is ["IVW","IVW-FE","UWR","WM","WM-pen","Simple-median","Sign","Egger","Egger-boot"].
             action (int, optional): How to treat palindromes during harmonizing between 
                 exposure and outcome data. Accepts:
-                - 1: Doesn't flip them (Assumes all alleles are on the forward strand)
-                - 2: Uses allele frequencies to attempt to flip (conservative, default)
-                - 3: Removes all palindromic SNPs (very conservative)
+                1: Doesn't flip them (Assumes all alleles are on the forward strand)
+                2: Uses allele frequencies to attempt to flip (conservative, default)
+                3: Removes all palindromic SNPs (very conservative)
             eaf_threshold (float, optional): Max effect allele frequency accepted when 
                 flipping palindromic SNPs (relevant if action=2). Default is 0.42.
             heterogeneity (bool, optional): If True, includes heterogeneity tests in the results (Cochran's Q test).Default is False.
