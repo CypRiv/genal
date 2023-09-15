@@ -42,14 +42,13 @@ def set_reference_folder(path=""):
     directory named 'tmp_GENAL' in the current working directory will be used.
     
     Parameters:
-    - path (str, optional): The desired directory path for storing reference data. 
-                            Defaults to a temporary folder in the current working directory.
+        path (str, optional): The desired directory path for storing reference data. Defaults to a temporary folder in the current working directory.
     
     Raises:
-    - OSError: If the directory cannot be created.
+        OSError: If the directory cannot be created.
     
     Returns:
-    - None: The function prints messages to inform the user of the status and any errors.
+        None: The function prints messages to inform the user of the status and any errors.
     """
     
     # If no path is provided, set default path to 'tmp_GENAL' in the current directory
@@ -92,16 +91,15 @@ def get_reference_panel_path(reference_panel="eur"):
     the function attempts to download it.
     
     Parameters:
-    - reference_panel (str, optional): The name of the reference panel or a path to bed/bim/fam files.
-                                       Defaults to "eur".
+        reference_panel (str, optional): The name of the reference panel or a path to bed/bim/fam files. Defaults to "eur".
     
     Raises:
-    - ValueError: If the provided reference panel is not recognized.
-    - OSError: If there's an issue creating the directory.
-    - FileNotFoundError: If the reference panel is not found.
+        ValueError: If the provided reference panel is not recognized.
+        OSError: If there's an issue creating the directory.
+        FileNotFoundError: If the reference panel is not found.
     
     Returns:
-    - str: The path to the reference panel.
+        str: The path to the reference panel.
     """
     
     # Remove file extension and check if it's a path to a bed/bim/fam triple

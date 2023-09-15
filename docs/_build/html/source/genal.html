@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal package &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../_static/doctools.js?v=888ff710"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">genal package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#module-genal.GENO">genal.GENO module</a><ul>
+<li><a class="reference internal" href="#genal.GENO.GENO"><code class="docutils literal notranslate"><span class="pre">GENO</span></code></a><ul>
+<li><a class="reference internal" href="#genal.GENO.GENO.name"><code class="docutils literal notranslate"><span class="pre">GENO.name</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.data"><code class="docutils literal notranslate"><span class="pre">GENO.data</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.data_clumped"><code class="docutils literal notranslate"><span class="pre">GENO.data_clumped</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.phenotype"><code class="docutils literal notranslate"><span class="pre">GENO.phenotype</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.MR_data"><code class="docutils literal notranslate"><span class="pre">GENO.MR_data</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.ram"><code class="docutils literal notranslate"><span class="pre">GENO.ram</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.cpus"><code class="docutils literal notranslate"><span class="pre">GENO.cpus</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.checks"><code class="docutils literal notranslate"><span class="pre">GENO.checks</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.reference_panel"><code class="docutils literal notranslate"><span class="pre">GENO.reference_panel</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.clump"><code class="docutils literal notranslate"><span class="pre">GENO.clump()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.prs"><code class="docutils literal notranslate"><span class="pre">GENO.prs()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.set_phenotype"><code class="docutils literal notranslate"><span class="pre">GENO.set_phenotype()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.association_test"><code class="docutils literal notranslate"><span class="pre">GENO.association_test()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.query_outcome"><code class="docutils literal notranslate"><span class="pre">GENO.query_outcome()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.MR"><code class="docutils literal notranslate"><span class="pre">GENO.MR()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.MRpresso"><code class="docutils literal notranslate"><span class="pre">GENO.MRpresso()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.lift"><code class="docutils literal notranslate"><span class="pre">GENO.lift()</span></code></a></li>
+<li><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">GENO.MR()</span></code></a></li>
+<li><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">GENO.MRpresso()</span></code></a></li>
+<li><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">GENO.association_test()</span></code></a></li>
+<li><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">GENO.clump()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.copy"><code class="docutils literal notranslate"><span class="pre">GENO.copy()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.extract_snps"><code class="docutils literal notranslate"><span class="pre">GENO.extract_snps()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.get_reference_panel"><code class="docutils literal notranslate"><span class="pre">GENO.get_reference_panel()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.init_attributes"><code class="docutils literal notranslate"><span class="pre">GENO.init_attributes()</span></code></a></li>
+<li><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">GENO.name</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.outcome"><code class="docutils literal notranslate"><span class="pre">GENO.outcome</span></code></a></li>
+<li><a class="reference internal" href="#id5"><code class="docutils literal notranslate"><span class="pre">GENO.data_clumped</span></code></a></li>
+<li><a class="reference internal" href="#id6"><code class="docutils literal notranslate"><span class="pre">GENO.cpus</span></code></a></li>
+<li><a class="reference internal" href="#id7"><code class="docutils literal notranslate"><span class="pre">GENO.ram</span></code></a></li>
+<li><a class="reference internal" href="#id8"><code class="docutils literal notranslate"><span class="pre">GENO.lift()</span></code></a></li>
+<li><a class="reference internal" href="#id9"><code class="docutils literal notranslate"><span class="pre">GENO.prs()</span></code></a></li>
+<li><a class="reference internal" href="#id10"><code class="docutils literal notranslate"><span class="pre">GENO.query_outcome()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.save"><code class="docutils literal notranslate"><span class="pre">GENO.save()</span></code></a></li>
+<li><a class="reference internal" href="#id11"><code class="docutils literal notranslate"><span class="pre">GENO.set_phenotype()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.sort_group"><code class="docutils literal notranslate"><span class="pre">GENO.sort_group()</span></code></a></li>
+<li><a class="reference internal" href="#genal.GENO.GENO.standardize"><code class="docutils literal notranslate"><span class="pre">GENO.standardize()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.MR">genal.MR module</a><ul>
+<li><a class="reference internal" href="#genal.MR.linreg"><code class="docutils literal notranslate"><span class="pre">linreg()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_egger_regression"><code class="docutils literal notranslate"><span class="pre">mr_egger_regression()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_egger_regression_bootstrap"><code class="docutils literal notranslate"><span class="pre">mr_egger_regression_bootstrap()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_ivw"><code class="docutils literal notranslate"><span class="pre">mr_ivw()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_ivw_fe"><code class="docutils literal notranslate"><span class="pre">mr_ivw_fe()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_ivw_re"><code class="docutils literal notranslate"><span class="pre">mr_ivw_re()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_pen_wm"><code class="docutils literal notranslate"><span class="pre">mr_pen_wm()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_sign"><code class="docutils literal notranslate"><span class="pre">mr_sign()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_simple_median"><code class="docutils literal notranslate"><span class="pre">mr_simple_median()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_uwr"><code class="docutils literal notranslate"><span class="pre">mr_uwr()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.mr_weighted_median"><code class="docutils literal notranslate"><span class="pre">mr_weighted_median()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.parallel_bootstrap_func"><code class="docutils literal notranslate"><span class="pre">parallel_bootstrap_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.weighted_median"><code class="docutils literal notranslate"><span class="pre">weighted_median()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR.weighted_median_bootstrap"><code class="docutils literal notranslate"><span class="pre">weighted_median_bootstrap()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.MR_tools">genal.MR_tools module</a><ul>
+<li><a class="reference internal" href="#genal.MR_tools.MR_func"><code class="docutils literal notranslate"><span class="pre">MR_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.apply_action_2"><code class="docutils literal notranslate"><span class="pre">apply_action_2()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.check_required_columns"><code class="docutils literal notranslate"><span class="pre">check_required_columns()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.flip_alleles"><code class="docutils literal notranslate"><span class="pre">flip_alleles()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.harmonize_MR"><code class="docutils literal notranslate"><span class="pre">harmonize_MR()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.load_outcome_from_filepath"><code class="docutils literal notranslate"><span class="pre">load_outcome_from_filepath()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.load_outcome_from_geno_object"><code class="docutils literal notranslate"><span class="pre">load_outcome_from_geno_object()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.mrpresso_func"><code class="docutils literal notranslate"><span class="pre">mrpresso_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MR_tools.query_outcome_func"><code class="docutils literal notranslate"><span class="pre">query_outcome_func()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.MRpresso">genal.MRpresso module</a><ul>
+<li><a class="reference internal" href="#genal.MRpresso.getRSS_LOO"><code class="docutils literal notranslate"><span class="pre">getRSS_LOO()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MRpresso.getRandomData"><code class="docutils literal notranslate"><span class="pre">getRandomData()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MRpresso.mr_presso"><code class="docutils literal notranslate"><span class="pre">mr_presso()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MRpresso.parallel_RSS_LOO"><code class="docutils literal notranslate"><span class="pre">parallel_RSS_LOO()</span></code></a></li>
+<li><a class="reference internal" href="#genal.MRpresso.power_eigen"><code class="docutils literal notranslate"><span class="pre">power_eigen()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.association">genal.association module</a><ul>
+<li><a class="reference internal" href="#genal.association.association_test_func"><code class="docutils literal notranslate"><span class="pre">association_test_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.association.set_phenotype_func"><code class="docutils literal notranslate"><span class="pre">set_phenotype_func()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.clump">genal.clump module</a><ul>
+<li><a class="reference internal" href="#genal.clump.clump_data"><code class="docutils literal notranslate"><span class="pre">clump_data()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.extract_prs">genal.extract_prs module</a><ul>
+<li><a class="reference internal" href="#genal.extract_prs.create_bedlist"><code class="docutils literal notranslate"><span class="pre">create_bedlist()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.extract_command_parallel"><code class="docutils literal notranslate"><span class="pre">extract_command_parallel()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.extract_snps_from_combined_data"><code class="docutils literal notranslate"><span class="pre">extract_snps_from_combined_data()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.extract_snps_func"><code class="docutils literal notranslate"><span class="pre">extract_snps_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.handle_multiallelic_variants"><code class="docutils literal notranslate"><span class="pre">handle_multiallelic_variants()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.merge_extracted_snps"><code class="docutils literal notranslate"><span class="pre">merge_extracted_snps()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.prepare_snp_list"><code class="docutils literal notranslate"><span class="pre">prepare_snp_list()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.process_split_data"><code class="docutils literal notranslate"><span class="pre">process_split_data()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.prs_func"><code class="docutils literal notranslate"><span class="pre">prs_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.report_snps_not_found"><code class="docutils literal notranslate"><span class="pre">report_snps_not_found()</span></code></a></li>
+<li><a class="reference internal" href="#genal.extract_prs.setup_path"><code class="docutils literal notranslate"><span class="pre">setup_path()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.geno_tools">genal.geno_tools module</a><ul>
+<li><a class="reference internal" href="#genal.geno_tools.Combine_GENO"><code class="docutils literal notranslate"><span class="pre">Combine_GENO()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.adjust_column_names"><code class="docutils literal notranslate"><span class="pre">adjust_column_names()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.check_allele_column"><code class="docutils literal notranslate"><span class="pre">check_allele_column()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.check_arguments"><code class="docutils literal notranslate"><span class="pre">check_arguments()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.check_beta_column"><code class="docutils literal notranslate"><span class="pre">check_beta_column()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.check_int_column"><code class="docutils literal notranslate"><span class="pre">check_int_column()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.check_p_column"><code class="docutils literal notranslate"><span class="pre">check_p_column()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.check_snp_column"><code class="docutils literal notranslate"><span class="pre">check_snp_column()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.delete_tmp"><code class="docutils literal notranslate"><span class="pre">delete_tmp()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.fill_coordinates_func"><code class="docutils literal notranslate"><span class="pre">fill_coordinates_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.fill_ea_nea"><code class="docutils literal notranslate"><span class="pre">fill_ea_nea()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.fill_nea"><code class="docutils literal notranslate"><span class="pre">fill_nea()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.fill_se_p"><code class="docutils literal notranslate"><span class="pre">fill_se_p()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.fill_snpids_func"><code class="docutils literal notranslate"><span class="pre">fill_snpids_func()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.remove_na"><code class="docutils literal notranslate"><span class="pre">remove_na()</span></code></a></li>
+<li><a class="reference internal" href="#genal.geno_tools.save_data"><code class="docutils literal notranslate"><span class="pre">save_data()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.lift">genal.lift module</a><ul>
+<li><a class="reference internal" href="#genal.lift.lift_coordinates"><code class="docutils literal notranslate"><span class="pre">lift_coordinates()</span></code></a></li>
+<li><a class="reference internal" href="#genal.lift.lift_data"><code class="docutils literal notranslate"><span class="pre">lift_data()</span></code></a></li>
+<li><a class="reference internal" href="#genal.lift.lift_data_liftover"><code class="docutils literal notranslate"><span class="pre">lift_data_liftover()</span></code></a></li>
+<li><a class="reference internal" href="#genal.lift.post_lift_operations"><code class="docutils literal notranslate"><span class="pre">post_lift_operations()</span></code></a></li>
+<li><a class="reference internal" href="#genal.lift.prepare_chain_file"><code class="docutils literal notranslate"><span class="pre">prepare_chain_file()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.proxy">genal.proxy module</a><ul>
+<li><a class="reference internal" href="#genal.proxy.apply_proxies"><code class="docutils literal notranslate"><span class="pre">apply_proxies()</span></code></a></li>
+<li><a class="reference internal" href="#genal.proxy.find_proxies"><code class="docutils literal notranslate"><span class="pre">find_proxies()</span></code></a></li>
+<li><a class="reference internal" href="#genal.proxy.query_outcome_proxy"><code class="docutils literal notranslate"><span class="pre">query_outcome_proxy()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal.tools">genal.tools module</a><ul>
+<li><a class="reference internal" href="#genal.tools.check_bfiles"><code class="docutils literal notranslate"><span class="pre">check_bfiles()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.default_config"><code class="docutils literal notranslate"><span class="pre">default_config()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.get_plink19_path"><code class="docutils literal notranslate"><span class="pre">get_plink19_path()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.get_reference_panel_path"><code class="docutils literal notranslate"><span class="pre">get_reference_panel_path()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.load_reference_panel"><code class="docutils literal notranslate"><span class="pre">load_reference_panel()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.read_config"><code class="docutils literal notranslate"><span class="pre">read_config()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.set_plink"><code class="docutils literal notranslate"><span class="pre">set_plink()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.set_reference_folder"><code class="docutils literal notranslate"><span class="pre">set_reference_folder()</span></code></a></li>
+<li><a class="reference internal" href="#genal.tools.write_config"><code class="docutils literal notranslate"><span class="pre">write_config()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-genal">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">genal package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/source/genal.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="genal-package">
+<h1>genal package<a class="headerlink" href="#genal-package" title="Link to this heading">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-genal.GENO">
+<span id="genal-geno-module"></span><h2>genal.GENO module<a class="headerlink" href="#module-genal.GENO" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="genal.GENO.GENO">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">genal.GENO.</span></span><span class="sig-name descname"><span class="pre">GENO</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'noname'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">CHR</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'CHR'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">POS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'POS'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SNP</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SNP'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EA</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'EA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">NEA</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'NEA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'BETA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SE'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'P'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EAF</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'EAF'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocessing</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effect_column</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_multi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_dups</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_snpids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_coordinates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class to handle GWAS-derived data, including SNP rsID, genome position,
+SNP-trait effects, and effect allele frequencies.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#genal.GENO.GENO.name" title="Link to this definition">¶</a></dt>
+<dd><p>Name of the object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.data">
+<span class="sig-name descname"><span class="pre">data</span></span><a class="headerlink" href="#genal.GENO.GENO.data" title="Link to this definition">¶</a></dt>
+<dd><p>Main DataFrame containing SNP data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.data_clumped">
+<span class="sig-name descname"><span class="pre">data_clumped</span></span><a class="headerlink" href="#genal.GENO.GENO.data_clumped" title="Link to this definition">¶</a></dt>
+<dd><p>DataFrame of clumped data. Initialized after
+‘clump’ method execution or when using clumped=True during initialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.phenotype">
+<span class="sig-name descname"><span class="pre">phenotype</span></span><a class="headerlink" href="#genal.GENO.GENO.phenotype" title="Link to this definition">¶</a></dt>
+<dd><p>Tuple with a DataFrame of individual-level phenotype
+data and a string representing the phenotype trait column. Initialized after
+running the ‘set_phenotype’ method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.MR_data">
+<span class="sig-name descname"><span class="pre">MR_data</span></span><a class="headerlink" href="#genal.GENO.GENO.MR_data" title="Link to this definition">¶</a></dt>
+<dd><p>Tuple containing DataFrames for associations
+with exposure and outcome, and a string for the outcome name. Initialized after
+running the ‘query_outcome’ method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, pd.DataFrame, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.ram">
+<span class="sig-name descname"><span class="pre">ram</span></span><a class="headerlink" href="#genal.GENO.GENO.ram" title="Link to this definition">¶</a></dt>
+<dd><p>Available memory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.cpus">
+<span class="sig-name descname"><span class="pre">cpus</span></span><a class="headerlink" href="#genal.GENO.GENO.cpus" title="Link to this definition">¶</a></dt>
+<dd><p>Number of available CPUs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.checks">
+<span class="sig-name descname"><span class="pre">checks</span></span><a class="headerlink" href="#genal.GENO.GENO.checks" title="Link to this definition">¶</a></dt>
+<dd><p>List of checks performed on the main DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.reference_panel">
+<span class="sig-name descname"><span class="pre">reference_panel</span></span><a class="headerlink" href="#genal.GENO.GENO.reference_panel" title="Link to this definition">¶</a></dt>
+<dd><p>Reference population SNP data used for SNP info
+adjustments. Initialized when first needed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.clump">
+<span class="sig-name descname"><span class="pre">clump</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.clump" title="Link to this definition">¶</a></dt>
+<dd><p>Clumps the main data and stores the result in data_clumped.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.prs">
+<span class="sig-name descname"><span class="pre">prs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.prs" title="Link to this definition">¶</a></dt>
+<dd><p>Computes Polygenic Risk Score on genomic data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.set_phenotype">
+<span class="sig-name descname"><span class="pre">set_phenotype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.set_phenotype" title="Link to this definition">¶</a></dt>
+<dd><p>Assigns a DataFrame with individual-level data and a phenotype trait to
+the phenotype attribute.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.association_test">
+<span class="sig-name descname"><span class="pre">association_test</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.association_test" title="Link to this definition">¶</a></dt>
+<dd><p>Computes SNP-trait effect estimates, standard errors, and p-values.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.query_outcome">
+<span class="sig-name descname"><span class="pre">query_outcome</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.query_outcome" title="Link to this definition">¶</a></dt>
+<dd><p>Extracts SNPs from outcome data with proxying and initializes MR_data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.MR">
+<span class="sig-name descname"><span class="pre">MR</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.MR" title="Link to this definition">¶</a></dt>
+<dd><p>Performs Mendelian Randomization between SNP-exposure and SNP-outcome data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.MRpresso">
+<span class="sig-name descname"><span class="pre">MRpresso</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.MRpresso" title="Link to this definition">¶</a></dt>
+<dd><p>Executes the MR-PRESSO algorithm for horizontal pleiotropy correction between
+SNP-exposure and SNP-outcome data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.lift">
+<span class="sig-name descname"><span class="pre">lift</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.lift" title="Link to this definition">¶</a></dt>
+<dd><p>Lifts SNP data from one genomic build to another.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">MR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">methods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['IVW',</span> <span class="pre">'IVW-FE',</span> <span class="pre">'UWR',</span> <span class="pre">'WM',</span> <span class="pre">'WM-pen',</span> <span class="pre">'Simple-median',</span> <span class="pre">'Sign',</span> <span class="pre">'Egger',</span> <span class="pre">'Egger-boot']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterogeneity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">penk</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id0" title="Link to this definition">¶</a></dt>
+<dd><p>Executes Mendelian Randomization (MR) using the <cite>data_clumped</cite> attribute as exposure data and <cite>MR_data</cite> attribute as outcome data queried using the <cite>query_outcome</cite> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>methods</strong> (<em>list</em><em>, </em><em>optional</em>) – List of MR methods to run. Possible options include:
+“IVW”: inverse variance-weighted with random effects and under-dispersion correction
+“IVW-FE”: inverse variance-weighted with fixed effects
+“IVW-RE”: inverse variance-weighted with random effects and without under-dispersion correction
+“UWR”: unweighted regression
+“WM”: weighted median (bootstrapped standard errors)
+“WM-pen”: penalised weighted median (bootstrapped standard errors)
+“Simple-median”: simple median (bootstrapped standard errors)
+“Sign”: sign concordance test
+“Egger”: egger regression
+“Egger-boot”: egger regression with bootstrapped standard errors
+Default is [“IVW”,”IVW-FE”,”UWR”,”WM”,”WM-pen”,”Simple-median”,”Sign”,”Egger”,”Egger-boot”].</p></li>
+<li><p><strong>action</strong> (<em>int</em><em>, </em><em>optional</em>) – How to treat palindromes during harmonizing between
+exposure and outcome data. Accepts:
+1: Doesn’t flip them (Assumes all alleles are on the forward strand)
+2: Uses allele frequencies to attempt to flip (conservative, default)
+3: Removes all palindromic SNPs (very conservative)</p></li>
+<li><p><strong>eaf_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Max effect allele frequency accepted when
+flipping palindromic SNPs (relevant if action=2). Default is 0.42.</p></li>
+<li><p><strong>heterogeneity</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, includes heterogeneity tests in the results (Cochran’s Q test).Default is False.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of bootstrap replications for methods with bootstrapping. Default is 10000.</p></li>
+<li><p><strong>penk</strong> (<em>int</em><em>, </em><em>optional</em>) – Penalty value for the WM-pen method. Default is 20.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A table with MR results.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">MRpresso</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distortion_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">significance_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id1" title="Link to this definition">¶</a></dt>
+<dd><p>Executes the MR-PRESSO Mendelian Randomization algorithm for detection and correction of horizontal pleiotropy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>action</strong> (<em>int</em><em>, </em><em>optional</em>) – Treatment for palindromes during harmonizing between
+exposure and outcome data. Options:
+- 1: Don’t flip (assume all alleles are on the forward strand)
+- 2: Use allele frequencies to flip (default)
+- 3: Remove all palindromic SNPs</p></li>
+<li><p><strong>eaf_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Max effect allele frequency when flipping
+palindromic SNPs (relevant if action=2). Default is 0.42.</p></li>
+<li><p><strong>n_iterations</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of random data generation steps for
+improved result stability. Default is 10000.</p></li>
+<li><p><strong>outlier_test</strong> (<em>bool</em><em>, </em><em>optional</em>) – Identify outlier SNPs responsible for horizontal
+pleiotropy if global test p_value &lt; significance_p. Default is True.</p></li>
+<li><p><strong>distortion_test</strong> (<em>bool</em><em>, </em><em>optional</em>) – Test significant distortion in causal estimates
+before and after outlier removal if global test p_value &lt; significance_p.
+Default is True.</p></li>
+<li><p><strong>significance_p</strong> (<em>float</em><em>, </em><em>optional</em>) – Statistical significance threshold for
+horizontal pleiotropy detection (both global test and outlier identification).
+Default is 0.05.</p></li>
+<li><p><strong>cpus</strong> (<em>int</em><em>, </em><em>optional</em>) – number of cpu cores to be used for the parallel random data generation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Contains the following elements:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>mod_table: DataFrame containing the original (before outlier removal)</dt><dd><p>and outlier-corrected (after outlier removal) inverse variance-weighted MR results.</p>
+</dd>
+</dl>
+</li>
+<li><p>GlobalTest: p-value of the global MR-PRESSO test indicating the presence of horizontal pleiotropy.</p></li>
+<li><dl class="simple">
+<dt>OutlierTest: DataFrame assigning a p-value to each SNP representing the likelihood of this</dt><dd><p>SNP being responsible for the global pleiotropy. Set to NaN if global test p_value &gt; significance_p.</p>
+</dd>
+</dl>
+</li>
+<li><p>DistortionTest: p-value for the distortion test.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">association_test</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">covar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">standardize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id2" title="Link to this definition">¶</a></dt>
+<dd><p>Conduct single-SNP association tests against a phenotype.</p>
+<p>This method requires the phenotype to be set using the set_phenotype() function.
+The method also expects the extract_snps method to have been called prior to this.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>covar</strong> (<em>list</em><em>, </em><em>optional</em>) – List of columns in the phenotype dataframe to be used
+as covariates in the association tests. Default is an empty list.</p></li>
+<li><p><strong>standardize</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, it will standardize a quantitative phenotype
+before performing association tests. This is typically done
+to make results more interpretable. Default is True.</p></li>
+<li><p><strong>clumped</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, association tests will be run for the clumped
+list of SNPs. If False, it will use the unclumped list. Default is True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Updates the BETA, SE, and P columns of the data attribute based on the results</dt><dd><p>of the association tests.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">clump</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">250</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5e-08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id3" title="Link to this definition">¶</a></dt>
+<dd><p>Clump the data based on linkage disequilibrium and assign it to the .data_clumped attribute.
+The clumping process is executed using plink.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Clumping window in terms of thousands of SNPs. Default is 250.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.</p></li>
+<li><p><strong>p1</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold during clumping. SNPs above this value are not considered. Default is 5e-8.</p></li>
+<li><p><strong>p2</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold post-clumping to further filter the clumped SNPs. If p2 &lt; p1, it won’t be considered. Default is 0.01.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The reference population for linkage disequilibrium values. Accepts values “eur”, “sas”, “afr”, “eas”, “amr”. Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is “eur”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The result is stored in the .data_clumped attribute.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.copy" title="Link to this definition">¶</a></dt>
+<dd><p>Create a deep copy of the GENO instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A deep copy of the instance.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#genal.GENO.GENO" title="genal.GENO.GENO">GENO</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.extract_snps">
+<span class="sig-name descname"><span class="pre">extract_snps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.extract_snps" title="Link to this definition">¶</a></dt>
+<dd><p>Extract the list of SNPs present in the data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>clumped</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, SNPs will be extracted from .data_clumped.
+If False, from .data. Default is True.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a bed/bim/fam set of genetic files.
+If files are split by chromosomes, replace the chromosome number with ‘$’.
+For instance: path = “ukb_chr$_file”. Default is None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The output is a bed/bim/fam triple in the tmp_GENAL folder
+with the format “{name}_extract_allchr” which includes the SNPs from the UKB.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The provided path is saved to the config file. If this function is called again,
+you don’t need to specify the path if you want to use the same genomic files.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.get_reference_panel">
+<span class="sig-name descname"><span class="pre">get_reference_panel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.get_reference_panel" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve or set the reference panel for the GENO object.</p>
+<p>If the GENO object does not have a reference panel attribute set,
+this method will try to set it based on the provided <cite>reference_panel</cite>
+argument. This can be either a string indicating a predefined reference panel
+or a DataFrame with specific columns or a path to a .bim file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>reference_panel</strong> (<em>str</em><em> or </em><em>pd.DataFrame</em><em>, </em><em>optional</em>) – Either a string indicating a predefined
+reference panel (default is “eur”) or a DataFrame with necessary columns or a valid path
+to a .bim file</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The reference panel DataFrame for the GENO object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the provided DataFrame doesn’t have the necessary columns.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.init_attributes">
+<span class="sig-name descname"><span class="pre">init_attributes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.init_attributes" title="Link to this definition">¶</a></dt>
+<dd><p>Initializes several attributes for the GENO object, including the <cite>name</cite>,
+<cite>outcome</cite>, and memory/CPU related attributes. Also guesses whether the provided
+data is clumped based on the <cite>P</cite> column.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Name for the GENO object.</p></li>
+<li><p><strong>clumped</strong> (<em>bool</em><em>, </em><em>optional</em>) – Specifies if the data is already clumped. If None,
+the method tries to determine this based on the <cite>P</cite> column.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#id4" title="Link to this definition">¶</a></dt>
+<dd><p>Name for the GENO object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.GENO.GENO.outcome">
+<span class="sig-name descname"><span class="pre">outcome</span></span><a class="headerlink" href="#genal.GENO.GENO.outcome" title="Link to this definition">¶</a></dt>
+<dd><p>List of outcomes (initialized as empty).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id5">
+<span class="sig-name descname"><span class="pre">data_clumped</span></span><a class="headerlink" href="#id5" title="Link to this definition">¶</a></dt>
+<dd><p>Dataframe of clumped data if <cite>clumped</cite> is True.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id6">
+<span class="sig-name descname"><span class="pre">cpus</span></span><a class="headerlink" href="#id6" title="Link to this definition">¶</a></dt>
+<dd><p>Number of CPUs to be used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id7">
+<span class="sig-name descname"><span class="pre">ram</span></span><a class="headerlink" href="#id7" title="Link to this definition">¶</a></dt>
+<dd><p>Amount of RAM to be used in MBs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id8">
+<span class="sig-name descname"><span class="pre">lift</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg19'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg38'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraction_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">liftover</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">liftover_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id8" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a liftover from one genetic build to another.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>clumped</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, uses data in .data_clumped. If False,
+uses data in .data. Default is True.</p></li>
+<li><p><strong>start</strong> (<em>str</em><em>, </em><em>optional</em>) – Current build of the data. Default is “hg19”.</p></li>
+<li><p><strong>end</strong> (<em>str</em><em>, </em><em>optional</em>) – Target build for the liftover. Default is “hg38”.</p></li>
+<li><p><strong>replace</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, updates the object data attributes in place. Default is False.</p></li>
+<li><p><strong>extraction_file</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, prints a CHR POS SNP space-delimited
+file. Default is False.</p></li>
+<li><p><strong>chain_file</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a local chain file for the lift.
+If provided, <cite>start</cite> and <cite>end</cite> arguments are not considered. Default is None.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Filename or filepath (without extension) to save the lifted dataframe.
+Default saves as [name]_lifted.txt in the current directory.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Data after being lifted.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id9">
+<span class="sig-name descname"><span class="pre">prs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weighted</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id9" title="Link to this definition">¶</a></dt>
+<dd><p>Compute a Polygenic Risk Score (PRS) and save it as a CSV file in the current directory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name or path of the saved PRS file. If not given,
+it defaults to the name of the GENO object.</p></li>
+<li><p><strong>clumped</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, uses data in .data_clumped. If False,
+uses data in .data. Default is True.</p></li>
+<li><p><strong>weighted</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, performs a PRS weighted by the BETA column estimates.
+If False, performs an unweighted PRS. Default is True.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a bed/bim/fam set of genetic files for PRS calculation.
+If files are split by chromosomes, replace the chromosome number
+with ‘$’. For instance: path = “ukb_chr$_file”.
+If not provided, it will use the genetic data extracted
+with the .extract_snps method. Default is None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The computed PRS data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the data hasn’t been clumped and ‘clumped’ parameter is True.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id10">
+<span class="sig-name descname"><span class="pre">query_outcome</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outcome</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_snps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id10" title="Link to this definition">¶</a></dt>
+<dd><p>Prepares dataframes required for Mendelian Randomization (MR) with <cite>data_clumped</cite> as exposure.</p>
+<p>Queries the outcome data, with or without proxying, and assigns a tuple to
+the outcome attribute: (exposure_data, outcome_data, name) ready for MR methods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>outcome</strong> – Can be a GENO object (from a GWAS) or a filepath of types: .h5 or .hdf5 (created with the <a class="reference internal" href="#genal.GENO.GENO.save" title="genal.GENO.GENO.save"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.save()</span></code></a> method.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name for the outcome data. Defaults to None.</p></li>
+<li><p><strong>proxy</strong> (<em>bool</em><em>, </em><em>optional</em>) – If true, proxies are searched. Default is True.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The reference population to get linkage
+disequilibrium values and find proxies (only if proxy=True). Acceptable values
+include “EUR”, “SAS”, “AFR”, “EAS”, “AMR” or a path to a specific bed/bim/fam panel.
+Default is “EUR”.</p></li>
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the genomic window to look for proxies. Default is 5000.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum linkage disequilibrium value with the main SNP
+for a proxy to be included. Default is 0.6.</p></li>
+<li><p><strong>window_snps</strong> (<em>int</em><em>, </em><em>optional</em>) – Compute the LD value for SNPs that are not
+more than x SNPs away from the main SNP. Default is 5000.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sets the <cite>MR_data</cite> attribute for the instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'h5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sep</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'\t'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.save" title="Link to this definition">¶</a></dt>
+<dd><p>Save the GENO data to a file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Folder path to save the file. Defaults to the current directory.</p></li>
+<li><p><strong>fmt</strong> (<em>str</em><em>, </em><em>optional</em>) – File format. Options: .h5 (default), .csv, .txt. Future: .vcf, .vcf.gz.</p></li>
+<li><p><strong>sep</strong> (<em>str</em><em>, </em><em>optional</em>) – Delimiter for .csv and .txt formats. Default is tab.</p></li>
+<li><p><strong>header</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save column names for .csv and .txt formats. Default is True.</p></li>
+<li><p><strong>clumped</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, save clumped data. Otherwise, save full data. Default is True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If clumped data is requested but data is not clumped.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id11">
+<span class="sig-name descname"><span class="pre">set_phenotype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IID</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PHENO</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PHENO_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alternate_control</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id11" title="Link to this definition">¶</a></dt>
+<dd><p>Assign a phenotype dataframe to the .phenotype attribute.</p>
+<p>This method sets the .phenotype attribute which is essential to perform
+single-SNP association tests using the association_test method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – DataFrame containing individual-level row data with at least an individual IDs column
+and one phenotype column.</p></li>
+<li><p><strong>IID</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of the individual IDs column in ‘data’. These IDs should
+correspond to the genetic IDs in the FAM file that will be used for association testing.</p></li>
+<li><p><strong>PHENO</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of the phenotype column in ‘data’ which will be used
+as the dependent variable for association tests.</p></li>
+<li><p><strong>PHENO_type</strong> (<em>str</em><em>, </em><em>optional</em>) – If not specified, the function will try to infer if
+the phenotype is binary or quantitative. To bypass this,
+use “quant” for quantitative or “binary” for binary phenotypes.
+Default is None.</p></li>
+<li><p><strong>alternate_control</strong> (<em>bool</em><em>, </em><em>optional</em>) – By default, the function assumes that for a binary
+trait, the controls have the most frequent value.
+Set to True if this is not the case. Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sets the .phenotype attribute for the instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.sort_group">
+<span class="sig-name descname"><span class="pre">sort_group</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lowest_p'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.sort_group" title="Link to this definition">¶</a></dt>
+<dd><p>Handle duplicate SNPs. Useful if the instance combines different GENOs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>method</strong> (<em>str</em><em>, </em><em>optional</em>) – How to handle duplicates. Default is “lowest_p”,
+which retains the lowest P-value for each SNP.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.GENO.GENO.standardize">
+<span class="sig-name descname"><span class="pre">standardize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.GENO.GENO.standardize" title="Link to this definition">¶</a></dt>
+<dd><p>Standardize the Betas and adjust the SE column accordingly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If the required columns are not found in the data.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-genal.MR">
+<span id="genal-mr-module"></span><h2>genal.MR module<a class="headerlink" href="#module-genal.MR" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.linreg">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">linreg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">w</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.linreg" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to run linear regressions for the parallel egger bootstrapping.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_egger_regression">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_egger_regression</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_egger_regression" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the egger regression method. See <a class="reference internal" href="#genal.MR.mr_egger_regression_bootstrap" title="genal.MR.mr_egger_regression_bootstrap"><code class="xref py py-func docutils literal notranslate"><span class="pre">mr_egger_regression_bootstrap()</span></code></a> for a version with bootstrapping.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em>) – Number of boostrap iterations to obtain the standard error and p-value</p></li>
+<li><p><strong>cpus</strong> (<em>int</em>) – Number of cpu cores to use in parallel for the boostrapping iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient of the regression, representing the causal estimate or the intercept.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient or intercept.</p></li>
+<li><p>’pval’: P-value for the causal estimate or intercept.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_egger_regression_bootstrap">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_egger_regression_bootstrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_egger_regression_bootstrap" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the egger regression method with boostrapped standard errors. See <a class="reference internal" href="#genal.MR.mr_egger_regression" title="genal.MR.mr_egger_regression"><code class="xref py py-func docutils literal notranslate"><span class="pre">mr_egger_regression()</span></code></a> for a version without bootstrapping.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em>) – Number of boostrap iterations to obtain the standard error and p-value</p></li>
+<li><p><strong>cpus</strong> (<em>int</em>) – Number of cpu cores to use in parallel for the boostrapping iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient of the regression, representing the causal estimate or the intercept.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient or intercept.</p></li>
+<li><p>’pval’: P-value for the causal estimate or intercept.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_ivw">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_ivw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_ivw" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the Inverse Variance Weighted (IVW) method with random effects. Standard Error is corrected for under dispersion (as opposed to <a class="reference internal" href="#genal.MR.mr_ivw_re" title="genal.MR.mr_ivw_re"><code class="xref py py-func docutils literal notranslate"><span class="pre">mr_ivw_re()</span></code></a>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient of the regression, representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+<li><p>’Q’: Cochran’s Q statistic for heterogeneity.</p></li>
+<li><p>’Q_df’: Degrees of freedom for the Q statistic.</p></li>
+<li><p>’Q_pval’: P-value for the Q statistic.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function uses weighted least squares regression (WLS) to estimate the causal effect size,
+weighting by the inverse of the variance of the outcome’s effect sizes.
+Cochran’s Q statistics also computed to assess the heterogeneity across the instrumental variables.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_ivw_fe">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_ivw_fe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_ivw_fe" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the Inverse Variance Weighted (IVW) method with fixed effects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient of the regression, representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+<li><p>’Q’: Cochran’s Q statistic for heterogeneity.</p></li>
+<li><p>’Q_df’: Degrees of freedom for the Q statistic.</p></li>
+<li><p>’Q_pval’: P-value for the Q statistic.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function uses weighted least squares regression (WLS) to estimate the causal effect size,
+weighting by the inverse of the variance of the outcome’s effect sizes.
+Cochran’s Q statistics also computed to assess the heterogeneity across the instrumental variables.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_ivw_re">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_ivw_re</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_ivw_re" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the Inverse Variance Weighted (IVW) method with random effects. Standard Error is not corrected for under dispersion (as opposed to <a class="reference internal" href="#genal.MR.mr_ivw" title="genal.MR.mr_ivw"><code class="xref py py-func docutils literal notranslate"><span class="pre">mr_ivw()</span></code></a>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient of the regression, representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+<li><p>’Q’: Cochran’s Q statistic for heterogeneity.</p></li>
+<li><p>’Q_df’: Degrees of freedom for the Q statistic.</p></li>
+<li><p>’Q_pval’: P-value for the Q statistic.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function uses weighted least squares regression (WLS) to estimate the causal effect size,
+weighting by the inverse of the variance of the outcome’s effect sizes.
+Cochran’s Q statistics also computed to assess the heterogeneity across the instrumental variables.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_pen_wm">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_pen_wm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">penk</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_pen_wm" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the penalised weighted median method. See <a class="reference external" href="https://arxiv.org/abs/1606.03729">https://arxiv.org/abs/1606.03729</a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em>) – Number of boostrap iterations to obtain the standard error and p-value.</p></li>
+<li><p><strong>penk</strong> (<em>float</em>) – Constant factor used to penalise the weights.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_sign">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_sign</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_sign" title="Link to this definition">¶</a></dt>
+<dd><p>Performs the sign concordance test.</p>
+<p>The sign concordance test is used to determine whether there is a consistent direction
+of effect (i.e., sign) between the exposure and outcome across the variants.
+The consistent directonality is an assumption of Mendelian Randomization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing dictionaries with the following keys:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the method.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+<li><dl class="simple">
+<dt>’b’: Proportion of concordant signs between exposure and outcome effect</dt><dd><p>sizes minus 0.5, multiplied by 2.</p>
+</dd>
+</dl>
+</li>
+<li><p>’se’: Not applicable for this method (returns NaN).</p></li>
+<li><p>’pval’: P-value for the sign concordance test based on a binomial distribution.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Effect sizes that are exactly zero are replaced with NaN and are not included in the analysis. A binomial test is then performed to evaluate the probability of observing the given number of concordant signs by chance alone, assuming a null expectation of 50% concordance.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_simple_median">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_simple_median</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_simple_median" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the simple median method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em>) – Number of boostrap iterations to obtain the standard error and p-value</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The standard error is obtained with bootstrapping.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_uwr">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_uwr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_uwr" title="Link to this definition">¶</a></dt>
+<dd><p>Performs an unweighted regression Mendelian Randomization analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient of the regression, representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+<li><p>’Q’: Cochran’s Q statistic for heterogeneity.</p></li>
+<li><p>’Q_df’: Degrees of freedom for the Q statistic.</p></li>
+<li><p>’Q_pval’: P-value for the Q statistic.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The returned causal estimate is not weighted by the inverse variance.
+The standard error is corrected for under dispersion.
+Cochran’s Q statistics also computed to assess the heterogeneity across the instrumental variables.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.mr_weighted_median">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">mr_weighted_median</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.mr_weighted_median" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a Mendelian Randomization analysis using the weighted median method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>BETA_e</strong> (<em>numpy array</em>) – Effect sizes of genetic variants on the exposure.</p></li>
+<li><p><strong>SE_e</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_e</cite>.</p></li>
+<li><p><strong>BETA_o</strong> (<em>numpy array</em>) – Effect sizes of the same genetic variants on the outcome.</p></li>
+<li><p><strong>SE_o</strong> (<em>numpy array</em>) – Standard errors corresponding to <cite>BETA_o</cite>.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em>) – Number of boostrap iterations to obtain the standard error and p-value</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list containing a dictionary with the results:</dt><dd><ul class="simple">
+<li><p>’method’: Name of the analysis method.</p></li>
+<li><p>’b’: Coefficient representing the causal estimate.</p></li>
+<li><p>’se’: Adjusted standard error of the coefficient.</p></li>
+<li><p>’pval’: P-value for the causal estimate.</p></li>
+<li><p>’nSNP’: Number of genetic variants used in the analysis.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of dict</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The standard error is obtained with bootstrapping.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.parallel_bootstrap_func">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">parallel_bootstrap_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.parallel_bootstrap_func" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to run the egger regression bootstrapping in parallel.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.weighted_median">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">weighted_median</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">b_iv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.weighted_median" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to compute the weighted median estimate.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR.weighted_median_bootstrap">
+<span class="sig-prename descclassname"><span class="pre">genal.MR.</span></span><span class="sig-name descname"><span class="pre">weighted_median_bootstrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">BETA_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR.weighted_median_bootstrap" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to generate boostrapped replications.</p>
+</dd></dl>
+
+</section>
+<section id="module-genal.MR_tools">
+<span id="genal-mr-tools-module"></span><h2>genal.MR_tools module<a class="headerlink" href="#module-genal.MR_tools" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.MR_func">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">MR_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">methods</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterogeneity</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">penk</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name_exposure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.MR_func" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function corresponding to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.MR()</span></code> method. Refer to them for more details regarding arguments and return values.
+The MR algorithms are implemented here: <code class="xref py py-func docutils literal notranslate"><span class="pre">MR.mr_ivw()</span></code>, <code class="xref py py-func docutils literal notranslate"><span class="pre">MR.mr_weighted_median()</span></code>, <code class="xref py py-func docutils literal notranslate"><span class="pre">MR.mr_egger_regression()</span></code>, <code class="xref py py-func docutils literal notranslate"><span class="pre">MR.mr_simple_median()</span></code>…</p>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Validation of the action and methods arguments</p></li>
+<li><p>EAF column check if action is set to 2.</p></li>
+<li><p>Data harmonization between exposure and outcome data based on action and eaf_threshold</p></li>
+<li><p>NA check</p></li>
+<li><p>MR methods execution</p></li>
+<li><p>Compiles results and return a pd.DataFrame</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.apply_action_2">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">apply_action_2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.apply_action_2" title="Link to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt>Use EAF_e and EAF_o to align palindromes if both EAFs are outside the intermediate allele frequency range.</dt><dd><ul class="simple">
+<li><p>Replace NA values in EAF columns by 0.5 (will be flagged and removed in step 3)</p></li>
+<li><p>Set boundaries for intermediate allele frequencies</p></li>
+<li><p>Identify palindromes that have an intermediate allele frequency and delete them</p></li>
+<li><p>Among the remaining palindromes, identify the ones that need to be flipped and flip them</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.check_required_columns">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">check_required_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.check_required_columns" title="Link to this definition">¶</a></dt>
+<dd><p>Check if the required columns are present in the dataframe.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.flip_alleles">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">flip_alleles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.flip_alleles" title="Link to this definition">¶</a></dt>
+<dd><p>Flip the alleles.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.harmonize_MR">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">harmonize_MR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df_exposure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df_outcome</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.42</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.harmonize_MR" title="Link to this definition">¶</a></dt>
+<dd><p>Harmonize exposure and outcome for MR analyses.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_exposure</strong> (<em>-</em>) – Exposure data with “SNP”,”BETA”,”SE”,”EA”,”NEA” and “EAF” if action=2</p></li>
+<li><p><strong>df_outcome</strong> (<em>-</em>) – Outcome data with “SNP”,”BETA”,”SE”,”EA”,”NEA” and “EAF” if action=2</p></li>
+<li><p><strong>action</strong> (<em>-</em>) – Determines how to treat palindromes. Defaults to 2.
+1: Doesn’t attempt to flip them (= Assume all alleles are coded on the forward strand)
+2: Use allele frequencies (EAF) to attempt to flip them (conservative, default)
+3: Remove all palindromic SNPs (very conservative).</p></li>
+<li><p><strong>eaf_threshold</strong> (<em>-</em>) – Maximal effect allele frequency accepted when attempting to flip palindromic SNPs (only applied if action = 2). Defaults to 0.42.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Harmonized data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>pd.DataFrame</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Verify the presence of required columns in both dataframes and rename them</p></li>
+<li><p>Merge exposure and outcome data</p></li>
+<li><p>Identify palindromes</p></li>
+<li><p>Classify SNPs into aligned / inverted / need to be flipped</p></li>
+<li><p>Flip the ones that require flipping</p></li>
+<li><p>Switch those that are inverted to align them</p></li>
+<li><p>Remove those that are still not aligned</p></li>
+<li><p>Treat palindromes based on action parameter</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.load_outcome_from_filepath">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">load_outcome_from_filepath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outcome</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.load_outcome_from_filepath" title="Link to this definition">¶</a></dt>
+<dd><p>Load outcome data from a file path.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.load_outcome_from_geno_object">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">load_outcome_from_geno_object</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outcome</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.load_outcome_from_geno_object" title="Link to this definition">¶</a></dt>
+<dd><p>Load outcome data from a GENO object.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.mrpresso_func">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">mrpresso_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_test</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distortion_test</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">significance_p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.mrpresso_func" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function corresponding to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.MRpresso()</span></code> method.
+The MR-PRESSO algorithm is implemented here: <code class="xref py py-func docutils literal notranslate"><span class="pre">MRpresso.mr_presso()</span></code>
+Refer to them for more details regarding arguments and return values.</p>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>EAF column check if action is set to 2.</p></li>
+<li><p>Data harmonization between exposure and outcome data based on action and eaf_threshold</p></li>
+<li><p>NA check</p></li>
+<li><p>MRpresso call and results return</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MR_tools.query_outcome_func">
+<span class="sig-prename descclassname"><span class="pre">genal.MR_tools.</span></span><span class="sig-name descname"><span class="pre">query_outcome_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outcome</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proxy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_snps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MR_tools.query_outcome_func" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function corresponding to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.query_outcome()</span></code> method.
+Refer to it for more details on the arguments and return values.</p>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Validation of the required columns</p></li>
+<li><p>Load outcome data from GENO or path.</p></li>
+<li><p>Identify SNPs present in the outcome data</p></li>
+<li><p>Find proxies for the absent SNPs if needed</p></li>
+<li><p>Return exposure dataframe, outcome dataframe, outcome name</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="module-genal.MRpresso">
+<span id="genal-mrpresso-module"></span><h2>genal.MRpresso module<a class="headerlink" href="#module-genal.MRpresso" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MRpresso.getRSS_LOO">
+<span class="sig-prename descclassname"><span class="pre">genal.MRpresso.</span></span><span class="sig-name descname"><span class="pre">getRSS_LOO</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_e_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">returnIV</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MRpresso.getRSS_LOO" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MRpresso.getRandomData">
+<span class="sig-prename descclassname"><span class="pre">genal.MRpresso.</span></span><span class="sig-name descname"><span class="pre">getRandomData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_e_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['BETA_e']</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MRpresso.getRandomData" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MRpresso.mr_presso">
+<span class="sig-prename descclassname"><span class="pre">genal.MRpresso.</span></span><span class="sig-name descname"><span class="pre">mr_presso</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_e_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['BETA_e']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distortion_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">significance_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MRpresso.mr_presso" title="Link to this definition">¶</a></dt>
+<dd><p>Perform the MR-PRESSO algorithm for detection of horizontal pleiotropy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – DataFrame with at least 4 columns: BETA_o (outcome), SE_o, BETA_e (exposure), SE_e.</p></li>
+<li><p><strong>BETA_e_columns</strong> (<em>list</em>) – List of exposure beta columns.</p></li>
+<li><p><strong>n_iterations</strong> (<em>int</em>) – Number of steps performed (random data generation).</p></li>
+<li><p><strong>outlier_test</strong> (<em>bool</em>) – If True, identifies outlier SNPs responsible for horizontal pleiotropy.</p></li>
+<li><p><strong>distortion_test</strong> (<em>bool</em>) – If True, tests significant distortion in the causal estimates.</p></li>
+<li><p><strong>significance_p</strong> (<em>float</em>) – Statistical significance threshold for the detection of horizontal pleiotropy.</p></li>
+<li><p><strong>cpus</strong> (<em>int</em>) – Number of CPUs to use for parallel processing.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with the original and outlier-corrected inverse variance-weighted MR results.
+GlobalTest (dict): Dictionary with p-value of the global MR-PRESSO test.
+OutlierTest (pd.DataFrame): DataFrame with p-value for each SNP for the outlier test.
+BiasTest (dict): Dictionary with results of the distortion test.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>mod_table (pd.DataFrame)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MRpresso.parallel_RSS_LOO">
+<span class="sig-prename descclassname"><span class="pre">genal.MRpresso.</span></span><span class="sig-name descname"><span class="pre">parallel_RSS_LOO</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA_e_columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MRpresso.parallel_RSS_LOO" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.MRpresso.power_eigen">
+<span class="sig-prename descclassname"><span class="pre">genal.MRpresso.</span></span><span class="sig-name descname"><span class="pre">power_eigen</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.MRpresso.power_eigen" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="module-genal.association">
+<span id="genal-association-module"></span><h2>genal.association module<a class="headerlink" href="#module-genal.association" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.association.association_test_func">
+<span class="sig-prename descclassname"><span class="pre">genal.association.</span></span><span class="sig-name descname"><span class="pre">association_test_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covar_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">standardize</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_pheno</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pheno_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.association.association_test_func" title="Link to this definition">¶</a></dt>
+<dd><p>Conduct single-SNP association tests against a phenotype.</p>
+<dl class="simple">
+<dt>This function performs a series of operations:</dt><dd><ol class="arabic simple">
+<li><p>Checks for necessary preliminary steps.</p></li>
+<li><p>Updates the FAM file with the phenotype data.</p></li>
+<li><p>Creates a covariate file if required.</p></li>
+<li><p>Runs a PLINK association test.</p></li>
+<li><p>Processes the results and returns them.</p></li>
+</ol>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – Genetic data with the standard GENO columns.</p></li>
+<li><p><strong>covar_list</strong> (<em>list</em>) – List of column names in the data_pheno DataFrame to use as covariates.</p></li>
+<li><p><strong>standardize</strong> (<em>bool</em>) – Flag indicating if the phenotype needs standardization.</p></li>
+<li><p><strong>name</strong> (<em>str</em>) – Prefix for the filenames used during the process.</p></li>
+<li><p><strong>data_pheno</strong> (<em>pd.DataFrame</em>) – Phenotype data with at least an IID and PHENO columns.</p></li>
+<li><p><strong>pheno_type</strong> (<em>str</em>) – Type of phenotype (‘binary’ or ‘quant’).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Processed results of the association test.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+<p>This function corresponds to the following GENO method: <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.association_test()</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.association.set_phenotype_func">
+<span class="sig-prename descclassname"><span class="pre">genal.association.</span></span><span class="sig-name descname"><span class="pre">set_phenotype_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PHENO</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PHENO_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IID</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alternate_control</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.association.set_phenotype_func" title="Link to this definition">¶</a></dt>
+<dd><p>Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – Contains at least an individual IDs column and one phenotype column.</p></li>
+<li><p><strong>IID</strong> (<em>str</em>) – Name of the individual IDs column in data.</p></li>
+<li><p><strong>PHENO</strong> (<em>str</em>) – Name of the phenotype column in data.</p></li>
+<li><p><strong>PHENO_type</strong> (<em>str</em><em>, </em><em>optional</em>) – Type of the phenotype column. Either “quant” for quantitative (continuous) or “binary”.The function tries to infer the type if not provided.</p></li>
+<li><p><strong>alternate_control</strong> (<em>bool</em>) – Assumes that for a binary trait, the controls are coded with the most frequent value. Use True to reverse the assumption.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The modified data.
+str: The inferred or provided PHENO_type.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – For inconsistencies in the provided data or arguments.</p>
+</dd>
+</dl>
+<p>This function corresponds to the following GENO method: <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.set_phenotype()</span></code>.</p>
+</dd></dl>
+
+</section>
+<section id="module-genal.clump">
+<span id="genal-clump-module"></span><h2>genal.clump module<a class="headerlink" href="#module-genal.clump" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.clump.clump_data">
+<span class="sig-prename descclassname"><span class="pre">genal.clump.</span></span><span class="sig-name descname"><span class="pre">clump_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plink19_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/gpfs/gibbs/pi/falcone/00_General/software/plink1.9/plink'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">250</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5e-08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'noname'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ram</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.clump.clump_data" title="Link to this definition">¶</a></dt>
+<dd><p>Perform clumping on the given data using plink. Corresponds to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.clump()</span></code> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – Input data with at least ‘SNP’ and ‘P’ columns.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em>) – The reference population for linkage disequilibrium values. Accepts values “eur”, “sas”, “afr”, “eas”, “amr”. Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is “eur”.</p></li>
+<li><p><strong>plink19_path</strong> (<em>str</em>) – Path to the plink 1.9 software.</p></li>
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Clumping window in terms of thousands of SNPs. Default is 250.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.</p></li>
+<li><p><strong>p1</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold during clumping. SNPs above this value are not considered. Default is 5e-8.</p></li>
+<li><p><strong>p2</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold post-clumping to further filter the clumped SNPs. If p2 &lt; p1, it won’t be considered. Default is 0.01.</p></li>
+<li><p><strong>name</strong> (<em>str</em>) – Name used for the files created in the tmp_GENAL folder.</p></li>
+<li><p><strong>ram</strong> (<em>int</em>) – Amount of RAM in MB to be used by plink.</p></li>
+<li><p><strong>checks</strong> (<em>list</em>) – List of column checks already performed on the data.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Data after clumping, if any.
+list: Updated checks.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-genal.extract_prs">
+<span id="genal-extract-prs-module"></span><h2>genal.extract_prs module<a class="headerlink" href="#module-genal.extract_prs" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.create_bedlist">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">create_bedlist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bedlist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">not_found</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.create_bedlist" title="Link to this definition">¶</a></dt>
+<dd><p>Creates a bedlist file for SNP extraction.
+:param bedlist: Path to save the bedlist file.
+:type bedlist: str
+:param output_name: Base name for the output files.
+:type output_name: str
+:param not_found: List of chromosome numbers for which no bed/bim/fam files were found.
+:type not_found: List[int]</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.extract_command_parallel">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">extract_command_parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snp_list_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.extract_command_parallel" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to run SNP extraction in parallel for different chromosomes.
+:param task_id: Identifier for the task/chromosome.
+:type task_id: int
+:param name: Name prefix for the output files.
+:type name: str
+:param path: Path to the data set.
+:type path: str
+:param snp_list_path: Path to the list of SNPs to extract.
+:type snp_list_path: str</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Returns the task_id if no valid bed/bim/fam files are found.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.extract_snps_from_combined_data">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">extract_snps_from_combined_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snp_list_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.extract_snps_from_combined_data" title="Link to this definition">¶</a></dt>
+<dd><p>Extract SNPs from combined data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.extract_snps_func">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">extract_snps_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snp_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.extract_snps_func" title="Link to this definition">¶</a></dt>
+<dd><p>Extracts a list of SNPs from the given path. This function corresponds to the following GENO method: <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.extract_snps()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>snp_list</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of SNPs to extract.</p></li>
+<li><p><strong>name</strong> (<em>str</em>) – Name prefix for the output files.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to the dataset. Defaults to the path from the configuration.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – Raises an error when no valid path is saved or when there’s an incorrect format in the provided path.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.handle_multiallelic_variants">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">handle_multiallelic_variants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_command</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.handle_multiallelic_variants" title="Link to this definition">¶</a></dt>
+<dd><p>Handle multiallelic variants detected during merging.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.merge_extracted_snps">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">merge_extracted_snps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">not_found</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.merge_extracted_snps" title="Link to this definition">¶</a></dt>
+<dd><p>Merge extracted SNPs from each chromosome.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.prepare_snp_list">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">prepare_snp_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snp_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.prepare_snp_list" title="Link to this definition">¶</a></dt>
+<dd><p>Prepare the SNP list for extraction.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.process_split_data">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">process_split_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snp_list_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.process_split_data" title="Link to this definition">¶</a></dt>
+<dd><p>Process data that is split by chromosome.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.prs_func">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">prs_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weighted</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ram</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.prs_func" title="Link to this definition">¶</a></dt>
+<dd><p>Compute a PRS (Polygenic Risk Score) using provided genetic data. Corresponds to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.prs()</span></code> method</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – Dataframe containing genetic information.</p></li>
+<li><p><strong>weighted</strong> (<em>bool</em><em>, </em><em>optional</em>) – Perform a weighted PRS using BETA column estimates.
+If False, perform an unweighted PRS (equivalent to BETAs set to 1). Defaults to True.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to bed/bim/fam set of genetic files to use for PRS calculation.
+If not provided, it uses the genetic data extracted with the <cite>.extract_snps</cite> method. Defaults to None.</p></li>
+<li><p><strong>checks</strong> (<em>list</em><em>, </em><em>optional</em>) – List of column checks already performed on the data to avoid repeating them.
+Defaults to None.</p></li>
+<li><p><strong>ram</strong> (<em>int</em><em>, </em><em>optional</em>) – RAM memory in MB to be used by plink. Defaults to 10000.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name used for naming output and intermediate files. Defaults to “”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame containing PRS results.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If mandatory columns are missing in the data.</p></li>
+<li><p><strong>TypeError</strong> – If valid bed/bim/fam files are not found.</p></li>
+<li><p><strong>ValueError</strong> – If PRS computation was not successful.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.report_snps_not_found">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">report_snps_not_found</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nrow</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.report_snps_not_found" title="Link to this definition">¶</a></dt>
+<dd><p>Report the number of SNPs not found in the data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.setup_path">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">setup_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.setup_path" title="Link to this definition">¶</a></dt>
+<dd><p>Configure the path based on user input and saved configuration.</p>
+</dd></dl>
+
+</section>
+<section id="module-genal.geno_tools">
+<span id="genal-geno-tools-module"></span><h2>genal.geno_tools module<a class="headerlink" href="#module-genal.geno_tools" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.Combine_GENO">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">Combine_GENO</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Gs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'noname'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocessing</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.Combine_GENO" title="Link to this definition">¶</a></dt>
+<dd><p>Combine a list of GWAS objects into one.</p>
+<p>Args:
+- Gs (list): List of GWAS objects.
+- name (str, optional): Name for the combined object. Default is “noname”.
+- clumped (bool, optional): If True, uses the clumped data of each object. Default is False.
+- preprocessing (int, optional): Level of preprocessing to apply. Default is 0.</p>
+<p>Returns:
+GENO object: Combined GENO object.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.adjust_column_names">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">adjust_column_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">CHR</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">POS</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SNP</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EA</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">NEA</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EAF</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.adjust_column_names" title="Link to this definition">¶</a></dt>
+<dd><p>Rename columns to the standard names making sure that there are no duplicated names.
+Delete other columns if keep_columns=False, keep them if True.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.check_allele_column">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">check_allele_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allele_col</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_multi</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.check_allele_column" title="Link to this definition">¶</a></dt>
+<dd><p>Verify that the corresponding allele column is upper case strings. Set to nan if not formed with A, T, C, G letters.
+Set to nan if values are multiallelic unless keep_multi=True.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.check_arguments">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">check_arguments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocessing</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clumped</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effect_column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_snpids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_coordinates</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_multi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_dups</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.check_arguments" title="Link to this definition">¶</a></dt>
+<dd><p>Verify the arguments passed for the GENO initialization and apply logic based on the preprocessing value. See <code class="xref py py-class docutils literal notranslate"><span class="pre">GENO</span></code> for more details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple containing updated values for (keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>TypeError</strong> – For invalid data types or incompatible argument values.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.check_beta_column">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">check_beta_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effect_column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocessing</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.check_beta_column" title="Link to this definition">¶</a></dt>
+<dd><p>If the BETA column is a column of odds ratios, log-transform it.
+If no effect_column argument is specified, determine if the BETA column are beta estimates or odds ratios.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.check_int_column">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">check_int_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">int_col</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.check_int_column" title="Link to this definition">¶</a></dt>
+<dd><p>Set the type of the int_col column to Int32 and non-numeric values to NA.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.check_p_column">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">check_p_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.check_p_column" title="Link to this definition">¶</a></dt>
+<dd><p>Verify that the P column contains numeric values in the range [0,1]. Set inappropriate values to NA.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.check_snp_column">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">check_snp_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.check_snp_column" title="Link to this definition">¶</a></dt>
+<dd><p>Remove duplicates in the SNP column.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.delete_tmp">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">delete_tmp</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.delete_tmp" title="Link to this definition">¶</a></dt>
+<dd><p>Delete the tmp folder.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.fill_coordinates_func">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">fill_coordinates_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel_df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.fill_coordinates_func" title="Link to this definition">¶</a></dt>
+<dd><p>Fill in the CHR/POS columns based on reference data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.fill_ea_nea">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">fill_ea_nea</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel_df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.fill_ea_nea" title="Link to this definition">¶</a></dt>
+<dd><p>Fill in the EA and NEA columns based on reference data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.fill_nea">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">fill_nea</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel_df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.fill_nea" title="Link to this definition">¶</a></dt>
+<dd><p>Fill in the NEA column based on reference data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.fill_se_p">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">fill_se_p</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.fill_se_p" title="Link to this definition">¶</a></dt>
+<dd><p>If either P or SE is missing but the other and BETA are present, fill it.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.fill_snpids_func">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">fill_snpids_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel_df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.fill_snpids_func" title="Link to this definition">¶</a></dt>
+<dd><p>Fill in the SNP column based on reference data.
+If some SNPids are still missing, they will be replaced by a standard name: CHR:POS:EA</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.remove_na">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">remove_na</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.remove_na" title="Link to this definition">¶</a></dt>
+<dd><p>Identify the columns containing NA values. Delete rows with NA values.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.geno_tools.save_data">
+<span class="sig-prename descclassname"><span class="pre">genal.geno_tools.</span></span><span class="sig-name descname"><span class="pre">save_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'h5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sep</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'\t'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.geno_tools.save_data" title="Link to this definition">¶</a></dt>
+<dd><p>Save a DataFrame to a file in a given format.</p>
+<p>Args:
+- data (pd.DataFrame): The data to be saved.
+- name (str): The name of the file without extension.
+- path (str, optional): Directory path for saving. Default is the current directory.
+- fmt (str, optional): Format for the file, e.g., “h5”, “csv”, “txt”, “vcf”, “vcf.gz”. Default is “h5”.
+- sep (str, optional): Delimiter for csv or txt files. Default is tab.
+- header (bool, optional): Whether to include header in csv or txt files. Default is True.</p>
+<p>Returns:
+None. But saves the data to a file and prints the file path.</p>
+<p>Raises:
+- ValueError: If the provided format is not recognized.</p>
+</dd></dl>
+
+</section>
+<section id="module-genal.lift">
+<span id="genal-lift-module"></span><h2>genal.lift module<a class="headerlink" href="#module-genal.lift" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.lift.lift_coordinates">
+<span class="sig-prename descclassname"><span class="pre">genal.lift.</span></span><span class="sig-name descname"><span class="pre">lift_coordinates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lo</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.lift.lift_coordinates" title="Link to this definition">¶</a></dt>
+<dd><p>Perform liftover on data using LiftOver object after handling missing values.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.lift.lift_data">
+<span class="sig-prename descclassname"><span class="pre">genal.lift.</span></span><span class="sig-name descname"><span class="pre">lift_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg19'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg38'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraction_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.lift.lift_data" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a liftover from one genetic build to another. If the chain file required for the liftover is not present, it will be downloaded. It’s also possible to manually provide the path to the chain file.
+If the dataset is large, it is suggested to use an alternate method (e.g., <cite>lift_data_liftover</cite>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – The input data containing at least “CHR” and “POS” columns.</p></li>
+<li><p><strong>start</strong> (<em>str</em><em>, </em><em>optional</em>) – The current build of the data. Defaults to “hg19”.</p></li>
+<li><p><strong>end</strong> (<em>str</em><em>, </em><em>optional</em>) – The target build for liftover. Defaults to “hg38”.</p></li>
+<li><p><strong>extraction_file</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, also prints a CHR POS SNP space-delimited file for extraction. Defaults to False.</p></li>
+<li><p><strong>chain_file</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a local chain file for the lift. Overrides the start and end arguments if provided.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Specify a filename or filepath (without extension) for saving. If not provided, uses [name]_lifted.txt.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If required columns are missing or if provided chain file path is incorrect.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Lifted data.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pd.DataFrame</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Function for the <code class="xref py py-meth docutils literal notranslate"><span class="pre">GENO.lift()</span></code> method.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.lift.lift_data_liftover">
+<span class="sig-prename descclassname"><span class="pre">genal.lift.</span></span><span class="sig-name descname"><span class="pre">lift_data_liftover</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg19'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg38'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraction_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">genal_tools_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">liftover_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.lift.lift_data_liftover" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a liftover from a genetic build to another using the LiftOver software (requires Linux).
+The software must be installed on your system. It can be downloaded from <a class="reference external" href="https://genome-store.ucsc.edu">https://genome-store.ucsc.edu</a>
+If the chain file required to do the liftover is not present, download it first. It is also possible to manually provide the path to the chain file.
+start=”hg19”: current build of the data
+end=”hg38”: build to be lifted to
+replace=False: whether to change the dataframe inplace or return a new one
+extraction_file==True, also print a CHR POS SNP space delimited file for extraction in All of Us (WES data)
+chain_file=””: path to a local chain file to be used for the lift. If provided, the start and end arguments are not considered.
+name=””: can be used to specify a filename or filepath (without extension) to save the lifted dataframe. If not provided, will be saved in the current folder as [name]_lifted.txt
+genal_tools_path: path to the Genal_tools folder. If not provided, the tmp_GENAL folder will be used.
+liftover_path: path to LiftOver executable</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.lift.post_lift_operations">
+<span class="sig-prename descclassname"><span class="pre">genal.lift.</span></span><span class="sig-name descname"><span class="pre">post_lift_operations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraction_file</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.lift.post_lift_operations" title="Link to this definition">¶</a></dt>
+<dd><p>Handle post-liftover operations like reporting, and saving results.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.lift.prepare_chain_file">
+<span class="sig-prename descclassname"><span class="pre">genal.lift.</span></span><span class="sig-name descname"><span class="pre">prepare_chain_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chain_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.lift.prepare_chain_file" title="Link to this definition">¶</a></dt>
+<dd><p>Handle chain file loading, downloading if necessary. Return LiftOver object.</p>
+</dd></dl>
+
+</section>
+<section id="module-genal.proxy">
+<span id="genal-proxy-module"></span><h2>genal.proxy module<a class="headerlink" href="#module-genal.proxy" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.proxy.apply_proxies">
+<span class="sig-prename descclassname"><span class="pre">genal.proxy.</span></span><span class="sig-name descname"><span class="pre">apply_proxies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ld</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">searchspace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.proxy.apply_proxies" title="Link to this definition">¶</a></dt>
+<dd><p>Given a dataframe (coming from GENO.data or GENO.data_clumped attributes) and a dataframe of proxies
+(output from find_proxies), replace the SNPs in df with their best proxies, if they exist.
+This function is suited for exposure data (before running a PRS for instance).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>DataFrame</em>) – Dataframe of SNP information with the usual GENO columns (SNP, BETA, SE, EAF, EA, NEA). EAF is not necessary.</p></li>
+<li><p><strong>ld</strong> (<em>DataFrame</em>) – Dataframe of proxies (output from find_proxies).</p></li>
+<li><p><strong>searchspace</strong> (<em>list</em><em>, </em><em>optional</em>) – List of SNPs to restrict the list of potential proxies. By default, includes all the proxies found. Using a searchspace can be done either at the find_proxies step or at this step, but it is much faster to use it here.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame with SNPs replaced by their best proxies, if they exist.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.proxy.find_proxies">
+<span class="sig-prename descclassname"><span class="pre">genal.proxy.</span></span><span class="sig-name descname"><span class="pre">find_proxies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snp_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">searchspace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_snps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threads</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.proxy.find_proxies" title="Link to this definition">¶</a></dt>
+<dd><p>Given a list of SNPs, return a table of proxies.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>snp_list</strong> (<em>list</em>) – List of rsids.</p></li>
+<li><p><strong>searchspace</strong> (<em>list</em><em>, </em><em>optional</em>) – List of SNPs to include in the search. By default, includes the whole reference panel.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The reference population to get linkage disequilibrium values and find proxies.
+Accepts values: “EUR”, “SAS”, “AFR”, “EAS”, “AMR”.
+Alternatively, provide a path leading to a specific bed/bim/fam reference panel.</p></li>
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the genomic window to look for proxies. Defaults to 5000.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum linkage disequilibrium value with the main SNP for a proxy to be included. Defaults to 0.6.</p></li>
+<li><p><strong>window_snps</strong> (<em>int</em><em>, </em><em>optional</em>) – Compute the LD value for SNPs that are not more than x SNPs apart from the main SNP. Defaults to 5000.</p></li>
+<li><p><strong>threads</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of threads to use. Defaults to 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing the proxies. Only biallelic SNPs are returned.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.proxy.query_outcome_proxy">
+<span class="sig-prename descclassname"><span class="pre">genal.proxy.</span></span><span class="sig-name descname"><span class="pre">query_outcome_proxy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ld</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snps_to_extract</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snps_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.proxy.query_outcome_proxy" title="Link to this definition">¶</a></dt>
+<dd><p>Extract the best proxies from a dataframe, as well as specific SNPs.</p>
+<p>Given a dataframe <cite>df</cite> (originating from GENO.data) and a dataframe of potential proxies
+(output from <cite>find_proxies</cite>), this function extracts the best proxies from <cite>df</cite> as well as
+the SNPs specified in <cite>snps_to_extract</cite>.
+This is suited for querying outcome data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – Dataframe of SNP information with the usual GENO columns
+(SNP, BETA, SE, EAF, EA, NEA). EAF is not necessary.</p></li>
+<li><p><strong>ld</strong> (<em>pd.DataFrame</em>) – Dataframe of proxies (output from <cite>find_proxies</cite>).</p></li>
+<li><p><strong>snps_to_extract</strong> (<em>list</em>) – List of SNPs to extract in addition to the proxies.</p></li>
+<li><p><strong>snps_df</strong> (<em>list</em><em>, </em><em>optional</em>) – List of SNPs to choose the proxy from. Should be the list of
+SNPs in df. Can be provided to avoid recomputing it. Defaults to an empty list.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dataframe with queried SNPs and their proxies.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-genal.tools">
+<span id="genal-tools-module"></span><h2>genal.tools module<a class="headerlink" href="#module-genal.tools" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.check_bfiles">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">check_bfiles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.check_bfiles" title="Link to this definition">¶</a></dt>
+<dd><p>Check if the path specified leads to a bed/bim/fam triple.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.default_config">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">default_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.default_config" title="Link to this definition">¶</a></dt>
+<dd><p>Returns default config values</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.get_plink19_path">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">get_plink19_path</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.get_plink19_path" title="Link to this definition">¶</a></dt>
+<dd><p>Return the plink19 path if it exists in the config file.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.get_reference_panel_path">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">get_reference_panel_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.get_reference_panel_path" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve the path of the specified reference panel.</p>
+<p>This function checks if the provided reference panel is a valid path to bed/bim/fam files.
+If not, it checks if the reference panel exists in the reference folder. If it doesn’t exist,
+the function attempts to download it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The name of the reference panel or a path to bed/bim/fam files. Defaults to “eur”.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If the provided reference panel is not recognized.</p></li>
+<li><p><strong>OSError</strong> – If there’s an issue creating the directory.</p></li>
+<li><p><strong>FileNotFoundError</strong> – If the reference panel is not found.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The path to the reference panel.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.load_reference_panel">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">load_reference_panel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.load_reference_panel" title="Link to this definition">¶</a></dt>
+<dd><p>Load the bim file from the reference panel specified.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.read_config">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">read_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.read_config" title="Link to this definition">¶</a></dt>
+<dd><p>Get config file data</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.set_plink">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">set_plink</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.set_plink" title="Link to this definition">¶</a></dt>
+<dd><p>Set the plink 1.9 path and verify that it is the correct version.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.set_reference_folder">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">set_reference_folder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.set_reference_folder" title="Link to this definition">¶</a></dt>
+<dd><p>Set a folder path to store reference data.</p>
+<p>This function allows users to specify a directory where reference data will be stored.
+If the directory doesn’t exist, it will be created. If no path is provided, a default
+directory named ‘tmp_GENAL’ in the current working directory will be used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – The desired directory path for storing reference data. Defaults to a temporary folder in the current working directory.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>OSError</strong> – If the directory cannot be created.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The function prints messages to inform the user of the status and any errors.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.tools.write_config">
+<span class="sig-prename descclassname"><span class="pre">genal.tools.</span></span><span class="sig-name descname"><span class="pre">write_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.tools.write_config" title="Link to this definition">¶</a></dt>
+<dd><p>Write data to config file</p>
+</dd></dl>
+
+</section>
+<section id="module-genal">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-genal" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
