@@ -10,6 +10,11 @@ Welcome to genal's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   introduction
+   getting_started
+   genal
+   modules
+
 
 
 Indices and tables
