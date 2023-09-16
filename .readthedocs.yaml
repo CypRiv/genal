@@ -3,7 +3,7 @@ version: 2
     
 # Build documentation with Sphinx
 sphinx:
-  configuration: docs/conf.py
+  configuration: docs/source/conf.py
 
 # Use Python 3.8 to build the documentation
 python:
