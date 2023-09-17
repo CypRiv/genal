@@ -68,7 +68,7 @@ def mr_presso(data, BETA_e_columns = ["BETA_e"], n_iterations = 1000, outlier_te
 
     # 3- Computing the single IV outlier test
     if global_p < significance_p and outlier_test:
-        print("Performing the Outlier test.") 
+        print("Running the Outlier test.") 
         
         if len(BETA_e_columns) == 1:
             Dif = data["BETA_o"].values - data["BETA_e"].values * RSSobs[1]
@@ -92,7 +92,7 @@ def mr_presso(data, BETA_e_columns = ["BETA_e"], n_iterations = 1000, outlier_te
         outlier_test = False
         
     # 4- Computing the test of the distortion of the causal estimate
-    print ("Performing the Distortion test.")
+    print ("Running the Distortion test.")
     formula = f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}"
     mod_all = smf.wls(formula, data=data, weights=data['Weights']).fit()
     

@@ -37,6 +37,8 @@ def association_test_func(data, covar_list, standardize, name, data_pheno, pheno
     genetic_path = os.path.join("tmp_GENAL", f"{name}_allchr")
     if not check_bfiles(genetic_path):
         raise FileNotFoundError("Run the extract_snps() method before performing association tests.")
+    if data.shape[0] == 0:
+        raise ValueError("No SNPs for the association tests. Check the .data or .data_clumped dataframes.")
         
     # Update phenotype in the FAM file
     fam = _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize)
@@ -57,10 +59,15 @@ def _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize):
     # Extract relevant phenotype data
     data_pheno_trait = data_pheno[["IID","PHENO"]].rename(columns={"IID":0}).copy()
     # Merge phenotype data with the FAM dataframe
-    fam = fam.merge(data_pheno_trait, how="left", on=0)
+    fam = fam.merge(data_pheno_trait, how="left", on=0, indicator=True)
     fam[5] = fam.PHENO
-    fam = fam.drop(axis=1, columns="PHENO")
-    
+    # Verify that the merge was successful
+    if (fam["_merge"] == "both").sum() == 0:
+        raise ValueError("The IDs in the phenotype dataframe are inconsistent with those in the genetic dataset. Call set_phenotype() method again, specifying the correct column name for the genetic IDs.")
+    fam.drop(axis=1, columns=["PHENO", "_merge"], inplace = True)
+    # Count the number of individuals with a valid phenotype trait
+    n_non_na = fam.shape[0] - fam[5].isna().sum()
+    print(f"{n_non_na} individuals are present in the genetic data and have a valid phenotype trait.")
     # Update phenotype values based on its type
     if pheno_type == "binary":
         fam[5] = fam[5] + 1
@@ -79,20 +86,27 @@ def _handle_covariates(covar_list, data_pheno, name):
         # Ensure all covariates are present in phenotype data
         for col in covar_list:
             if col not in data_pheno.columns:
-                raise TypeError(f"The {col} column is not found in the .phenotype dataframe.")
+                raise TypeError(f"The {col} column is not found in the .phenotype dataframe.") 
         # Select required columns and rename columns
-        data_pheno = data_pheno[["IID", "IID"] + covar_list]
-        data_pheno = data_pheno.rename(columns={data_pheno.columns[1]: "FID"})
+        data_cov = data_pheno[["IID", "IID"] + covar_list].copy()
+        data_cov.columns = ['FID'] + list(data_cov.columns[1:])
         # Remove rows with NA values and print their number
-        nrows = data_pheno.shape[0]
-        data_pheno.dropna(inplace=True)
-        removed_rows = nrows - data_pheno.shape[0]
+        nrows = data_cov.shape[0]
+        data_cov.dropna(inplace=True)
+        removed_rows = nrows - data_cov.shape[0]
         if removed_rows > 0:
-            print(f"{removed_rows} rows contain NA values in the phenotype data and will be excluded from the association tests.")
-         
+            print(f"{removed_rows}({removed_rows/nrows*100:.3f}%) individuals have NA values in the covariates columns and will be excluded from the association tests.")
+        # Ensure the covariates are numeric and not trivial (lead to association fail)
+        for col in covar_list:
+            if data_pheno[col].nunique() == 1:
+                print(f"The {col} covariate contains only one value and is removed from the tests.")
+                data_cov.drop(axis=1, columns=[col], inplace=True)
+            if not pd.api.types.is_numeric_dtype(data_pheno[col]):
+                print(f"The {col} covariate is not numeric and is removed from the tests.")
+                data_cov.drop(axis=1, columns=[col], inplace=True, errors="ignore")
         # Define the covariate filename
         covar_filename = os.path.join("tmp_GENAL", f"{name}_covar.cov")
-        data_pheno.to_csv(covar_filename, sep=" ", header=True, index=False)
+        data_cov.to_csv(covar_filename, sep=" ", header=True, index=False)
         covar = True
     else:
         covar = False
@@ -116,6 +130,7 @@ def _process_results(output, method, data, pheno_type):
     # Path to PLINK results
     results_path = output + f".assoc." + method
     assoc = pd.read_csv(results_path, delimiter="\s+")
+    n_na = assoc["BETA"].isna().sum()
     
     # If logistic regression, log-transform the odds ratio
     assoc["BETA"] = np.log(assoc.OR) if pheno_type == "binary" else assoc.BETA
@@ -133,15 +148,15 @@ def _process_results(output, method, data, pheno_type):
     # Remove rows with mismatches in allele columns and notify the user
     nrow_previous = data.shape[0]
     data = data.dropna(subset="BETA")
-    delta_nrow = nrow_previous - data.shape[0]
-    if delta_nrow > 0: 
-        print(f"{delta_nrow} rows removed due to allele discrepancies between the main data and the genetic data.")
+    delta_nrow = nrow_previous - data.shape[0] - n_na
+    if (delta_nrow > 0) or (n_na > 0): 
+        print(f"{f'{n_na}({n_na/nrow_previous*100:.3f}%) SNP-trait tests returned NA value and ' if n_na>0 else ''}{delta_nrow}({delta_nrow/nrow_previous*100:.3f}%) SNPs removed due to allele discrepancies between the main data and the genetic data.")
     return data
     
 
     
     
-def set_phenotype_func(data, PHENO, PHENO_type, IID, alternate_control):
+def set_phenotype_func(data_original, PHENO, PHENO_type, IID, alternate_control):
     """
     Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.
 
@@ -161,7 +176,7 @@ def set_phenotype_func(data, PHENO, PHENO_type, IID, alternate_control):
 
     This function corresponds to the following GENO method: :meth:`GENO.set_phenotype`.
     """
-    
+    data = data_original.copy()
     _validate_columns_existence(data, PHENO, IID)
     data = _standardize_column_names(data, PHENO, IID)
     PHENO_type = _determine_phenotype_type(data, PHENO_type)
@@ -180,6 +195,8 @@ def _validate_columns_existence(data, PHENO, IID):
         # Raise an error if the column does not exist in the data
         if column not in data.columns:
             raise ValueError(f"The column '{column}' is not present in the dataset. This column is required!")
+    if data.shape[0]==0:
+        raise ValueError("The phenotype dataframe is empty.")
 
 def _standardize_column_names(data, PHENO, IID):
     """Standardizes the column names to 'IID' and 'PHENO'."""
