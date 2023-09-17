@@ -1,0 +1,1 @@
+REQUIRED_GWAS_COLUMNS = ["CHR", "POS", "SNP", "EA", "NEA", "BETA", "SE", "P"]

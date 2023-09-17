@@ -5,7 +5,19 @@ import pandas as pd
 from .geno_tools import *
 from .tools import *
 
-def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=250, r2=0.1, p1=5e-8, p2=0.01, name="noname", ram=10000, checks=[]):
+
+def clump_data(
+    data,
+    reference_panel="eur",
+    plink19_path=get_plink19_path(),
+    kb=250,
+    r2=0.1,
+    p1=5e-8,
+    p2=0.01,
+    name="noname",
+    ram=10000,
+    checks=[],
+):
     """
     Perform clumping on the given data using plink. Corresponds to the :meth:`GENO.clump` method.
     
@@ -25,7 +37,7 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
         pd.DataFrame: Data after clumping, if any.
         list: Updated checks.
     """
-    
+
     # Ensure required columns exist in the data
     for column in ["SNP", "P"]:
         if column not in data.columns:
@@ -40,7 +52,9 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
         data.dropna(subset=["SNP", "P"], inplace=True)
         deleted_rows = initial_rows - data.shape[0]
         if deleted_rows > 0:
-            print(f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP or P have been deleted.")
+            print(
+                f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP or P have been deleted."
+            )
         checks.append("P")
 
     # Create tmp directory if it doesn't exist
@@ -48,7 +62,9 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
         try:
             os.makedirs("tmp_GENAL")
         except OSError:
-            raise OSError("Unable to create the 'tmp_GENAL' directory. Check permissions.")
+            raise OSError(
+                "Unable to create the 'tmp_GENAL' directory. Check permissions."
+            )
 
     # Save the relevant data columns to a temporary file
     to_clump_filename = os.path.join("tmp_GENAL", f"{name}_to_clump.txt")
@@ -59,13 +75,19 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
     plink_command = f"{plink19_path} --memory {ram} --bfile {get_reference_panel_path(reference_panel)} \
                      --clump {to_clump_filename} --clump-kb {kb} --clump-r2 {r2} --clump-p1 {p1} \
                      --clump-p2 {p2} --out {output_path}"
-    output = subprocess.run(plink_command, shell=True, capture_output=True, text=True, check=True)
+    output = subprocess.run(
+        plink_command, shell=True, capture_output=True, text=True, check=True
+    )
 
     # Check and print the outputs for relevant information
     if output.returncode != 0:
-        raise RuntimeError(f"PLINK execution failed with the following error: {output.stderr}")
+        raise RuntimeError(
+            f"PLINK execution failed with the following error: {output.stderr}"
+        )
     if "more top variant IDs missing" in output.stderr:
-        missing_variants = output.stderr.split('more top variant IDs missing')[0].split('\n')[-1]
+        missing_variants = output.stderr.split("more top variant IDs missing")[0].split(
+            "\n"
+        )[-1]
         print(f"Warning: {missing_variants} top variant IDs missing")
     if "No significant --clump results." in output.stderr:
         print("No SNPs remaining after clumping.")
