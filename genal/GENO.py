@@ -656,14 +656,19 @@ class GENO:
         return
 
 
-    def copy(self):
+    def copy(self, name=None):
         """
-        Create a deep copy of the GENO instance.
+        Create a deep copy of the GENO instance. 
+        
+        Args:
+            name (str, optional): Name to give the copied GENO object
 
         Returns:
             GENO: A deep copy of the instance.
         """
-        return copy.deepcopy(self)
+        copied_geno = copy.deepcopy(self)
+        if name is not None: copied_geno.name = name
+        return copied_geno
 
 
     def save(self, path="", fmt="h5", sep="\t", header=True, clumped=True):

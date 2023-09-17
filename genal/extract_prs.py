@@ -62,6 +62,10 @@ def prs_func(data, weighted=True, path=None, checks=None, ram=10000, name=""):
         print(f"Computing an unweighted PRS using {path} data.")
     else:
         print(f"Computing a weighted PRS using {path} data.")
+                  
+    # Check for empty dataframe
+    if data_prs.shape[0] == 0:
+        raise ValueError("No SNPs remain for the polygenic risk score (PRS) calculation.")
         
     # Write processed data to file and run plink on it
     data_prs = data_prs[["SNP", "EA", "BETA"]]
