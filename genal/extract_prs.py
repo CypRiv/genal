@@ -30,7 +30,7 @@ def prs_func(data, weighted=True, path=None, checks=None, ram=10000, name=""):
         TypeError: If valid bed/bim/fam files are not found.
         ValueError: If PRS computation was not successful.
     """
-    
+
     # Initialize checks if it's None
     checks = checks or []
 
@@ -43,10 +43,12 @@ def prs_func(data, weighted=True, path=None, checks=None, ram=10000, name=""):
     # Check path; if it exists, extract the SNPs from it, otherwise, use data already extracted with extract_snps
     if path:
         extract_snps_func(data.SNP, name, path)
-    path = os.path.join('tmp_GENAL', f'{name}_allchr')
+    path = os.path.join("tmp_GENAL", f"{name}_allchr")
 
     if not check_bfiles(path):
-        raise TypeError("Valid bed/bim/fam files were not detected. Specify the correct path using the path='YOUR_PATH' argument.")
+        raise TypeError(
+            "Valid bed/bim/fam files were not detected. Specify the correct path using the path='YOUR_PATH' argument."
+        )
 
     data_prs = data.copy()
 
@@ -62,11 +64,13 @@ def prs_func(data, weighted=True, path=None, checks=None, ram=10000, name=""):
         print(f"Computing an unweighted PRS using {path} data.")
     else:
         print(f"Computing a weighted PRS using {path} data.")
-                  
+
     # Check for empty dataframe
     if data_prs.shape[0] == 0:
-        raise ValueError("No SNPs remain for the polygenic risk score (PRS) calculation.")
-        
+        raise ValueError(
+            "No SNPs remain for the polygenic risk score (PRS) calculation."
+        )
+
     # Write processed data to file and run plink on it
     data_prs = data_prs[["SNP", "EA", "BETA"]]
     data_prs_path = os.path.join("tmp_GENAL", "To_prs.txt")
@@ -75,7 +79,9 @@ def prs_func(data, weighted=True, path=None, checks=None, ram=10000, name=""):
     data_prs.to_csv(data_prs_path, sep="\t", index=False, header=True)
     plink_command = f"{get_plink19_path()} --memory {ram} --bfile {path} \
                      --score {data_prs_path} 1 2 3 header --out {output_path}"
-    output = subprocess.run(plink_command, shell=True, capture_output=True, text=True, check=True)
+    output = subprocess.run(
+        plink_command, shell=True, capture_output=True, text=True, check=True
+    )
 
     # Read and process PRS results
     prs_file = output_path + ".profile"
@@ -85,11 +91,12 @@ def prs_func(data, weighted=True, path=None, checks=None, ram=10000, name=""):
         return df_score[["FID", "IID", "SCORE"]]
     else:
         print(output.stdout)
-        raise ValueError(f"The PRS computation was not successful. Check the {output_path + '.log'} file.")
-    
-    
-    
-def extract_snps_func(snp_list, name, path=None): 
+        raise ValueError(
+            f"The PRS computation was not successful. Check the {output_path + '.log'} file."
+        )
+
+
+def extract_snps_func(snp_list, name, path=None):
     """
     Extracts a list of SNPs from the given path. This function corresponds to the following GENO method: :meth:`GENO.extract_snps`.
 
@@ -127,11 +134,14 @@ def setup_path(path, config):
     else:
         # Ensure correct path format
         if path.count("$") > 1:
-            raise TypeError("The path should contain at most 1 '$' sign. Use it to indicate the chromosome number if the data is split by chromosomes.")
+            raise TypeError(
+                "The path should contain at most 1 '$' sign. Use it to indicate the chromosome number if the data is split by chromosomes."
+            )
         path = os.path.splitext(path)[0]  # Remove file extension
         config["paths"]["geno_path"] = path  # Save path to config.json file
         write_config(config)
     return path
+
 
 def prepare_snp_list(snp_list, name):
     """Prepare the SNP list for extraction."""
@@ -142,17 +152,23 @@ def prepare_snp_list(snp_list, name):
     nrow = len(snp_list)
     return snp_list, snp_list_path, nrow
 
+
 def process_split_data(name, path, snp_list_path):
     """Process data that is split by chromosome."""
     print("Extracting SNPs for each chromosome...")
-    num_tasks = 22 
-    partial_extract_command_parallel = partial(extract_command_parallel, name=name, path=path, snp_list_path=snp_list_path)  # Wrapper function
+    num_tasks = 22
+    partial_extract_command_parallel = partial(
+        extract_command_parallel, name=name, path=path, snp_list_path=snp_list_path
+    )  # Wrapper function
     with ProcessPoolExecutor() as executor:
-        not_found = list(executor.map(partial_extract_command_parallel, range(1, num_tasks + 1)))
+        not_found = list(
+            executor.map(partial_extract_command_parallel, range(1, num_tasks + 1))
+        )
 
     # Merge extracted SNPs from each chromosome
     merge_command = merge_extracted_snps(name, not_found)
     return merge_command
+
 
 def extract_command_parallel(task_id, name, path, snp_list_path):
     """
@@ -165,74 +181,113 @@ def extract_command_parallel(task_id, name, path, snp_list_path):
     Returns:
         int: Returns the task_id if no valid bed/bim/fam files are found.
     """
-    bfile_path = path.replace('$', str(task_id))
-    
+    bfile_path = path.replace("$", str(task_id))
+
     if not check_bfiles(bfile_path):
         return task_id
-    
-    output_path = os.path.join('tmp_GENAL', f'{name}_extract_chr{task_id}')
+
+    output_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{task_id}")
     command = f"{get_plink19_path()} --bfile {bfile_path} --extract {snp_list_path} --make-bed --out {output_path}"
-    subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                            
+    subprocess.run(
+        command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+
+
 def merge_extracted_snps(name, not_found):
     """Merge extracted SNPs from each chromosome."""
     bedlist_name = f"{name}_bedlist.txt"
-    bedlist_path = os.path.join('tmp_GENAL', bedlist_name)
-    create_bedlist(bedlist_path, os.path.join("tmp_GENAL", f"{name}_extract"), not_found) 
-    print("Merging SNPs extracted from each chromosome...") 
-    output_path = os.path.join('tmp_GENAL',f'{name}_allchr')
+    bedlist_path = os.path.join("tmp_GENAL", bedlist_name)
+    create_bedlist(
+        bedlist_path, os.path.join("tmp_GENAL", f"{name}_extract"), not_found
+    )
+    print("Merging SNPs extracted from each chromosome...")
+    output_path = os.path.join("tmp_GENAL", f"{name}_allchr")
     merge_command = f"{get_plink19_path()} --merge-list {bedlist_path} --make-bed --out {output_path}"
-    subprocess.run(merge_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(
+        merge_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
     print(f"Created merged bed/bim/fam fileset: {output_path}")
     return merge_command
+
 
 def extract_snps_from_combined_data(name, path, snp_list_path):
     """Extract SNPs from combined data."""
     print("Extracting SNPs...")
-    output_path = os.path.join('tmp_GENAL', f'{name}_allchr')
+    output_path = os.path.join("tmp_GENAL", f"{name}_allchr")
     extract_command = f"{get_plink19_path()} --bfile {path} --extract {snp_list_path} --make-bed --out {output_path}"
-    subprocess.run(extract_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(
+        extract_command,
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     print(f"Created merged bed/bim/fam fileset: {output_path}")
-                            
+
+
 def handle_multiallelic_variants(name, merge_command):
     """Handle multiallelic variants detected during merging. """
+
     def remove_multiallelic():
-        snps_to_exclude = pd.read_csv(os.path.join("tmp_GENAL", f"{name}_allchr-merge.missnp"), header=None)
+        snps_to_exclude = pd.read_csv(
+            os.path.join("tmp_GENAL", f"{name}_allchr-merge.missnp"), header=None
+        )
         for i in range(22):
             bim_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{i+1}.bim")
             if os.path.isfile(bim_path):
                 bim = pd.read_csv(bim_path, sep="\t", header=None)
                 if len(set(bim[1]).intersection(set(snps_to_exclude[0]))) > 0:
-                    bfile_path = os.path.join('tmp_GENAL', f'{name}_extract_chr{i+1}')
-                    missnp_path = os.path.join('tmp_GENAL', f'{name}_allchr-merge.missnp')
-                    output_path = os.path.join('tmp_GENAL', f'{name}_extract_chr{i+1}')
+                    bfile_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{i+1}")
+                    missnp_path = os.path.join(
+                        "tmp_GENAL", f"{name}_allchr-merge.missnp"
+                    )
+                    output_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{i+1}")
                     command = f"{get_plink19_path()} --bfile {bfile_path} --exclude {missnp_path} --make-bed --out {output_path}"
-                    subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(
+                        command,
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
 
     log_content = open(os.path.join("tmp_GENAL", f"{name}_allchr.log")).read()
     if "with 3+ alleles present" in log_content:
         print("Multiallelic variants detected: removing them before merging.")
         remove_multiallelic()
         print("Reattempting the merge after deletion of multiallelic variants.")
-        subprocess.run(merge_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
+        subprocess.run(
+            merge_command,
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
         ## In rare cases, plink fails to identify all the multiallelic SNPs with the first pass.
         if "with 3+ alleles present" in log_content:
             print("Multiallelic variants still detected: removing them before merging.")
             remove_multiallelic()
             print("Reattempting the merge after deletion of multiallelic variants.")
-            subprocess.run(merge_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                merge_command,
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
 
 def report_snps_not_found(nrow, name):
     """Report the number of SNPs not found in the data."""
+
     def count_lines(filepath):
-        with open(filepath, 'r') as file:
+        with open(filepath, "r") as file:
             return sum(1 for line in file)
-    file_path = os.path.join('tmp_GENAL', f'{name}_allchr.bim')
+
+    file_path = os.path.join("tmp_GENAL", f"{name}_allchr.bim")
     extracted_snps_count = count_lines(file_path)
     delta_nrow = nrow - extracted_snps_count
     if delta_nrow > 0:
-        print(f"{delta_nrow}({delta_nrow/nrow*100:.3f}%) SNPs were not present in the genetic data.")
+        print(
+            f"{delta_nrow}({delta_nrow/nrow*100:.3f}%) SNPs were not present in the genetic data."
+        )
 
 
 def create_bedlist(bedlist, output_name, not_found):
@@ -252,15 +307,3 @@ def create_bedlist(bedlist, output_name, not_found):
                 print(f"SNPs extracted for chr{i}.")
             else:
                 print(f"No SNPs extracted for chr{i}.")
-
-
-
-
-
-
-
-
-
-
-
-

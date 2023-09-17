@@ -10,6 +10,7 @@ from .proxy import *
 from .MR import *
 from .MR_tools import *
 from .clump import *
+from .models import GWASData, ClumpedData
 from .lift import *
 from .tools import *
 from .geno_tools import *
@@ -23,7 +24,7 @@ from .extract_prs import *
 # Phenoscanner
 
 
-class GENO:
+class Geno:
     """
     A class to handle GWAS-derived data, including SNP rsID, genome position, 
     SNP-trait effects, and effect allele frequencies.
@@ -72,10 +73,32 @@ class GENO:
         lift():
             Lifts SNP data from one genomic build to another.
     """
-    
-    def __init__(self, df, name="noname", CHR="CHR",POS="POS",SNP="SNP",EA="EA",NEA="NEA",BETA="BETA",SE="SE",P="P",EAF="EAF", preprocessing=1, reference_panel="eur", clumped=None, effect_column=None, keep_columns=None, keep_multi=None, keep_dups=None, fill_snpids=None, fill_coordinates=None):
+
+    def __init__(
+        self,
+        df,
+        name="noname",
+        CHR="CHR",
+        POS="POS",
+        SNP="SNP",
+        EA="EA",
+        NEA="NEA",
+        BETA="BETA",
+        SE="SE",
+        P="P",
+        EAF="EAF",
+        preprocessing=1,
+        reference_panel="eur",
+        clumped=None,
+        effect_column=None,
+        keep_columns=None,
+        keep_multi=None,
+        keep_dups=None,
+        fill_snpids=None,
+        fill_coordinates=None,
+    ):
         """
-        Initializes the GENO object used to store and transform Single Nucleotide Polymorphisms (SNP) data.
+        Initializes the Geno object used to store and transform Single Nucleotide Polymorphisms (SNP) data.
         
         Args:
             df (pd.DataFrame): DataFrame where each row represents a SNP.
@@ -103,18 +126,37 @@ class GENO:
             fill_snpids (bool, optional): Decides if the SNP (rsID) column should be created or replaced based on CHR/POS columns and a reference genome. If None, defers to preprocessing value. Defaults to None.
             fill_coordinates (bool, optional): Decides if CHR and/or POS should be created or replaced based on SNP column and a reference genome. If None, defers to preprocessing value. Defaults to None.
         """
-        
-        #Check arguments and solve arguments logic.
-        keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates = check_arguments(df, preprocessing, reference_panel, clumped, effect_column, keep_columns, fill_snpids, fill_coordinates, keep_multi, keep_dups)
-        
+
+        # Check arguments and solve arguments logic.
+        (
+            keep_columns,
+            keep_multi,
+            keep_dups,
+            fill_snpids,
+            fill_coordinates,
+        ) = check_arguments(
+            df,
+            preprocessing,
+            reference_panel,
+            clumped,
+            effect_column,
+            keep_columns,
+            fill_snpids,
+            fill_coordinates,
+            keep_multi,
+            keep_dups,
+        )
+
         # Create a copy of input dataframe
-        data=df.copy()
-        
+        data = df.copy()
+
         # List to keep track of performed checks
-        self.checks=[]
-            
+        self.checks = []
+
         # Standardize column names based on provided parameters +/- delete other columns
-        data = adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns)
+        data = adjust_column_names(
+            data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns
+        )
 
         # Ensure CHR and POS columns are integers if preprocessing is enabled
         for int_col in ["CHR", "POS"]:
@@ -123,27 +165,42 @@ class GENO:
                 self.checks.append(int_col)
 
         # Fill missing SNP column from reference data if necessary
-        should_fill_snpids = (("CHR" in data.columns) and ("POS" in data.columns) and 
-                              ("SNP" not in data.columns)) or fill_snpids
+        should_fill_snpids = (
+            ("CHR" in data.columns)
+            and ("POS" in data.columns)
+            and ("SNP" not in data.columns)
+        ) or fill_snpids
         if should_fill_snpids and fill_snpids is not False:
             data = fill_snpids_func(data, self.get_reference_panel(reference_panel))
 
         # Fill missing CHR/POS columns from reference data if necessary
-        should_fill_coordinates = ((("CHR" not in data.columns) or ("POS" not in data.columns)) and 
-                                  ("SNP" in data.columns)) or fill_coordinates
+        should_fill_coordinates = (
+            (("CHR" not in data.columns) or ("POS" not in data.columns))
+            and ("SNP" in data.columns)
+        ) or fill_coordinates
         if should_fill_coordinates and fill_coordinates is not False:
-            data = fill_coordinates_func(data, self.get_reference_panel(reference_panel))
+            data = fill_coordinates_func(
+                data, self.get_reference_panel(reference_panel)
+            )
 
         # Fill missing NEA column from reference data if necessary and preprocessing is enabled
-        
-        missing_nea_condition = ("CHR" in data.columns and "POS" in data.columns and 
-                                    "NEA" not in data.columns and "EA" in data.columns)
+
+        missing_nea_condition = (
+            "CHR" in data.columns
+            and "POS" in data.columns
+            and "NEA" not in data.columns
+            and "EA" in data.columns
+        )
         if missing_nea_condition and preprocessing > 0:
             data = fill_nea(data, self.get_reference_panel(reference_panel))
 
         # Fill missing EA and NEA columns from reference data if necessary and preprocessing is enabled
-        missing_ea_nea_condition = ("CHR" in data.columns and "POS" in data.columns and 
-                                    "NEA" not in data.columns and "EA" not in data.columns)
+        missing_ea_nea_condition = (
+            "CHR" in data.columns
+            and "POS" in data.columns
+            and "NEA" not in data.columns
+            and "EA" not in data.columns
+        )
         if missing_ea_nea_condition and preprocessing > 0:
             data = fill_ea_nea(data, self.get_reference_panel(reference_panel))
 
@@ -161,9 +218,9 @@ class GENO:
             data = fill_se_p(data)
 
         # Process allele columns
-        for allele_col in ["EA","NEA"]:
+        for allele_col in ["EA", "NEA"]:
             if (allele_col in data.columns) and (preprocessing > 0):
-                data = check_allele_column(data, allele_col, keep_multi)    
+                data = check_allele_column(data, allele_col, keep_multi)
                 self.checks.append(allele_col)
 
         # Check for and handle duplicate SNPs if necessary
@@ -171,39 +228,32 @@ class GENO:
             data = check_snp_column(data)
             self.checks.append("SNP")
 
-        # Warn if essential columns are missing
-        for column in ["CHR","POS","SNP","EA","NEA","BETA","SE","P"]:
-            if not(column in data.columns):
-                print(f"Warning: the data doesn't include a {column} column. This may become an issue later on.")       
-
         # Remove missing values if preprocessing level is set to 2
         if preprocessing == 2:
             data = remove_na(data)
             self.checks.append("NA_removal")
 
         ## Reset index
-        #self.data.reset_index(drop=True, inplace=True)
-            
+        # self.data.reset_index(drop=True, inplace=True)
+
         # Set object attributes
-        self.data = data
+        self.data = GWASData(data=data)
+        self.data.validate_data()
         self.init_attributes(name, clumped)
-        
-        return
-  
 
     def init_attributes(self, name, clumped):
         """
-        Initializes several attributes for the GENO object, including the `name`,
+        Initializes several attributes for the Geno object, including the `name`,
         `outcome`, and memory/CPU related attributes. Also guesses whether the provided
         data is clumped based on the `P` column.
 
         Args:
-            name (str): Name for the GENO object.
+            name (str): Name for the Geno object.
             clumped (bool, optional): Specifies if the data is already clumped. If None,
                 the method tries to determine this based on the `P` column.
 
         Attributes:
-            name (str): Name for the GENO object.
+            name (str): Name for the Geno object.
             outcome (list): List of outcomes (initialized as empty).
             data_clumped (pd.DataFrame): Dataframe of clumped data if `clumped` is True.
             cpus (int): Number of CPUs to be used.
@@ -212,7 +262,9 @@ class GENO:
 
         self.name = name
         if name == "noname":
-            print("You haven't passed a specific name to GENO. It is recommended if you are working with several GENO objects.")
+            print(
+                "You haven't passed a specific name to Geno. It is recommended if you are working with several Geno objects."
+            )
         self.outcome = []
 
         # Guess if clumped or not
@@ -226,28 +278,33 @@ class GENO:
 
         # If the data is already clumped (clumped=True): also assign the data to self.data_clumped
         if clumped:
-            self.data_clumped = self.data
+            self.data_clumped = ClumpedData(data=self.data)
 
         # Set the maximal amount of ram/cpu to be used by the methods and dask chunksize
-        self.cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', default=os.cpu_count()))
-        non_hpc_ram_per_cpu = psutil.virtual_memory().available / (1024 ** 2 * self.cpus)
-        ram_per_cpu = int(os.environ.get('SLURM_MEM_PER_CPU', default=non_hpc_ram_per_cpu))
+        self.cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", default=os.cpu_count()))
+        non_hpc_ram_per_cpu = psutil.virtual_memory().available / (
+            1024 ** 2 * self.cpus
+        )
+        ram_per_cpu = int(
+            os.environ.get("SLURM_MEM_PER_CPU", default=non_hpc_ram_per_cpu)
+        )
         self.ram = int(ram_per_cpu * self.cpus * 0.8)
-        #self.chunksize = round((self.ram*0.8*1024**2) / (1000*self.cpus) / 100000)*100000
+        # self.chunksize = round((self.ram*0.8*1024**2) / (1000*self.cpus) / 100000)*100000
 
         # Create folders for temporary files
         if not os.path.exists("tmp_GENAL"):
             try:
                 os.makedirs("tmp_GENAL")
             except OSError:
-                raise OSError("Unable to create the 'tmp_GENAL' directory. Check permissions.")
+                raise OSError(
+                    "Unable to create the 'tmp_GENAL' directory. Check permissions."
+                )
 
-            
     def get_reference_panel(self, reference_panel="eur"):
         """
-        Retrieve or set the reference panel for the GENO object.
+        Retrieve or set the reference panel for the Geno object.
 
-        If the GENO object does not have a reference panel attribute set,
+        If the Geno object does not have a reference panel attribute set,
         this method will try to set it based on the provided `reference_panel`
         argument. This can be either a string indicating a predefined reference panel 
         or a DataFrame with specific columns or a path to a .bim file.
@@ -258,7 +315,7 @@ class GENO:
                 to a .bim file
 
         Returns:
-            pd.DataFrame: The reference panel DataFrame for the GENO object.
+            pd.DataFrame: The reference panel DataFrame for the Geno object.
 
         Raises:
             ValueError: If the provided DataFrame doesn't have the necessary columns.
@@ -273,9 +330,13 @@ class GENO:
 
                 for col in required_cols:
                     if col not in reference_panel.columns:
-                        raise ValueError(f"The {col} column is not present in the reference_panel provided and is necessary.")   
+                        raise ValueError(
+                            f"The {col} column is not present in the reference_panel provided and is necessary."
+                        )
 
-                print("Using the provided reference_panel dataframe as the reference panel.")
+                print(
+                    "Using the provided reference_panel dataframe as the reference panel."
+                )
                 self.reference_panel = reference_panel.copy()
             else:
                 # Load the reference panel based on the provided string identifier
@@ -283,7 +344,6 @@ class GENO:
 
         return self.reference_panel
 
-    
     def clump(self, kb=250, r2=0.1, p1=5e-8, p2=0.01, reference_panel="eur"):
         """
         Clump the data based on linkage disequilibrium and assign it to the .data_clumped attribute. 
@@ -299,18 +359,75 @@ class GENO:
         Returns:
             None: The result is stored in the .data_clumped attribute.
         """
+        # Ensure required columns exist in the data
+        for column in ["SNP", "P"]:
+            if column not in self.data.columns:
+                raise ValueError(f"The column {column} is not found in the data")
 
-        # Validate input and clump the data using the specified parameters
-        clumped_data, checks = clump_data(self.data, reference_panel, get_plink19_path(), kb, r2, p1, p2, self.name, self.ram, self.checks) 
+        # Validate and process SNP and P columns, if not already done
+        if "SNP" not in self.checks:
+            data = check_snp_column(data)
+            self.checks.append("SNP")
 
-        # Update checks attribute with latest checks
-        self.checks = checks
+        if "P" not in self.checks:
+            initial_rows = self.data.shape[0]
+            data.dropna(subset=["SNP", "P"], inplace=True)
+            deleted_rows = initial_rows - data.shape[0]
+            if deleted_rows > 0:
+                print(
+                    f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP or P have been deleted."
+                )
+            self.checks.append("P")
 
-        # If clumped data is successfully generated, assign it to the object's attribute
-        if clumped_data is not None:
-            self.data_clumped = clumped_data
-            print("The clumped data is stored in the .data_clumped attribute.")
-  
+        # Create tmp directory if it doesn't exist
+        if not os.path.exists("tmp_GENAL"):
+            try:
+                os.makedirs("tmp_GENAL")
+            except OSError:
+                raise OSError(
+                    "Unable to create the 'tmp_GENAL' directory. Check permissions."
+                )
+
+        # Save the relevant data columns to a temporary file
+        to_clump_filename = os.path.join("tmp_GENAL", f"{self.name}_to_clump.txt")
+        data[["SNP", "P"]].to_csv(to_clump_filename, index=False, sep="\t")
+
+        # Construct and execute the plink clumping command
+        output_path = os.path.join("tmp_GENAL", self.name)
+        plink_command = f"{get_plink19_path()} --memory {self.ram} --bfile {get_reference_panel_path(reference_panel)} \
+                        --clump {to_clump_filename} --clump-kb {kb} --clump-r2 {r2} --clump-p1 {p1} \
+                        --clump-p2 {p2} --out {output_path}"
+        output = subprocess.run(
+            plink_command, shell=True, capture_output=True, text=True, check=True
+        )
+
+        # Check and print the outputs for relevant information
+        if output.returncode != 0:
+            raise RuntimeError(
+                f"PLINK execution failed with the following error: {output.stderr}"
+            )
+        if "more top variant IDs missing" in output.stderr:
+            missing_variants = output.stderr.split("more top variant IDs missing")[
+                0
+            ].split("\n")[-1]
+            print(f"Warning: {missing_variants} top variant IDs missing")
+        if "No significant --clump results." in output.stderr:
+            print("No SNPs remaining after clumping.")
+            return
+        print(output.stdout.split("--clump: ")[1].split("\n")[0])
+
+        # Extract the list of clumped SNPs and get the relevant data subset
+        clumped_filename = os.path.join("tmp_GENAL", f"{self.name}.clumped")
+        if not os.path.exists(clumped_filename):
+            raise FileNotFoundError(f"'{clumped_filename}' is missing.")
+        plink_clumped = pd.read_csv(clumped_filename, sep="\s+", usecols=["SNP"])
+        clumped_data = data[data["SNP"].isin(plink_clumped["SNP"])]
+        clumped_data.reset_index(drop=True, inplace=True)
+
+        self.data_clumped = ClumpedData(
+            data=clumped_data, kb=kb, r2=r2, p1=p1, p2=p2, reference=reference_panel
+        )
+        print("The clumped data is stored in the .data_clumped attribute.")
 
     def extract_snps(self, clumped=True, path=None):
         """
@@ -338,14 +455,13 @@ class GENO:
         # Extract SNPs using the provided path and SNP list
         extract_snps_func(snp_list, self.name, path)
 
-        
     def prs(self, name=None, clumped=True, weighted=True, path=None):
         """
         Compute a Polygenic Risk Score (PRS) and save it as a CSV file in the current directory.
 
         Args:
             name (str, optional): Name or path of the saved PRS file. If not given, 
-                                  it defaults to the name of the GENO object.
+                                  it defaults to the name of the Geno object.
             clumped (bool, optional): If True, uses data in .data_clumped. If False, 
                                       uses data in .data. Default is True.
             weighted (bool, optional): If True, performs a PRS weighted by the BETA column estimates. 
@@ -365,15 +481,31 @@ class GENO:
 
         # Check if clumped data exists when the clumped argument is True
         if not hasattr(self, "data_clumped") and clumped:
-            raise ValueError("clumped=True but data isn't clumped. Use .clump() first or set clumped=False.")
+            raise ValueError(
+                "clumped=True but data isn't clumped. Use .clump() first or set clumped=False."
+            )
 
         # Compute PRS based on whether clumped or unclumped data is desired
         if clumped:
             print("Using clumped data for PRS calculation.")
-            prs_data = prs_func(self.data_clumped, weighted, path, checks=self.checks, ram=self.ram, name=self.name)       
+            prs_data = prs_func(
+                self.data_clumped,
+                weighted,
+                path,
+                checks=self.checks,
+                ram=self.ram,
+                name=self.name,
+            )
         else:
             print("Using unclumped data for PRS calculation.")
-            prs_data = prs_func(self.data, weighted, path, checks=self.checks, ram=self.ram, name=self.name)
+            prs_data = prs_func(
+                self.data,
+                weighted,
+                path,
+                checks=self.checks,
+                ram=self.ram,
+                name=self.name,
+            )
 
         # Save the computed PRS data as a CSV file
         if name is None:
@@ -384,9 +516,10 @@ class GENO:
         print(f"PRS data saved to {prs_filename}")
 
         return prs_data
-  
 
-    def set_phenotype(self, data, IID=None, PHENO=None, PHENO_type=None, alternate_control=False):
+    def set_phenotype(
+        self, data, IID=None, PHENO=None, PHENO_type=None, alternate_control=False
+    ):
         """
         Assign a phenotype dataframe to the .phenotype attribute.
 
@@ -411,11 +544,12 @@ class GENO:
         Returns:
             None: Sets the .phenotype attribute for the instance.
         """
-        processed_data, inferred_pheno_type = set_phenotype_func(data, PHENO, PHENO_type, IID, alternate_control)
+        processed_data, inferred_pheno_type = set_phenotype_func(
+            data, PHENO, PHENO_type, IID, alternate_control
+        )
 
         # Assign the processed data and inferred phenotype type to the .phenotype attribute
         self.phenotype = (processed_data, inferred_pheno_type)
-
 
     def association_test(self, covar=[], standardize=True, clumped=True):
         """
@@ -440,13 +574,22 @@ class GENO:
 
         # Ensure that the phenotype has been set using set_phenotype
         if not hasattr(self, "phenotype"):
-            raise ValueError("You first need to set a phenotype using .set_phenotype(data, PHENO, PHENO_type, IID)!")
+            raise ValueError(
+                "You first need to set a phenotype using .set_phenotype(data, PHENO, PHENO_type, IID)!"
+            )
 
         # Determine which data to use (clumped or unclumped)
         target_data = self.data_clumped if clumped else self.data
 
         # Perform the association test
-        updated_data = association_test_func(target_data, covar, standardize, self.name, self.phenotype[0], self.phenotype[1])
+        updated_data = association_test_func(
+            target_data,
+            covar,
+            standardize,
+            self.name,
+            self.phenotype[0],
+            self.phenotype[1],
+        )
 
         # Update the instance data based on whether we're using clumped data or not
         if clumped:
@@ -454,11 +597,20 @@ class GENO:
         else:
             self.data = updated_data
 
-        print(f"The BETA, SE, P columns of the .data{'_clumped' if clumped else ''} attribute have been updated.")
-  
+        print(
+            f"The BETA, SE, P columns of the .data{'_clumped' if clumped else ''} attribute have been updated."
+        )
 
-    def query_outcome(self, outcome, name=None, proxy=True, reference_panel="eur", 
-                      kb=5000, r2=0.6, window_snps=5000):
+    def query_outcome(
+        self,
+        outcome,
+        name=None,
+        proxy=True,
+        reference_panel="eur",
+        kb=5000,
+        r2=0.6,
+        window_snps=5000,
+    ):
         """
         Prepares dataframes required for Mendelian Randomization (MR) with `data_clumped` as exposure.
 
@@ -466,7 +618,7 @@ class GENO:
         the outcome attribute: (exposure_data, outcome_data, name) ready for MR methods.
 
         Args:
-            outcome: Can be a GENO object (from a GWAS) or a filepath of types: .h5 or .hdf5 (created with the :meth:`GENO.save` method.
+            outcome: Can be a Geno object (from a GWAS) or a filepath of types: .h5 or .hdf5 (created with the :meth:`Geno.save` method.
             name (str, optional): Name for the outcome data. Defaults to None.
             proxy (bool, optional): If true, proxies are searched. Default is True.
             reference_panel (str, optional): The reference population to get linkage 
@@ -485,19 +637,45 @@ class GENO:
 
         # Ensure that data_clumped attribute exists
         if not hasattr(self, "data_clumped"):
-            raise ValueError("The data needs to be clumped before using the query_outcome method."
-                             " Use .clump() or set clumped=True when initializing the GENO.")
+            raise ValueError(
+                "The data needs to be clumped before using the query_outcome method."
+                " Use .clump() or set clumped=True when initializing the Geno."
+            )
 
         exposure, outcome_data, outcome_name = query_outcome_func(
-            self.data_clumped, outcome, name, proxy, reference_panel, kb, r2, window_snps, self.cpus
+            self.data_clumped,
+            outcome,
+            name,
+            proxy,
+            reference_panel,
+            kb,
+            r2,
+            window_snps,
+            self.cpus,
         )
 
         # Assign the processed data to the MR_data attribute
         self.MR_data = (exposure, outcome_data, outcome_name)
 
-
-    def MR(self, methods=["IVW","IVW-FE","UWR","WM","WM-pen","Simple-median","Sign","Egger","Egger-boot"], 
-           action=2, eaf_threshold=0.42, heterogeneity=False, nboot=10000, penk=20):
+    def MR(
+        self,
+        methods=[
+            "IVW",
+            "IVW-FE",
+            "UWR",
+            "WM",
+            "WM-pen",
+            "Simple-median",
+            "Sign",
+            "Egger",
+            "Egger-boot",
+        ],
+        action=2,
+        eaf_threshold=0.42,
+        heterogeneity=False,
+        nboot=10000,
+        penk=20,
+    ):
         """
         Executes Mendelian Randomization (MR) using the `data_clumped` attribute as exposure data and `MR_data` attribute as outcome data queried using the `query_outcome` method.
 
@@ -534,12 +712,27 @@ class GENO:
             raise ValueError("You must first call query_outcome() before running MR.")
 
         return MR_func(
-            self.MR_data, methods, action, heterogeneity, eaf_threshold, nboot, penk, self.name, self.cpus
+            self.MR_data,
+            methods,
+            action,
+            heterogeneity,
+            eaf_threshold,
+            nboot,
+            penk,
+            self.name,
+            self.cpus,
         )
- 
 
-    def MRpresso(self, action=2, eaf_threshold=0.42, n_iterations=10000, outlier_test=True, 
-                 distortion_test=True, significance_p=0.05, cpus=-1):
+    def MRpresso(
+        self,
+        action=2,
+        eaf_threshold=0.42,
+        n_iterations=10000,
+        outlier_test=True,
+        distortion_test=True,
+        significance_p=0.05,
+        cpus=-1,
+    ):
         """
         Executes the MR-PRESSO Mendelian Randomization algorithm for detection and correction of horizontal pleiotropy.
 
@@ -576,15 +769,30 @@ class GENO:
         if not hasattr(self, "outcome"):
             raise ValueError("You must first call query_outcome() before running MR.")
         cpus = self.cpus if cpus == -1 else cpus
-        
+
         return mrpresso_func(
-            self.MR_data, action, eaf_threshold, n_iterations, outlier_test, distortion_test, significance_p, cpus
+            self.MR_data,
+            action,
+            eaf_threshold,
+            n_iterations,
+            outlier_test,
+            distortion_test,
+            significance_p,
+            cpus,
         )
 
-
-    def lift(self, clumped=True, start="hg19", end="hg38", replace=False, 
-             extraction_file=False, chain_file=None, name=None, liftover=False, 
-             liftover_path=None):
+    def lift(
+        self,
+        clumped=True,
+        start="hg19",
+        end="hg38",
+        replace=False,
+        extraction_file=False,
+        chain_file=None,
+        name=None,
+        liftover=False,
+        liftover_path=None,
+    ):
         """
         Perform a liftover from one genetic build to another.
 
@@ -605,22 +813,29 @@ class GENO:
             pd.DataFrame: Data after being lifted.
         """
 
-        data_type = 'clumped' if clumped else 'unclumped'
+        data_type = "clumped" if clumped else "unclumped"
         data = getattr(self, f"data_{data_type}" if clumped else "data")
         if not replace:
             data = data.copy()
 
-        print(f"Lifting the {data_type} data{' inplace' if replace else ''}. "
-              f"The .data{'_clumped' if clumped else ''} attribute will {'' if replace else 'not '}be modified. "
-              f"Use replace={'False' if replace else 'True'} to {'leave it as is' if replace else 'lift inplace'}.")
+        print(
+            f"Lifting the {data_type} data{' inplace' if replace else ''}. "
+            f"The .data{'_clumped' if clumped else ''} attribute will {'' if replace else 'not '}be modified. "
+            f"Use replace={'False' if replace else 'True'} to {'leave it as is' if replace else 'lift inplace'}."
+        )
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            data = lift_data(data, start=start, end=end, extraction_file=extraction_file, 
-                             chain_file=chain_file, name=f"{self.name if name is None else name}")
+            data = lift_data(
+                data,
+                start=start,
+                end=end,
+                extraction_file=extraction_file,
+                chain_file=chain_file,
+                name=f"{self.name if name is None else name}",
+            )
 
-        return data 
-   
+        return data
 
     def standardize(self):
         """
@@ -634,14 +849,17 @@ class GENO:
             if column not in self.data.columns:
                 raise ValueError(f"The column {column} is not found in the data!")
 
-        self.data["BETA"] = (self.data.BETA - np.mean(self.data.BETA)) / np.std(self.data.BETA)
+        self.data["BETA"] = (self.data.BETA - np.mean(self.data.BETA)) / np.std(
+            self.data.BETA
+        )
         self.data["SE"] = np.abs(self.data.BETA / st.norm.ppf(self.data.P / 2))
-        print("The Beta column has been standardized and the SE column has been adjusted.")
-
+        print(
+            "The Beta column has been standardized and the SE column has been adjusted."
+        )
 
     def sort_group(self, method="lowest_p"):
         """
-        Handle duplicate SNPs. Useful if the instance combines different GENOs.
+        Handle duplicate SNPs. Useful if the instance combines different Genos.
 
         Args:
             method (str, optional): How to handle duplicates. Default is "lowest_p", 
@@ -655,25 +873,24 @@ class GENO:
             self.data = self.data.groupby(by=["SNP"]).first().reset_index(drop=False)
         return
 
-
     def copy(self, name=None):
         """
-        Create a deep copy of the GENO instance. 
+        Create a deep copy of the Geno instance. 
         
         Args:
-            name (str, optional): Name to give the copied GENO object
+            name (str, optional): Name to give the copied Geno object
 
         Returns:
-            GENO: A deep copy of the instance.
+            Geno: A deep copy of the instance.
         """
         copied_geno = copy.deepcopy(self)
-        if name is not None: copied_geno.name = name
+        if name is not None:
+            copied_geno.name = name
         return copied_geno
-
 
     def save(self, path="", fmt="h5", sep="\t", header=True, clumped=True):
         """
-        Save the GENO data to a file.
+        Save the Geno data to a file.
 
         Args:
             path (str, optional): Folder path to save the file. Defaults to the current directory.
@@ -687,10 +904,21 @@ class GENO:
         """
         if clumped:
             if not hasattr(self, "data_clumped"):
-                raise ValueError("clumped=True was used but the data is not clumped. "
-                                 "Use .clump() first, or set clumped=False.")
+                raise ValueError(
+                    "clumped=True was used but the data is not clumped. "
+                    "Use .clump() first, or set clumped=False."
+                )
             else:
-                save_data(self.data_clumped, name=self.name+"_clumped", path=path, fmt=fmt, sep=sep, header=header)
+                save_data(
+                    self.data_clumped,
+                    name=self.name + "_clumped",
+                    path=path,
+                    fmt=fmt,
+                    sep=sep,
+                    header=header,
+                )
         else:
-            save_data(self.data, name=self.name, path=path, fmt=fmt, sep=sep, header=header)
+            save_data(
+                self.data, name=self.name, path=path, fmt=fmt, sep=sep, header=header
+            )
         return
