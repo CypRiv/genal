@@ -1,13 +1,23 @@
 import os
 import subprocess
 import pandas as pd
+import uuid
 
-from .geno_tools import *
-from .tools import *
+from .geno_tools import check_snp_column
+from .tools import read_config, get_plink19_path, get_reference_panel_path, create_tmp
 
-def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=250, r2=0.1, p1=5e-8, p2=0.01, name="noname", ram=10000, checks=[]):
+def clump_data(data, 
+               reference_panel="eur", 
+               plink19_path=get_plink19_path(), 
+               kb=250, 
+               r2=0.1, 
+               p1=5e-8, 
+               p2=0.01, 
+               name="", 
+               ram=10000, 
+               checks={}):
     """
-    Perform clumping on the given data using plink. Corresponds to the :meth:`GENO.clump` method.
+    Perform clumping on the given data using plink. Corresponds to the :meth:`Geno.clump` method.
     
     Args:
         data (pd.DataFrame): Input data with at least 'SNP' and 'P' columns.
@@ -23,7 +33,6 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
     
     Returns:
         pd.DataFrame: Data after clumping, if any.
-        list: Updated checks.
     """
     
     # Ensure required columns exist in the data
@@ -33,22 +42,22 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
 
     # Validate and process SNP and P columns, if not already done
     if "SNP" not in checks:
-        data = check_snp_column(data)
-        checks.append("SNP")
+        check_snp_column(data)
+        
     if "P" not in checks:
+        check_p_column(data)
         initial_rows = data.shape[0]
         data.dropna(subset=["SNP", "P"], inplace=True)
         deleted_rows = initial_rows - data.shape[0]
         if deleted_rows > 0:
             print(f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP or P have been deleted.")
-        checks.append("P")
 
     # Create tmp directory if it doesn't exist
-    if not os.path.exists("tmp_GENAL"):
-        try:
-            os.makedirs("tmp_GENAL")
-        except OSError:
-            raise OSError("Unable to create the 'tmp_GENAL' directory. Check permissions.")
+    create_tmp()
+    
+    # Create unique ID for the name if none is passed
+    if not name:
+        name = str(uuid.uuid4())[:8]
 
     # Save the relevant data columns to a temporary file
     to_clump_filename = os.path.join("tmp_GENAL", f"{name}_to_clump.txt")
@@ -79,4 +88,4 @@ def clump_data(data, reference_panel="eur", plink19_path=get_plink19_path(), kb=
     plink_clumped = pd.read_csv(clumped_filename, sep="\s+", usecols=["SNP"])
     clumped_data = data[data["SNP"].isin(plink_clumped["SNP"])]
     clumped_data.reset_index(drop=True, inplace=True)
-    return clumped_data, checks
+    return clumped_data

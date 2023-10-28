@@ -315,11 +315,14 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
     # If less than 2 valid rows, return NA values
     l = len(BETA_e)
     if l < 2:
-        return {"method": "Inverse-Variance Weighted", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nsnp': np.nan}
+        return {"method": "Inverse-Variance Weighted", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
     
     # Create weights and perform weighted regression
     weights = 1 / (SE_o ** 2)
-    model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
+    try:
+        model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
+    except:
+        return {"method": "Inverse-Variance Weighted", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
     
     # Extract coefficients
     b = model.params[0]
@@ -362,7 +365,7 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
     # If less than 2 valid rows, return NA values
     l = len(BETA_e)
     if l < 2:
-        return {"method": "Inverse-Variance Weighted (Random effects)",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nsnp': np.nan}
+        return {"method": "Inverse-Variance Weighted (Random effects)",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
     
     # Create weights and perform weighted regression
     weights = 1 / (SE_o ** 2)
@@ -410,7 +413,10 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     
     # Create weights and perform weighted regression
     weights = 1 / SE_o ** 2   
-    model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
+    try:
+        model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
+    except:
+        return {"method": "Inverse-Variance Weighted (Fixed effects)", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
     
     # Extract coefficients
     b = model.params[0]
@@ -451,7 +457,7 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
     
     l = len(BETA_e)
     if l < 2:
-        return {"method": "Unweighted regression", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nsnp': np.nan}
+        return {"method": "Unweighted regression", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
 
     # Perform regression without weights
     model = sm.OLS(BETA_o, BETA_e).fit()
