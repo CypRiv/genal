@@ -5,14 +5,22 @@ import os, subprocess
 import scipy.stats as st
 from pandas.api.types import is_numeric_dtype
 
-from .proxy import *
+from .proxy import find_proxies, query_outcome_proxy
 from .MR import *
-from .MRpresso import *
+from .MRpresso import mr_presso
 
+REQUIRED_COLUMNS = ["SNP", "BETA", "SE", "EA", "NEA"]
 
-def mrpresso_func(data, action, eaf_threshold, n_iterations, outlier_test, distortion_test, significance_p, cpus):
+def mrpresso_func(data, 
+                  action, 
+                  eaf_threshold, 
+                  n_iterations, 
+                  outlier_test, 
+                  distortion_test, 
+                  significance_p, 
+                  cpus):
     """
-    Wrapper function corresponding to the :meth:`GENO.MRpresso` method. 
+    Wrapper function corresponding to the :meth:`Geno.MRpresso` method. 
     The MR-PRESSO algorithm is implemented here: :func:`MRpresso.mr_presso`
     Refer to them for more details regarding arguments and return values.
     
@@ -24,7 +32,7 @@ def mrpresso_func(data, action, eaf_threshold, n_iterations, outlier_test, disto
     """
     
     #Check that action argument is a correct input
-    if (action not in [1,2,3]):
+    if (action not in [1, 2, 3]):
         raise ValueError("The action argument only takes 1,2 or 3 as value")
         
     #Unpack data (coming from MR_data attribute)
@@ -35,32 +43,54 @@ def mrpresso_func(data, action, eaf_threshold, n_iterations, outlier_test, disto
     #Check EAF columns if action = 2
     if action == 2:
         if "EAF" not in df_exposure.columns: 
-            print("Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3).")
+            print(
+                "Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3)."
+            )
             action = 3
         elif "EAF" not in df_outcome.columns: 
-            print("Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3).")
+            print(
+                "Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3)."
+            )
             action = 3
             
     #Harmonize exposure and outcome data
-    df_mr = harmonize_MR(df_exposure, df_outcome, action = action, eaf_threshold = eaf_threshold)
+    df_mr = harmonize_MR(
+        df_exposure, df_outcome, action = action, eaf_threshold = eaf_threshold
+    )
 
     #Re-check that there are no NAs
     na_rows = df_mr[df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].isna().any(axis=1)]
     if len(na_rows) > 0:
-        print(f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows['SNP']}")
+        print(
+            f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows["SNP"]}"
+        )
         df_mr = df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].dropna(inplace=True)
     else:
         df_mr = df_mr[["BETA_e","SE_e","BETA_o","SE_o"]]
 
     #Call and return the results of MR-PRESSO
-    return mr_presso(df_mr, ["BETA_e"], n_iterations, outlier_test, distortion_test, significance_p, cpus)
+    return mr_presso(
+        df_mr, ["BETA_e"], 
+        n_iterations, 
+        outlier_test, 
+        distortion_test, 
+        significance_p, 
+        cpus)
 
 
 
 
-def MR_func(data, methods, action , heterogeneity, eaf_threshold, nboot, penk, name_exposure, cpus):
+def MR_func(data, 
+            methods, 
+            action , 
+            heterogeneity, 
+            eaf_threshold, 
+            nboot, 
+            penk, 
+            name_exposure, 
+            cpus):
     """
-    Wrapper function corresponding to the :meth:`GENO.MR` method. Refer to them for more details regarding arguments and return values.
+    Wrapper function corresponding to the :meth:`Geno.MR` method. Refer to them for more details regarding arguments and return values.
     The MR algorithms are implemented here: :func:`MR.mr_ivw`, :func:`MR.mr_weighted_median`, :func:`MR.mr_egger_regression`, :func:`MR.mr_simple_median`...
     
     Notes:
@@ -72,11 +102,20 @@ def MR_func(data, methods, action , heterogeneity, eaf_threshold, nboot, penk, n
         - Compiles results and return a pd.DataFrame
     """
     # Check that action argument is a correct input
-    if (action not in [1,2,3]):
+    if (action not in [1, 2, 3]):
         raise ValueError("The action argument only takes 1,2 or 3 as value")
 
     # Check the methods argument
-    valid_methods = ["IVW","IVW-FE","UWR","WM","WM-pen","Simple-median","Sign","Egger","Egger-boot"]
+    valid_methods = [
+        "IVW",
+        "IVW-FE",
+        "UWR",
+        "WM",
+        "WM-pen",
+        "Simple-median",
+        "Sign",
+        "Egger",
+        "Egger-boot"]
     if not all(m in valid_methods for m in methods):
         raise ValueError(f"The list of methods can only contain strings in {valid_methods}")
         
@@ -88,19 +127,27 @@ def MR_func(data, methods, action , heterogeneity, eaf_threshold, nboot, penk, n
     # Check EAF columns if action = 2
     if action == 2:
         if "EAF" not in df_exposure.columns: 
-            print("Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3).")
+            print(
+                "Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3)."
+            )
             action = 3
         elif "EAF" not in df_outcome.columns: 
-            print("Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3).")
+            print(
+                "Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3)."
+            )
             action = 3
 
     # Harmonize exposure and outcome data
-    df_mr = harmonize_MR(df_exposure, df_outcome, action = action, eaf_threshold = eaf_threshold)
+    df_mr = harmonize_MR(
+        df_exposure, df_outcome, action = action, eaf_threshold = eaf_threshold
+    )
 
     # Re-check that there are no NAs
     na_rows = df_mr[df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].isna().any(axis=1)]
     if len(na_rows) > 0:
-        print(f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows['SNP']}")
+        print(
+            f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows["SNP"]}"
+        )
         df_mr = df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].dropna(inplace=True)
     else:
         df_mr = df_mr[["BETA_e","SE_e","BETA_o","SE_o"]]
@@ -108,20 +155,23 @@ def MR_func(data, methods, action , heterogeneity, eaf_threshold, nboot, penk, n
     # Prepare values for MR methods
     BETA_e, BETA_o, SE_e, SE_o = df_mr["BETA_e"], df_mr["BETA_o"], df_mr["SE_e"], df_mr["SE_o"]
 
-    print(f"Running Mendelian Randomization with {name_exposure} as exposure and {name_outcome} as outcome.")
+    print(
+        f"Running Mendelian Randomization with {name_exposure} as exposure and {name_outcome} as outcome."
+    )
     
     # Mapping the methods passed as argument to the corresponding functions and freeze arguments
-    FUNCTION_MAP = {"Egger": partial(mr_egger_regression, BETA_e, SE_e, BETA_o, SE_o),
-                    "Egger-boot": partial(mr_egger_regression_bootstrap, BETA_e, SE_e, BETA_o, SE_o, nboot, cpus),
-                    "WM": partial(mr_weighted_median, BETA_e, SE_e, BETA_o, SE_o, nboot), 
-                    "WM-pen": partial(mr_pen_wm, BETA_e, SE_e, BETA_o, SE_o, nboot, penk),
-                    "Simple-median": partial(mr_simple_median, BETA_e, SE_e, BETA_o, SE_o, nboot),
-                    "IVW": partial(mr_ivw, BETA_e, SE_e, BETA_o, SE_o), 
-                    "IVW-RE": partial(mr_ivw_re, BETA_e, SE_e, BETA_o, SE_o), 
-                    "IVW-FE": partial(mr_ivw_fe, BETA_e, SE_e, BETA_o, SE_o), 
-                    "UWR": partial(mr_uwr, BETA_e, SE_e, BETA_o, SE_o), 
-                    "Sign": partial(mr_sign, BETA_e, BETA_o)
-                       }
+    FUNCTION_MAP = {
+        "Egger": partial(mr_egger_regression, BETA_e, SE_e, BETA_o, SE_o),
+        "Egger-boot": partial(mr_egger_regression_bootstrap, BETA_e, SE_e, BETA_o, SE_o, nboot, cpus),
+        "WM": partial(mr_weighted_median, BETA_e, SE_e, BETA_o, SE_o, nboot), 
+        "WM-pen": partial(mr_pen_wm, BETA_e, SE_e, BETA_o, SE_o, nboot, penk),
+        "Simple-median": partial(mr_simple_median, BETA_e, SE_e, BETA_o, SE_o, nboot),
+        "IVW": partial(mr_ivw, BETA_e, SE_e, BETA_o, SE_o), 
+        "IVW-RE": partial(mr_ivw_re, BETA_e, SE_e, BETA_o, SE_o), 
+        "IVW-FE": partial(mr_ivw_fe, BETA_e, SE_e, BETA_o, SE_o), 
+        "UWR": partial(mr_uwr, BETA_e, SE_e, BETA_o, SE_o), 
+        "Sign": partial(mr_sign, BETA_e, BETA_o)
+    }
 
     # Compute required MR methods and gather results
     results = []
@@ -134,22 +184,34 @@ def MR_func(data, methods, action , heterogeneity, eaf_threshold, nboot, penk, n
     res["exposure"], res["outcome"] = name_exposure, name_outcome
 
     if not heterogeneity:
-        res = res[["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]
+        res = res[
+            ["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]
+        ]
     else:
-        res = res[["exposure", "outcome", "method", "nSNP", "b", "se", "pval", "Q", "Q_df", "Q_pval"]]
+        res = res[
+            ["exposure", "outcome", "method", "nSNP", "b", "se", "pval", "Q", "Q_df", "Q_pval"]
+        ]
         res["Q_df"] = res["Q_df"].astype("Int64")
 
     return res
 
 
-def query_outcome_func(data, outcome, name, proxy, reference_panel, kb, r2, window_snps, cpus):
+def query_outcome_func(data, 
+                       outcome, 
+                       name, 
+                       proxy, 
+                       reference_panel, 
+                       kb, 
+                       r2, 
+                       window_snps, 
+                       cpus):
     """
-    Wrapper function corresponding to the :meth:`GENO.query_outcome` method. 
+    Wrapper function corresponding to the :meth:`Geno.query_outcome` method. 
     Refer to it for more details on the arguments and return values.
     
     Notes:
         - Validation of the required columns
-        - Load outcome data from GENO or path.
+        - Load outcome data from Geno or path.
         - Identify SNPs present in the outcome data
         - Find proxies for the absent SNPs if needed
         - Return exposure dataframe, outcome dataframe, outcome name
@@ -160,13 +222,15 @@ def query_outcome_func(data, outcome, name, proxy, reference_panel, kb, r2, wind
             raise ValueError(f"The column {column} is not found in the data and is necessary.")
 
     # Load the outcome dataframe (to be queried)
-    from .GENO import GENO
-    if isinstance(outcome, GENO):  # Assuming GENO is the class name
+    import genal
+    if isinstance(outcome, genal.Geno): 
         df_outcome, name = load_outcome_from_geno_object(outcome)
     elif isinstance(outcome, str):
         df_outcome, name = load_outcome_from_filepath(outcome)
     else:
-        raise ValueError("You need to provide either a GENO object or filepath string to the outcome variable.")
+        raise ValueError(
+            "You need to provide either a Geno object or filepath string to the outcome variable."
+        )
 
     # Check necessary columns from outcome
     for column in REQUIRED_COLUMNS:
@@ -178,13 +242,22 @@ def query_outcome_func(data, outcome, name, proxy, reference_panel, kb, r2, wind
     outcome_snps = set(df_outcome.SNP.values)
     exposure_snps = set(data.SNP.values)
     snps_present = exposure_snps & outcome_snps
-    print(f"{len(snps_present)} SNPs out of {len(exposure_snps)} are present in the outcome data.")
+    print(
+        f"{len(snps_present)} SNPs out of {len(exposure_snps)} are present in the outcome data."
+    )
 
     # Find proxies for absent SNPs if needed
     if proxy and (len(exposure_snps) - len(snps_present) > 0):
         snps_absent = exposure_snps - snps_present
         print(f"Searching proxies for {len(snps_absent)} SNPs...")
-        ld = find_proxies(snps_absent, reference_panel=reference_panel, kb=kb, r2=r2, window_snps=window_snps, threads=cpus)
+        ld = find_proxies(
+            snps_absent, 
+            reference_panel=reference_panel, 
+            kb=kb, 
+            r2=r2, 
+            window_snps = window_snps, 
+            threads=cpus
+        )
         outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
         exposure = data[data.SNP.isin(outcome.SNP)]
     else:
@@ -198,9 +271,8 @@ def query_outcome_func(data, outcome, name, proxy, reference_panel, kb, r2, wind
     
     return exposure, outcome, name
 
-REQUIRED_COLUMNS = ["SNP", "BETA", "SE", "EA", "NEA"]
 def load_outcome_from_geno_object(outcome):
-    """Load outcome data from a GENO object."""
+    """Load outcome data from a Geno object."""
     df_outcome = outcome.data
     name = outcome.name
     print(f"Outcome data successfully loaded from '{name}' geno object.")
@@ -219,7 +291,10 @@ def load_outcome_from_filepath(outcome):
 
 
 
-def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
+def harmonize_MR(df_exposure, 
+                 df_outcome, 
+                 action=2, 
+                 eaf_threshold=0.42):
     """
     Harmonize exposure and outcome for MR analyses.
 
@@ -251,63 +326,106 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
     check_required_columns(df_outcome, REQUIRED_COLUMNS)
     
     # Rename columns
-    df_exposure = df_exposure.rename(columns={"EA": "EA_e", "NEA": "NEA_e", "EAF": "EAF_e", "BETA": "BETA_e", "SE": "SE_e"}, errors="ignore")
-    df_outcome = df_outcome.rename(columns={"EA": "EA_o", "NEA": "NEA_o", "EAF": "EAF_o", "BETA": "BETA_o", "SE": "SE_o"}, errors="ignore")
-    df_outcome=df_outcome[df_outcome.columns.intersection(["SNP","EA_o","NEA_o","EAF_o","BETA_o","SE_o"])]
+    df_exposure = df_exposure.rename(
+        columns={
+            "EA": "EA_e", 
+            "NEA": "NEA_e", 
+            "EAF": "EAF_e", 
+            "BETA": "BETA_e", 
+            "SE": "SE_e"},
+        errors="ignore"
+    )
+    df_outcome = df_outcome.rename(
+        columns={"EA": "EA_o", 
+                 "NEA": "NEA_o", 
+                 "EAF": "EAF_o", 
+                 "BETA": "BETA_o", 
+                 "SE": "SE_o"},
+        errors="ignore"
+    )
+    df_outcome = df_outcome[
+        df_outcome.columns.intersection(
+            ["SNP","EA_o","NEA_o","EAF_o","BETA_o","SE_o"]
+        )
+    ]
     
     # Merge the dataframes on SNP
     df = df_exposure.merge(df_outcome, on="SNP", how="left")
 
     # Default EAF columns if they do not exist
-    df['EAF_e'] = df.get('EAF_e', 0.5)
-    df['EAF_o'] = df.get('EAF_o', 0.5)
+    df["EAF_e"] = df.get("EAF_e", 0.5)
+    df["EAF_o"] = df.get("EAF_o", 0.5)
     
     # Identify palindromes
-    condition1 = ((df['EA_e'] == 'A') & (df['NEA_e'] == 'T')) | ((df['EA_e'] == 'T') & (df['NEA_e'] == 'A'))
-    condition2 = ((df['EA_e'] == 'C') & (df['NEA_e'] == 'G')) | ((df['EA_e'] == 'G') & (df['NEA_e'] == 'C'))
-    df['palindrome'] = condition1 | condition2
+    condition1 = (
+        (df["EA_e"] == "A") & (df["NEA_e"] == "T")
+    ) | (
+        (df["EA_e"] == "T") & (df["NEA_e"] == "A")
+    )
+    condition2 = (
+        (df["EA_e"] == "C") & (df["NEA_e"] == "G")
+    ) | (
+        (df["EA_e"] == "G") & (df["NEA_e"] == "C")
+    )
+    df["palindrome"] = condition1 | condition2
     
     # Align effect alleles between exposure and outcome
     # Classify SNPs into aligned / inverted / need to be flipped
     df["aligned"] = (df.EA_e == df.EA_o) & (df.NEA_e == df.NEA_o) #Already aligned
     df["inverted"] = (df.EA_e == df.NEA_o) & (df.NEA_e == df.EA_o) #Inverted
-    df["to_flip"] = ~df["aligned"] & ~df["inverted"] & ~df["palindrome"] #Neither aligned nor inverted nor palindromic
+    df["to_flip"] = (
+        ~df["aligned"] & ~df["inverted"] & ~df["palindrome"]
+    )#Neither aligned nor inverted nor palindromic
     
     # Flip the SNPs to be flipped
     if df.to_flip.sum() > 0:
         to_flip_idx = df[df["to_flip"]].index #Get indices of SNPs to be flipped
-        df.loc[to_flip_idx, 'EA_o'] = flip_alleles(df.loc[to_flip_idx, 'EA_o'])
-        df.loc[to_flip_idx, 'NEA_o'] = flip_alleles(df.loc[to_flip_idx, 'NEA_o'])
+        df.loc[to_flip_idx, "EA_o"] = flip_alleles(df.loc[to_flip_idx, "EA_o"])
+        df.loc[to_flip_idx, "NEA_o"] = flip_alleles(df.loc[to_flip_idx, "NEA_o"])
         
     # Recheck inverted SNPS to flag those that are inverted after being flipped
-    df["inverted"]=np.where((df.EA_e == df.NEA_o) & (df.NEA_e == df.EA_o), True, False) 
+    df["inverted"]=np.where(
+        (df.EA_e == df.NEA_o) & (df.NEA_e == df.EA_o), 
+        True, 
+        False
+    ) 
     
     # Switch the inverted SNPs to align them
     if df.inverted.sum() > 0: 
         inverted_idx = df[df["inverted"]].index #Get indices of inverted SNPs
-        df.loc[inverted_idx, ['EA_o', 'NEA_o']] = df.loc[inverted_idx, ['NEA_o', 'EA_o']].values #Swap outcome EA and NEA values
-        df.loc[inverted_idx, 'BETA_o'] *= -1 #Invert outcome BETA
-        df.loc[inverted_idx, 'EAF_o'] = 1 - df.loc[inverted_idx, 'EAF_o'] #Invert outcome EAF
+        df.loc[inverted_idx, ["EA_o", "NEA_o"]] = df.loc[
+            inverted_idx, ["NEA_o", "EA_o"]
+        ].values #Swap outcome EA and NEA values
+        df.loc[inverted_idx, "BETA_o"] *= -1 #Invert outcome BETA
+        df.loc[inverted_idx, "EAF_o"] = (
+            1 - df.loc[inverted_idx, "EAF_o"]
+        ) #Invert outcome EAF
         
     # All the SNPs should be aligned at this point. If not, they have an allele mismatch and need to be removed
     df["aligned"] = (df.EA_e == df.EA_o) & (df.NEA_e == df.NEA_o) #Recheck aligned
     df["allele_mismatch"] = ~df["aligned"] #If still not aligned: requires exclusion due to allele mismatch
     mismatched_snps = df[df["allele_mismatch"]].shape[0]
     if mismatched_snps > 0:
-        print(f"{mismatched_snps} SNPs have been excluded due to a mismatch between the exposure and outcome alleles data.")
+        print(
+            f"{mismatched_snps} SNPs have been excluded due to a mismatch between the exposure and outcome alleles data."
+        )
     df = df[~df["allele_mismatch"]]
-    df.reset_index(inplace=True,drop=True)
+    df.reset_index(inplace=True, drop=True)
 
     #Treat palindromes based on the action parameter
     if action == 3: #Simply delete them
         snps_deleted = df[df.palindrome].SNP.values
         df = df[~df.palindrome]
         df.reset_index(drop=True, inplace=True)
-        print(f"Action = 3: excluding {len(snps_deleted)} palindromic SNPs: {', '.join(snps_deleted)}")
+        print(
+            f"Action = 3: excluding {len(snps_deleted)} palindromic SNPs: {', '.join(snps_deleted)}"
+        )
     elif action==2: 
         df = apply_action_2(df, eaf_threshold)
     elif action==1:
-        print("Action = 1: Keeping all palindromic SNPs without attempting to flip them.")
+        print(
+            "Action = 1: Keeping all palindromic SNPs without attempting to flip them."
+        )
 
     return df
 
@@ -318,13 +436,17 @@ def flip_alleles(x):
     x = x.str.upper()
     return x
 
-def check_required_columns(df, columns):
+def check_required_columns(df, 
+                           columns):
     """Check if the required columns are present in the dataframe."""
     missing_columns = [col for col in columns if col not in df.columns]
     if missing_columns:
-        raise ValueError(f"The columns {', '.join(missing_columns)} are not found in the data and are necessary.")
+        raise ValueError(
+            f"The columns {', '.join(missing_columns)} are not found in the data and are necessary."
+        )
 
-def apply_action_2(df, eaf_threshold):
+def apply_action_2(df, 
+                   eaf_threshold):
     """
     Use EAF_e and EAF_o to align palindromes if both EAFs are outside the intermediate allele frequency range.
         - Replace NA values in EAF columns by 0.5 (will be flagged and removed in step 3)
@@ -337,25 +459,33 @@ def apply_action_2(df, eaf_threshold):
     df["EAF_o"] = np.where(df.EAF_o.isna(), 0.5, df.EAF_o)
     
     # Set the boundaries for intermediate frequencies
-    minf = np.minimum(eaf_threshold,1-eaf_threshold) 
+    minf = np.minimum(eaf_threshold, 1 - eaf_threshold) 
     maxf = 1 - minf
     
     # Identify palindromes that have an intermediate allele frequency and delete them
-    df["ambiguous"] = (df['palindrome'] & (((minf <= df['EAF_e']) & (df['EAF_e'] <= maxf)) | ((minf <= df['EAF_o']) & (df['EAF_o'] <= maxf))))
+    df["ambiguous"] = (
+        df["palindrome"] & (
+            ((minf <= df["EAF_e"]) & (df["EAF_e"] <= maxf)) 
+            | ((minf <= df["EAF_o"]) & (df["EAF_o"] <= maxf)))
+    )
     snps_deleted = df[df.ambiguous].SNP.values
     df = df[~df.ambiguous]
     diff = len(snps_deleted)
     if diff > 0: 
-        print(f"Action = 2: {diff} SNPs excluded for being palindromic with intermediate allele frequencies: {', '.join(snps_deleted)}.")
+        print(
+            f"Action = 2: {diff} SNPs excluded for being palindromic with intermediate allele frequencies: {', '.join(snps_deleted)}."
+        )
     else:
-        print(f"Action = 2: None of the SNPs are palindromic with intermediate allele frequency, keeping all of them.")
+        print(
+            f"Action = 2: None of the SNPs are palindromic with intermediate allele frequency, keeping all of them."
+        )
         
     # Identify palindromes that need to be flipped and flip them
-    df.loc[:, "to_flip"] = (df['palindrome'] & ((df.EAF_e - 0.5) * (df.EAF_o - 0.5) < 0))
+    df.loc[:, "to_flip"] = (df["palindrome"] & ((df.EAF_e - 0.5) * (df.EAF_o - 0.5) < 0))
     if df["to_flip"].sum() > 0:
         to_flip_idx = df[df["to_flip"]].index #Get indices of SNPs to be flipped
-        df.loc[to_flip_idx, 'BETA_o'] *= -1 #Invert outcome BETA
-        df.loc[to_flip_idx, 'EAF_o'] = 1 - df.loc[to_flip_idx, 'EAF_o'] #Invert outcome EAF
+        df.loc[to_flip_idx, "BETA_o"] *= -1 #Invert outcome BETA
+        df.loc[to_flip_idx, "EAF_o"] = 1 - df.loc[to_flip_idx, "EAF_o"] #Invert outcome EAF
         print(f"Action = 2: {df.to_flip.sum()} palindromic SNPs have been flipped.")
         
     df.reset_index(drop=True, inplace=True)

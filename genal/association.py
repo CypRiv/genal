@@ -2,13 +2,17 @@ import pandas as pd
 import numpy as np
 from pandas.api.types import is_numeric_dtype
 import scipy.stats as st
-import os
+import os, subprocess
 
 from .extract_prs import check_bfiles
-from .tools import *
+from .tools import get_plink19_path
 
-
-def association_test_func(data, covar_list, standardize, name, data_pheno, pheno_type):
+def association_test_func(data, 
+                          covar_list, 
+                          standardize, 
+                          name, 
+                          data_pheno, 
+                          pheno_type):
     """
     Conduct single-SNP association tests against a phenotype.
 
@@ -20,7 +24,7 @@ def association_test_func(data, covar_list, standardize, name, data_pheno, pheno
         5. Processes the results and returns them.
 
     Args:
-        data (pd.DataFrame): Genetic data with the standard GENO columns.
+        data (pd.DataFrame): Genetic data with the standard Geno columns.
         covar_list (list): List of column names in the data_pheno DataFrame to use as covariates.
         standardize (bool): Flag indicating if the phenotype needs standardization.
         name (str): Prefix for the filenames used during the process.
@@ -30,7 +34,7 @@ def association_test_func(data, covar_list, standardize, name, data_pheno, pheno
     Returns:
         pd.DataFrame: Processed results of the association test.
 
-    This function corresponds to the following GENO method: :meth:`GENO.association_test`.
+    This function corresponds to the following Geno method: :meth:`Geno.association_test`.
     """
 
     # Check necessary files are available
@@ -52,7 +56,10 @@ def association_test_func(data, covar_list, standardize, name, data_pheno, pheno
     # Process and return results
     return _process_results(output, method, data, pheno_type)
 
-def _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize):
+def _prepare_fam_file(genetic_path, 
+                      data_pheno, 
+                      pheno_type, 
+                      standardize):
     """Helper function to prepare the FAM file with phenotype data."""
     # Read the FAM file
     fam = pd.read_csv(genetic_path + ".fam", header=None, delimiter=" ")
@@ -80,7 +87,9 @@ def _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize):
     fam.to_csv(genetic_path + ".fam", header=None, index=False, sep=" ")
     return fam
 
-def _handle_covariates(covar_list, data_pheno, name):
+def _handle_covariates(covar_list, 
+                       data_pheno, 
+                       name):
     """Helper function to prepare the covariate file."""
     if len(covar_list) > 0:
         # Ensure all covariates are present in phenotype data
@@ -113,7 +122,12 @@ def _handle_covariates(covar_list, data_pheno, name):
         covar_filename = None
     return covar, covar_filename
 
-def _run_plink_assoc_test(genetic_path, name, pheno_type, covar, covar_filename, covar_list):
+def _run_plink_assoc_test(genetic_path, 
+                          name, 
+                          pheno_type, 
+                          covar, 
+                          covar_filename, 
+                          covar_list):
     """Helper function to execute the PLINK association test."""
     method = "logistic" if pheno_type == "binary" else "linear"
     print(f"Running single-SNP {method} regression tests on {genetic_path} data {f'with adjustment for: {covar_list}' if covar else 'without covariate adjustments'}.")
@@ -125,7 +139,10 @@ def _run_plink_assoc_test(genetic_path, name, pheno_type, covar, covar_filename,
     subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
     return output, method
 
-def _process_results(output, method, data, pheno_type):
+def _process_results(output, 
+                     method, 
+                     data, 
+                     pheno_type):
     """Helper function to process results after the PLINK association test."""
     # Path to PLINK results
     results_path = output + f".assoc." + method
@@ -156,7 +173,11 @@ def _process_results(output, method, data, pheno_type):
 
     
     
-def set_phenotype_func(data_original, PHENO, PHENO_type, IID, alternate_control):
+def set_phenotype_func(data_original, 
+                       PHENO, 
+                       PHENO_type, 
+                       IID, 
+                       alternate_control):
     """
     Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.
 
@@ -186,7 +207,9 @@ def set_phenotype_func(data_original, PHENO, PHENO_type, IID, alternate_control)
     print("The phenotype data is stored in the .phenotype attribute.")
     return data, PHENO_type
 
-def _validate_columns_existence(data, PHENO, IID):
+def _validate_columns_existence(data, 
+                                PHENO, 
+                                IID):
     """Checks if columns exist and raises errors if not."""
     for column in [PHENO, IID]:
         # Raise an error if the column name is not provided
@@ -198,7 +221,9 @@ def _validate_columns_existence(data, PHENO, IID):
     if data.shape[0]==0:
         raise ValueError("The phenotype dataframe is empty.")
 
-def _standardize_column_names(data, PHENO, IID):
+def _standardize_column_names(data, 
+                              PHENO, 
+                              IID):
     """Standardizes the column names to 'IID' and 'PHENO'."""
     # Drop redundant columns if they exist and rename the target columns to standard names
     if PHENO != "PHENO":    
@@ -208,7 +233,8 @@ def _standardize_column_names(data, PHENO, IID):
     data.rename(columns={IID: "IID", PHENO: "PHENO"}, inplace=True)
     return data
 
-def _determine_phenotype_type(data, PHENO_type):
+def _determine_phenotype_type(data, 
+                              PHENO_type):
     """Guesses or validates the phenotype type."""
     # If phenotype type is not given, deduce it based on the unique values in the column
     if PHENO_type is None:
@@ -223,7 +249,10 @@ def _determine_phenotype_type(data, PHENO_type):
             raise ValueError(f"The only possible values for the PHENO_type argument are 'binary' or 'quant'")
     return PHENO_type
 
-def _validate_and_process_phenotype(data, PHENO, PHENO_type, alternate_control):
+def _validate_and_process_phenotype(data, 
+                                    PHENO, 
+                                    PHENO_type, 
+                                    alternate_control):
     """Validates the phenotype and processes it accordingly."""
     # Process the phenotype based on its type
     if PHENO_type == "binary":
@@ -234,7 +263,9 @@ def _validate_and_process_phenotype(data, PHENO, PHENO_type, alternate_control):
         raise ValueError("Accepted values for 'PHENO_type' are 'binary' or 'quant'.")
     return data
 
-def _process_binary_phenotype(data, PHENO, alternate_control):
+def _process_binary_phenotype(data, 
+                              PHENO, 
+                              alternate_control):
     """Processes a binary phenotype."""
     # Ensure that the phenotype is binary
     if len(np.unique(data.PHENO.dropna())) != 2:
@@ -250,7 +281,8 @@ def _process_binary_phenotype(data, PHENO, alternate_control):
     else:
         data.replace({"PHENO": {code_control: 1, code_case: 0}}, inplace=True)
 
-def _validate_quantitative_phenotype(data, PHENO):
+def _validate_quantitative_phenotype(data, 
+                                     PHENO):
     """Validates a quantitative phenotype."""
     # Ensure that the phenotype is numeric
     if not is_numeric_dtype(data.PHENO):

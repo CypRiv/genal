@@ -5,28 +5,31 @@ import os, subprocess
 import shutil
 from collections import Counter
 
-from .tools import *
+from .constants import STANDARD_COLUMNS
 
 def remove_na(data):
-    """Identify the columns containing NA values. Delete rows with NA values."""
+    """Identify the standard columns containing NA values. Delete rows with NA values."""
     nrows = data.shape[0]
-    columns_na = data.columns[data.isna().any()].tolist()
-    data.dropna(inplace=True)
+    present_standard_columns = [col for col in STANDARD_COLUMNS if col in data.columns]
+    columns_na = data[present_standard_columns].columns[data[present_standard_columns].isna().any()].tolist()
+    data.dropna(subset = present_standard_columns, inplace=True)
     n_del = nrows - data.shape[0]
     if n_del>0:
         print(f"Deleted {n_del}({n_del/nrows*100:.3f}%) rows containing NA values in columns {columns_na}. Use preprocessing = 1 to keep the rows containing NA values.")
-    return data
+    return
 
 def check_snp_column(data):
     """Remove duplicates in the SNP column."""
-    duplicates = data.duplicated(subset=["SNP"], keep="first")
-    data = data[~duplicates]
-    n_del = duplicates.sum()
+    duplicate_indices = data[data.duplicated(subset=["SNP"], keep="first")].index
+    n_del = len(duplicate_indices)
     if n_del > 0:
+        data.drop(index=duplicate_indices, inplace=True)
         print(f"{n_del}({n_del/data.shape[0]*100:.3f}%) duplicated SNPs have been removed. Use keep_dups=True to keep them.")  
-    return data
+    return
 
-def check_allele_column(data, allele_col, keep_multi):
+def check_allele_column(data, 
+                        allele_col, 
+                        keep_multi):
     """
     Verify that the corresponding allele column is upper case strings. Set to nan if not formed with A, T, C, G letters. 
     Set to nan if values are multiallelic unless keep_multi=True.
@@ -45,7 +48,7 @@ def check_allele_column(data, allele_col, keep_multi):
         if multi_count > 0:
             data.loc[multi_condition, allele_col] = np.nan
             print(f"{multi_count}({multi_count/nrows*100:.3f}%) rows containing multiallelic values in the {allele_col} column are set to nan. Use keep_multi=True to keep them.")
-    return data
+    return
 
 def fill_se_p(data):
     """If either P or SE is missing but the other and BETA are present, fill it."""
@@ -59,19 +62,21 @@ def fill_se_p(data):
     if (("SE" in data.columns) & ("BETA" in data.columns) & ("P" not in data.columns)):
         data["P"] = np.where(data["SE"]>0, 2*(1-st.norm.cdf(np.abs(data.BETA)/data.SE)), 1)
         print("The P (P-value) column has been created.")
-    return data
+    return
 
 def check_p_column(data):
     """Verify that the P column contains numeric values in the range [0,1]. Set inappropriate values to NA."""
     nrows = data.shape[0]
     data["P"] = pd.to_numeric(data["P"], errors="coerce")
-    data.loc[(data['P'] < 0) & (data['P'] > 1)] = np.nan
+    data.loc[(data['P'] < 0) | (data['P'] > 1), "P"] = np.nan
     n_missing = data["P"].isna().sum()
     if n_missing > 0:
         print(f"{n_missing}({n_missing/nrows*100:.3f}%) values in the P column have been set to nan for being missing, non numeric or out of range [0,1].")
-    return data
+    return
 
-def check_beta_column(data, effect_column, preprocessing):
+def check_beta_column(data, 
+                      effect_column, 
+                      preprocessing):
     """
     If the BETA column is a column of odds ratios, log-transform it.
     If no effect_column argument is specified, determine if the BETA column are beta estimates or odds ratios.
@@ -94,9 +99,10 @@ def check_beta_column(data, effect_column, preprocessing):
         data["BETA"]=np.log(data["BETA"])
         data.drop(columns="SE", errors="ignore", inplace=True)
         print("The BETA column has been log-transformed to obtain Beta estimates.")
-    return data
+    return 
 
-def fill_ea_nea(data, reference_panel_df):
+def fill_ea_nea(data, 
+                reference_panel_df):
     """Fill in the EA and NEA columns based on reference data."""
     if "BETA" in data.columns:
         print("Warning: You have specified an effect (BETA) column but no effect allele (EA) column. An effect estimate is only meaningful if paired with its corresponding allele.")
@@ -106,7 +112,8 @@ def fill_ea_nea(data, reference_panel_df):
     print(f"Alleles columns created: effect (EA) and non-effect allele (NEA). {n_missing}({n_missing/data.shape[0]*100:.3f}%) values are set to nan because SNPs were not found in the reference data.")
     return data
 
-def fill_nea(data, reference_panel_df):
+def fill_nea(data, 
+             reference_panel_df):
     """Fill in the NEA column based on reference data."""
     data = data.merge(reference_panel_df[["CHR","POS","A1","A2"]], on=["CHR","POS"], how="left")
     conditions = [
@@ -119,7 +126,8 @@ def fill_nea(data, reference_panel_df):
     print(f"The NEA (Non Effect Allele) column has been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) values are set to nan because SNPs were not found in the reference data.")
     return data
 
-def fill_coordinates_func(data, reference_panel_df):
+def fill_coordinates_func(data, 
+                          reference_panel_df):
     """Fill in the CHR/POS columns based on reference data."""
     if not "SNP" in data.columns:
         raise ValueError(f"The SNP column is not found in the data and is mandatory to fill coordinates!")
@@ -131,7 +139,8 @@ def fill_coordinates_func(data, reference_panel_df):
     print(f"The coordinates columns (CHR for chromosome and POS for position) have been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data and their values  set to nan.") 
     return data
 
-def fill_snpids_func(data, reference_panel_df):
+def fill_snpids_func(data, 
+                     reference_panel_df):
     """
     Fill in the SNP column based on reference data.
     If some SNPids are still missing, they will be replaced by a standard name: CHR:POS:EA 
@@ -151,12 +160,13 @@ def fill_snpids_func(data, reference_panel_df):
             data.loc[missing_snp_condition, "POS"].astype(str) + ":" + 
             data.loc[missing_snp_condition, "EA"].astype(str)
         )
-        print_statement = f" and their name set to CHR:POS:EA"
+        print_statement = f" and their ID set to CHR:POS:EA"
         
     print(f"The SNP column (rsID) has been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data{print_statement if standard_name_condition else ''}.")
     return data
 
-def check_int_column(data, int_col):
+def check_int_column(data, 
+                     int_col):
     """Set the type of the int_col column to Int32 and non-numeric values to NA."""
     nrows = data.shape[0]
     data[int_col] = pd.to_numeric(data[int_col], errors="coerce")
@@ -164,13 +174,27 @@ def check_int_column(data, int_col):
     n_nan = data[int_col].isna().sum()
     if n_nan > 0:
         print(f"The {int_col} column contains {n_nan}({n_nan/nrows*100:.3f}%) values set to NaN (due to being missing or non-integer).")
-    return data
+    return
 
-def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns):
+def adjust_column_names(data, 
+                        CHR, 
+                        POS, 
+                        SNP, 
+                        EA, 
+                        NEA, 
+                        BETA, 
+                        SE, 
+                        P, 
+                        EAF, 
+                        keep_columns):
     """
     Rename columns to the standard names making sure that there are no duplicated names.
     Delete other columns if keep_columns=False, keep them if True.
     """
+    #Check keep_columns argument
+    if not isinstance(keep_columns, bool):
+        raise TypeError(f"{keep_columns} only accepts values: True or False.")
+            
     rename_dict = {CHR:"CHR", POS:"POS", SNP:"SNP", EA:"EA", NEA:"NEA", BETA:"BETA", SE:"SE", P:"P", EAF:"EAF"}
     for key, value in rename_dict.items():
         if key != value and key not in data.columns:
@@ -187,10 +211,15 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
         raise ValueError(f"After adjusting the column names, the resulting dataframe has duplicated columns. Make sure your dataframe does not have a different column named {duplicated_columns}.")
     return data
 
-def check_arguments(df, preprocessing, reference_panel, clumped, effect_column, keep_columns, 
-                    fill_snpids, fill_coordinates, keep_multi, keep_dups):
+def check_arguments(preprocessing, 
+                    reference_panel, 
+                    effect_column, 
+                    fill_snpids, 
+                    fill_coordinates, 
+                    keep_multi, 
+                    keep_dups):
     """
-    Verify the arguments passed for the GENO initialization and apply logic based on the preprocessing value. See :class:`GENO` for more details.
+    Verify the arguments passed for the Geno initialization and apply logic based on the preprocessing value. See :class:`Geno` for more details.
 
     Returns:
         tuple: Tuple containing updated values for (keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates)
@@ -199,13 +228,9 @@ def check_arguments(df, preprocessing, reference_panel, clumped, effect_column, 
         TypeError: For invalid data types or incompatible argument values.
     """
     
-    # Validate df type
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("df needs to be a pandas dataframe.")
-    
     # Validate preprocessing value
     if preprocessing not in [0,1,2]:
-        raise ValueError("preprocessing must be one of [0, 1, 2]. Refer to the GENO class docstring for details.")
+        raise ValueError("preprocessing must be one of [0, 1, 2]. Refer to the Geno class docstring for details.")
     
     # Validate effect_column value
     if not ((effect_column is None) or (effect_column in ["OR", "BETA"])):
@@ -213,8 +238,6 @@ def check_arguments(df, preprocessing, reference_panel, clumped, effect_column, 
     
     # Ensure all other arguments are either None or boolean type
     variables = {
-        "clumped": clumped,
-        "keep_columns": keep_columns,
         "fill_snpids": fill_snpids,
         "fill_coordinates": fill_coordinates,
         "keep_multi": keep_multi,
@@ -226,7 +249,7 @@ def check_arguments(df, preprocessing, reference_panel, clumped, effect_column, 
 
     # Helper functions for preprocessing logic
     def keeptype_column(arg):
-        """Helper function to decide whether to keep columns/multi-values/duplicates."""
+        """Helper function to decide whether to keep multi-values/duplicates."""
         return True if arg is None and preprocessing < 2 else arg
     
     def filltype_column(arg):
@@ -234,16 +257,20 @@ def check_arguments(df, preprocessing, reference_panel, clumped, effect_column, 
         return False if arg is None and preprocessing == 0 else arg
 
     # Apply preprocessing logic
-    keep_columns = keeptype_column(keep_columns)
     keep_multi = keeptype_column(keep_multi)
     keep_dups = keeptype_column(keep_dups)
     fill_snpids = filltype_column(fill_snpids)
     fill_coordinates = filltype_column(fill_coordinates)
 
-    return keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates
+    return keep_multi, keep_dups, fill_snpids, fill_coordinates
 
 
-def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
+def save_data(data, 
+              name, 
+              path="", 
+              fmt="h5", 
+              sep="\t", 
+              header=True):
     """
     Save a DataFrame to a file in a given format.
     
@@ -285,7 +312,10 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     print(f"Data saved to {path_name}")
 
 
-def Combine_GENO(Gs, name="noname", clumped=False, preprocessing=0):
+def Combine_Geno(Gs, 
+                 name="noname", 
+                 clumped=False, 
+                 preprocessing=0):
     """
     Combine a list of GWAS objects into one.
 
@@ -296,7 +326,7 @@ def Combine_GENO(Gs, name="noname", clumped=False, preprocessing=0):
     - preprocessing (int, optional): Level of preprocessing to apply. Default is 0.
     
     Returns:
-    GENO object: Combined GENO object.
+    Geno object: Combined Geno object.
     """
     C = pd.DataFrame()
 
@@ -309,7 +339,7 @@ def Combine_GENO(Gs, name="noname", clumped=False, preprocessing=0):
 
     C = C.reset_index(drop=True)
 
-    return GENO(C, name=name, clumped=clumped, preprocessing=preprocessing)
+    return Geno(C, name=name, clumped=clumped, preprocessing=preprocessing)
 
 
 def delete_tmp():
