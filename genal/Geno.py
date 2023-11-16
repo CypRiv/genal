@@ -127,7 +127,7 @@ class Geno:
         self.name = str(uuid.uuid4())[:8]
         
         # List to keep track of checks performed
-        self.checks = CHECKS_DICT
+        self.checks = CHECKS_DICT.copy()
 
         # Set the maximal amount of ram/cpu to be used by the methods and dask chunksize
         self.cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', default=os.cpu_count()))
@@ -222,6 +222,7 @@ class Geno:
         # Convert effect column to Beta estimates if present
         if "BETA" in data.columns:
             check_beta_column(data, effect_column, preprocessing)
+            self.checks["BETA"] = True
 
         # Ensure P column contains valid values
         if "P" in data.columns and preprocessing > 0:
@@ -332,13 +333,34 @@ class Geno:
         Returns:
             genal.Geno: A new Geno object based on the clumped data.
         """
+        
+        # Ensure required columns exist in the data
+        for column in ["SNP", "P"]:
+            if column not in self.data.columns:
+                raise ValueError(f"The column {column} is not found in the data")
 
-        # Validate input and clump the data using the specified parameters
-        clumped_data = clump_data(self.data, reference_panel, get_plink19_path(), kb, r2, p1, p2, self.name, self.ram, self.checks) 
+        # Validate and process SNP and P columns, if not already done
+        if "SNP" not in self.checks:
+            check_snp_column(self.data)
+            self.checks["SNP"] = True
 
-        # Update checks attribute with latest checks
-        self.checks["SNP"] = True
-        self.checks["P"] = True
+        if "P" not in self.checks:
+            check_p_column(self.data)
+            self.checks["P"] = True
+            
+        initial_rows = self.data.shape[0]
+        self.data.dropna(subset=["SNP", "P"], inplace=True)
+        deleted_rows = initial_rows - self.data.shape[0]
+        if deleted_rows > 0:
+            print(
+                f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP or P have been deleted."
+            )
+
+        # Create tmp directory if it doesn't exist
+        create_tmp()
+        
+        # Clump the data using the specified parameters
+        clumped_data = clump_data(self.data, reference_panel, get_plink19_path(), kb, r2, p1, p2, self.name, self.ram) 
 
         # If clumped data is successfully generated, assign it to the object's attribute
         if clumped_data is not None:
@@ -374,11 +396,13 @@ class Geno:
         snp_list = self.data["SNP"] 
 
         # Extract SNPs using the provided path and SNP list
-        extract_snps_func(snp_list, self.name, path)
+        _ = extract_snps_func(snp_list, self.name, path)
+        
+        return
 
         
     def prs(self, 
-            name, 
+            name=None, 
             weighted=True, 
             path=None):
         """
@@ -401,17 +425,40 @@ class Geno:
             ValueError: If the data hasn't been clumped and 'clumped' parameter is True.
         """
 
+        # Check for mandatory columns in data
+        mandatory_cols = ["SNP", "EA", "BETA"]
+        for col in mandatory_cols:
+            if col not in self.data.columns:
+                raise ValueError(f"The column {col} is not found in the data!")
+                
+        data_prs = self.data.copy()       
+        
+        # Check SNP and EA columns
+        if "SNP" not in self.checks:
+            check_snp_column(data_prs)
+        if "EA" not in self.checks:
+            check_allele_column(data_prs, "EA", keep_multi=False)
+        if "BETA" not in self.checks:
+            check_beta_column(data_prs, effect_column=None, preprocessing=2)
+            
+        initial_rows = data_prs.shape[0]
+        data_prs.dropna(subset=["SNP", "P", "BETA"], inplace=True)
+        deleted_rows = initial_rows - data_prs.shape[0]
+        if deleted_rows > 0:
+            print(
+                f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP, P, or BETA have been deleted."
+            )
+                
         # Compute PRS 
-        prs_data = prs_func(self.data, weighted, path, checks=self.checks, ram=self.ram, name=self.name)
+        prs_data = prs_func(data_prs, weighted, path, ram=self.ram, name=self.name)
 
         # Save the computed PRS data as a CSV file
+        name = self.name if not name else name
         prs_filename = os.path.splitext(name)[0] + ".csv"
         prs_data.to_csv(prs_filename, index=False, header=True)
-        print(
-            f"PRS data saved to {prs_filename}"
-        )
+        print(f"PRS data saved to {prs_filename}")
 
-        return prs_data
+        return
   
 
     def set_phenotype(self, 
@@ -660,10 +707,29 @@ class Geno:
         Returns:
             pd.DataFrame: Data after being lifted.
         """
+        # Ensure mandatory columns are present in the input data
+        for column in ["CHR", "POS"]:
+            if column not in self.data.columns:
+                raise ValueError(f"The column {column} is not found in the data!")
+                
+        create_tmp() #Create tmp folder if does not exist
+            
+        # Select appropriate data or copy of data depending on replace argument
         if not replace:
-            data = data.copy()
+            data = self.data.copy()
         else:
             data = self.data
+            
+        # Do the appropriate preprocessing on CHR and POS columns if not already done 
+        if not self.checks["CHR"]:
+            check_int_column(data, "CHR")
+        if not self.checks["POS"]:
+            check_int_column(data, "POS")
+            
+        # Update the checks if replace = True
+        if replace:
+            self.checks["CHR"] = True
+            self.checks["POS"] = True
 
         print(f"Lifting the data{' inplace' if replace else ''}. "
               f"The .data attribute will {'' if replace else 'not '}be modified. "
@@ -671,8 +737,9 @@ class Geno:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            data = lift_data(data, start=start, end=end, extraction_file=extraction_file, 
-                             chain_file=chain_file, name=name, liftover_path=liftover_path, object_id=self.name)
+            data = lift_data(
+                data, start=start, end=end, extraction_file=extraction_file,chain_file=chain_file, name=name, liftover_path=liftover_path, object_id=self.name
+            )
 
         return data 
    

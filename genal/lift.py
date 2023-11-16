@@ -20,7 +20,7 @@ def lift_data(data,
               liftover_path=None, 
               object_id="tmp_id"):
     """
-    Perform a liftover from one genetic build to another. If the chain file required for the liftover is not present, it will be downloaded. It's also possible to manually provide the path to the chain file. 
+    Perform a liftover from one genetic build to another. If the chain file required for the liftover is not present, it will be downloaded. It"s also possible to manually provide the path to the chain file. 
     If the dataset is large, it is suggested to use an alternate method (e.g., `lift_data_liftover`). 
     
     Args:
@@ -43,18 +43,6 @@ def lift_data(data,
         Function for the :meth:`Geno.lift` method.
     """
     
-    # Ensure mandatory columns are present in the input data
-    for column in ["CHR", "POS"]:
-        if column not in data.columns:
-            raise ValueError(f"The column {column} is not found in the data!")
-
-    # Create temporary directory if it doesn't exist
-    if not os.path.exists("tmp_GENAL"):
-        try:
-            os.makedirs("tmp_GENAL")
-        except OSError:
-            raise OSError("Unable to create the 'tmp_GENAL' directory. Check permissions.")
-    
     # Prepare chain file and get its path
     chain_path = prepare_chain_file(chain_file, start, end)
     
@@ -64,7 +52,9 @@ def lift_data(data,
     data.reset_index(drop=True, inplace=True)
     n_na = nrows - data.shape[0]
     if n_na:
-        print(f"Excluded {n_na} SNPs ({n_na/nrows*100:.3f}%) with NaN values in CHR or POS columns.")
+        print(
+            f"Excluded {n_na} SNPs ({n_na/nrows*100:.3f}%) with NaN values in CHR or POS columns."
+        )
         
     # Perform liftover with the liftover executable or in python
     if liftover_path:
@@ -110,11 +100,15 @@ def prepare_chain_file(chain_file,
                 wget.download(url, out=chains_folder_path)
                 # Decompress the downloaded file
                 print(f"The download was successful. Unzipping...")
-                with gzip.open(f'{chain_path}.gz', 'rb') as f_in, open(chain_path, 'wb') as f_out:
+                with gzip.open(f"{chain_path}.gz", "rb") as f_in, open(
+                    chain_path, "wb"
+                ) as f_out:
                     shutil.copyfileobj(f_in, f_out)
             except Exception as e:
                 print(f"The download was unsuccessful: {e}")
-                print("Consider downloading the chain file manually from the UCSC website and providing its path via the chain_file argument.")
+                print(
+                    "Consider downloading the chain file manually from the UCSC website and providing its path via the chain_file argument."
+                )
                 raise FileNotFoundError("Chain file not found.")
 
     return chain_path
@@ -131,7 +125,9 @@ def lift_coordinates_liftover(data,
     try:
         process = subprocess.run([liftover_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5, text=True)
         if not process.stderr.startswith("liftOver"):
-            raise TypeError("The path provided is an executable, but not the liftOver executable. Check the path.")
+            raise TypeError(
+                "The path provided is an executable, but not the liftOver executable. Check the path."
+            )
     except Exception as e:
         raise TypeError(e)
     print("Lifting coordinates using liftOver.")
@@ -141,7 +137,7 @@ def lift_coordinates_liftover(data,
     data["CHR_liftover"]="chr"+data.CHR.astype(str)
     to_lift_filename = os.path.join("tmp_GENAL", f"{object_id}.prelift")
     lifted_filename = os.path.join("tmp_GENAL", f"{object_id}.postlift")
-    unmapped_filename = os.path.join('tmp_GENAL', f'{object_id}_unMapped')
+    unmapped_filename = os.path.join("tmp_GENAL", f"{object_id}_unMapped")
     data[["CHR_liftover","POS","POS"]].to_csv(to_lift_filename, sep=" ", index=False, header=False)
     
     # Call the liftOver software
@@ -151,7 +147,7 @@ def lift_coordinates_liftover(data,
 
     ## Read the output, print the number of unlifted SNPs and remove them from the prelift data. 
     df_post=pd.read_csv(lifted_filename,sep="\t",header=None)
-    unMapped = open(unmapped_filename, 'r')
+    unMapped = open(unmapped_filename, "r")
     Lines = unMapped.readlines()
     if len(Lines)>0:
         print(f"{int(len(Lines)/2)} SNPs could not be lifted.")
@@ -170,7 +166,9 @@ def lift_coordinates_liftover(data,
     
     #Check the length of files
     if len(data) != len(df_post):
-        raise ValueError("There was a problem lifting with liftOver. Try lifting in python (liftover_path = None).")
+        raise ValueError(
+            "There was a problem lifting with liftOver. Try lifting in python (liftover_path = None)."
+        )
     
     ## Merge prelift and postlift data. Unknown chr from the output of liftOver are assigned the value 99. SNPs mapped to unknown chr are deleted from the final data and their number printed.
     data["POS"]=df_post[1].astype(int)
@@ -180,7 +178,9 @@ def lift_coordinates_liftover(data,
     data.drop(index=drop_chr_indices, inplace=True)
     nrow_diff=nrow_before-data.shape[0]
     if nrow_diff>0:
-        print(f"{nrow_diff} SNPs were lifted to an unknown chromosome and deleted from the final files.")
+        print(
+            f"{nrow_diff} SNPs were lifted to an unknown chromosome and deleted from the final files."
+        )
     data.drop(columns=["CHR_liftover"],inplace=True)
     return data
 
@@ -197,15 +197,15 @@ def lift_coordinates_python(data,
         
     # Perform the lift
     def convert_coordinate(args):
-        return lo.convert_coordinate(f'chr{args[0]}', args[1], '-')
+        return lo.convert_coordinate(f"chr{args[0]}", args[1], "-")
     
-    args = data[['CHR', 'POS']].to_records(index=False)
+    args = data[["CHR", "POS"]].to_records(index=False)
     results = list(ThreadPoolExecutor().map(convert_coordinate, args))
     
-    data['POS'] = [res[0][1] if res else np.nan for res in results]
+    data["POS"] = [res[0][1] if res else np.nan for res in results]
     nrows = data.shape[0]
     data.dropna(subset=["POS"], inplace=True)
-    data['POS'] = data['POS'].astype("Int32")
+    data["POS"] = data["POS"].astype("Int32")
     data.reset_index(drop=True, inplace=True)
     n_na = nrows - data.shape[0]
     if n_na:
@@ -223,9 +223,11 @@ def post_lift_operations(data,
         data.to_csv(f"{filename}", sep="\t", header=True, index=False)
         print(f"Lifted list of SNPs saved to {filename}")
     if extraction_file:
-        if not("SNP" in data.columns):
+        if not ("SNP" in data.columns):
             data["SNP"] = data["CHR"].astype(str) + ":" + data["POS"].astype(str)
-        data[["CHR", "POS", "SNP"]].to_csv(f"{name + '_lifted'}_extraction.txt", sep=" ", header=False, index=False)
+        data[["CHR", "POS", "SNP"]].to_csv(
+            f"{name + '_lifted'}_extraction.txt", sep=" ", header=False, index=False
+        )
         print(f"Extraction file saved to {name+ '_lifted'}_extraction.txt")
     return data
 
