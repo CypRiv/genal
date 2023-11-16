@@ -77,7 +77,7 @@ def query_outcome_proxy(df,
         print(
             f"Deleted {nrow-output.shape[0]} base SNPs that did not have matching alleles in reference data."
         )
-    print(f"Found proxies for {output["proxy"].sum()} SNPs.")
+    print(f"Found proxies for {output['proxy'].sum()} SNPs.")
     
     # Replace original SNPs with their proxy (if proxied)
     output["SNP"] = np.where(output["proxy"], output["SNP_A"], output["SNP"])
@@ -147,7 +147,7 @@ def apply_proxies(df,
         print(
             f"Deleted {nrow-output.shape[0]} base SNPs that did not have matching alleles in reference data."
         )
-    print(f"Found proxies for {output["proxy"].sum()} SNPs.")
+    print(f"Found proxies for {output['proxy'].sum()} SNPs.")
     
     # Replace the original SNPs with their proxy (if proxied)
     output["SNP"] = np.where(output["proxy"], output["SNP_B"], output["SNP"])

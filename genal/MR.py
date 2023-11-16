@@ -29,15 +29,27 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
 
     Returns:
         list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient of the regression, representing the causal estimate or the intercept.
-            - 'se': Adjusted standard error of the coefficient or intercept.
-            - 'pval': P-value for the causal estimate or intercept.
-            - 'nSNP': Number of genetic variants used in the analysis.
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate or the intercept.
+            - "se": Adjusted standard error of the coefficient or intercept.
+            - "pval": P-value for the causal estimate or intercept.
+            - "nSNP": Number of genetic variants used in the analysis.
     """
     # Initialize null result
-    null_result = [{"method": "MR Egger", 'b': np.nan, 'se': np.nan, 'pval': np.nan,'nSNP': np.nan}, 
-                   {"method": "Egger Intercept", 'b': np.nan, 'se': np.nan, 'pval': np.nan,'nSNP': np.nan}]
+    null_result = [
+        {
+            "method": "MR Egger", 
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan,
+            "nSNP": np.nan
+        },{
+            "method": "Egger Intercept", 
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan,
+            "nSNP": np.nan}
+    ]
     
     l = len(BETA_e)
     # Early return if insufficient data
@@ -72,10 +84,31 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
         Q_df = l - 2
         Q_pval = 1 - chi2.cdf(Q, Q_df)
         
-        return [{"method": "MR Egger", 'b': b, 'se': se, 'pval': pval,'nSNP': l, 'Q': Q, 'Q_df': Q_df, 'Q_pval': Q_pval}, 
-                   {"method": "Egger Intercept", 'b': b_i, 'se': se_i, 'pval': pval_i,'nSNP': l, 'Q': Q, 'Q_df': Q_df, 'Q_pval': Q_pval}]
+        return [
+            {
+                "method": "MR Egger", 
+                "b": b, 
+                "se": se, 
+                "pval": pval,
+                "nSNP": l, 
+                "Q": Q, 
+                "Q_df": Q_df, 
+                "Q_pval": Q_pval
+            },{
+                "method": "Egger Intercept", 
+                "b": b_i, 
+                "se": se_i, 
+                "pval": pval_i,
+                "nSNP": l, 
+                "Q": Q, 
+                "Q_df": Q_df, 
+                "Q_pval": Q_pval
+            }
+        ]
     else:
-        print("Warning: Collinearities in MR Egger, try LD pruning the exposure (can be done with .clump()).")
+        print(
+            "Warning: Collinearities in MR Egger, try LD pruning the exposure (can be done with .clump())."
+        )
         return null_result
 
 def parallel_bootstrap_func(i, BETA_e, SE_e, BETA_o, SE_o):
@@ -103,7 +136,9 @@ def linreg(x, y, w=None):
     yhat = ahat + bhat * x
 
     residuals = y - yhat
-    se = np.sqrt(sum(w * residuals ** 2) / (np.sum(~np.isnan(yhat)) - 2) / np.sum(w * x**2))
+    se = np.sqrt(
+        sum(w * residuals ** 2) / (np.sum(~np.isnan(yhat)) - 2) / np.sum(w * x**2)
+    )
     pval = 2 * (1 - norm.cdf(abs(bhat / se)))
 
     return {"ahat": ahat, "bhat": bhat, "se": se, "pval": pval}
@@ -122,31 +157,62 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus = 4):
 
     Returns:
         list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient of the regression, representing the causal estimate or the intercept.
-            - 'se': Adjusted standard error of the coefficient or intercept.
-            - 'pval': P-value for the causal estimate or intercept.
-            - 'nSNP': Number of genetic variants used in the analysis.
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate or the intercept.
+            - "se": Adjusted standard error of the coefficient or intercept.
+            - "pval": P-value for the causal estimate or intercept.
+            - "nSNP": Number of genetic variants used in the analysis.
     """
     
     l = len(BETA_e)
     if l < 3:
-        return [{"method": "MR Egger bootstrap", 'b': np.nan, 'se': np.nan, 'pval': np.nan,'nSNP': np.nan}, 
-                {"method": "Egger Intercept bootstrap", 'b': np.nan, 'se': np.nan, 'pval': np.nan,'nSNP': np.nan}]
+        return [
+            {
+                "method": "MR Egger bootstrap", 
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan,
+                "nSNP": np.nan
+            }, {
+                "method": "Egger Intercept bootstrap", 
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan,
+                "nSNP": np.nan
+            }
+        ]
     
     res = np.zeros((nboot+1, 2))
 
     with ProcessPoolExecutor(max_workers=cpus) as executor:
         # Start the load operations and mark each future with its URL
-        futures = {executor.submit(parallel_bootstrap_func, i, BETA_e, SE_e, BETA_o, SE_o): i for i in range(nboot)}
-        for future in tqdm(as_completed(futures), total=nboot, desc="MR Egger bootstrapping", ncols=100):
+        futures = {
+            executor.submit(parallel_bootstrap_func, i, BETA_e, SE_e, BETA_o, SE_o): i for i in range(nboot)
+        }
+        for future in tqdm(
+            as_completed(futures), 
+            total=nboot, 
+            desc="MR Egger bootstrapping", 
+            ncols=100
+        ):
             ahat, bhat = future.result()
             i = futures[future]  # get the original index/counter
             res[i, 0] = ahat
             res[i, 1] = bhat
 
-    return [{"method": "MR Egger bootstrap", 'b': np.nanmean(res[:, 1]), 'se': np.nanstd(res[:, 1]), 'pval': np.sum(np.sign(np.nanmean(res[:, 1])) * res[:, 1] < 0) / nboot, 'nSNP': l}, 
-            {"method": "Egger Intercept bootstrap", 'b': np.nanmean(res[:, 0]), 'se': np.nanstd(res[:, 0]), 'pval': np.sum(np.sign(np.nanmean(res[:, 0])) * res[:, 0] < 0) / nboot,'nSNP': l}]
+    return [
+        {
+            "method": "MR Egger bootstrap", 
+            "b": np.nanmean(res[:, 1]), 
+            "se": np.nanstd(res[:, 1]), 
+            "pval": np.sum(np.sign(np.nanmean(res[:, 1])) * res[:, 1] < 0) / nboot, 
+            "nSNP": l}, {
+            "method": "Egger Intercept bootstrap", 
+            "b": np.nanmean(res[:, 0]), 
+            "se": np.nanstd(res[:, 0]), 
+            "pval": np.sum(np.sign(np.nanmean(res[:, 0])) * res[:, 0] < 0) / nboot,"nSNP": l
+        }
+    ]
 
 
 """
@@ -161,14 +227,17 @@ def weighted_median(b_iv, weights):
     weights_sum = np.cumsum(weights_order) - 0.5 * weights_order
     weights_sum /= np.sum(weights_order)
     below = np.max(np.where(weights_sum < 0.5))
-    b = betaIV_order[below] + (betaIV_order[below + 1] - betaIV_order[below]) * \
-        (0.5 - weights_sum[below]) / (weights_sum[below + 1] - weights_sum[below])
+    b = betaIV_order[below] + (betaIV_order[below + 1] - betaIV_order[below]) * (
+        0.5 - weights_sum[below]
+    ) / (weights_sum[below + 1] - weights_sum[below])
     return b
 
 def weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, weights, nboot):
     """Helper function to generate boostrapped replications."""
     med = np.zeros(nboot)
-    for i in tqdm(range(nboot), total=nboot, desc="Weighted median bootstrapping", ncols=100):
+    for i in tqdm(
+        range(nboot), total=nboot, desc="Weighted median bootstrapping", ncols=100
+    ):
         BETA_e_boot = np.random.normal(loc=BETA_e, scale=SE_e)
         BETA_o_boot = np.random.normal(loc=BETA_o, scale=SE_o)
         betaIV_boot = BETA_o_boot / BETA_e_boot
@@ -188,18 +257,26 @@ def mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
+            - "method": Name of the analysis method.
+            - "b": Coefficient representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
             
     Notes:
         The standard error is obtained with bootstrapping.
     """
     l = len(BETA_e)
     if l < 3:
-        return [{"method": "Weighted median",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}]
+        return [
+            {
+                "method": "Weighted median",
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan, 
+                "nSNP": np.nan
+            }
+        ]
 
     b_iv = BETA_o / BETA_e
     VBj = (SE_o ** 2) / (BETA_e ** 2) + ((BETA_o ** 2) * (SE_e ** 2)) / (BETA_e ** 4)
@@ -207,7 +284,15 @@ def mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     b = weighted_median(b_iv, 1 / VBj)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, 1 / VBj, nboot)
     pval = 2 * (1 - norm.cdf(abs(b / se)))
-    return [{"method": "Weighted Median", 'nSNP': l,'b': b, 'se': se, 'pval': pval}]
+    return [
+        {
+            "method": "Weighted Median", 
+            "nSNP": l,
+            "b": b, 
+            "se": se, 
+            "pval": pval
+        }
+    ]
 
 def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
     """
@@ -223,15 +308,23 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
+            - "method": Name of the analysis method.
+            - "b": Coefficient representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
     """   
     l = len(BETA_e)
     if l < 3:
-        return [{"method": "Penalised weighted median",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}]
+        return [
+            {
+                "method": "Penalised weighted median",
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan, 
+                "nSNP": np.nan
+            }
+        ]
     
     betaIV = BETA_o / BETA_e  
     betaIVW = np.sum(BETA_o * BETA_e / SE_o**2) / np.sum(BETA_e**2 / SE_o**2) 
@@ -239,14 +332,22 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
     weights = 1 / VBj
     
     bwm = mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot)
-    penalty = chi2.sf(weights * (betaIV - bwm[0]['b'])**2, df=1)
+    penalty = chi2.sf(weights * (betaIV - bwm[0]["b"])**2, df=1)
     pen_weights = weights * np.minimum(1, penalty * penk)  
 
     b = weighted_median(betaIV, pen_weights) 
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, pen_weights, nboot)
     pval = 2 * (1 - norm.cdf(abs(b / se)))
     
-    return [{"method": "Penalised weighted median",'b': b, 'se': se, 'pval': pval, 'nSNP': l}]
+    return [
+        {
+            "method": "Penalised weighted median",
+            "b": b, 
+            "se": se, 
+            "pval": pval, 
+            "nSNP": l
+        }
+    ]
 
 def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     """
@@ -261,25 +362,41 @@ def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
+            - "method": Name of the analysis method.
+            - "b": Coefficient representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
             
     Notes:
         The standard error is obtained with bootstrapping.
     """
     l = len(BETA_e)
     if l < 3:
-        return [{"method": "Simple median",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}]
+        return [
+            {
+                "method": "Simple median",
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan, 
+                "nSNP": np.nan
+            }
+        ]
 
     b_iv = BETA_o / BETA_e
     weights = np.repeat(1/len(BETA_e), len(BETA_e))
     b = weighted_median(b_iv, weights)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, weights, nboot)
     pval = 2 * (1 - norm.cdf(abs(b/se)))
-    return [{"method": "Simple median",'b': b, 'se': se, 'pval': pval, 'nSNP': l}]
+    return [
+        {
+            "method": "Simple median",
+            "b": b, 
+            "se": se, 
+            "pval": pval, 
+            "nSNP": l
+        }
+    ]
 
 
 """
@@ -298,31 +415,43 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient of the regression, representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
-            - 'Q': Cochran's Q statistic for heterogeneity.
-            - 'Q_df': Degrees of freedom for the Q statistic.
-            - 'Q_pval': P-value for the Q statistic.
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
+            - "Q": Cochran"s Q statistic for heterogeneity.
+            - "Q_df": Degrees of freedom for the Q statistic.
+            - "Q_pval": P-value for the Q statistic.
 
     Notes:
         The function uses weighted least squares regression (WLS) to estimate the causal effect size,
-        weighting by the inverse of the variance of the outcome's effect sizes. 
-        Cochran's Q statistics also computed to assess the heterogeneity across the instrumental variables.
+        weighting by the inverse of the variance of the outcome"s effect sizes. 
+        Cochran"s Q statistics also computed to assess the heterogeneity across the instrumental variables.
     """   
     # If less than 2 valid rows, return NA values
     l = len(BETA_e)
     if l < 2:
-        return {"method": "Inverse-Variance Weighted", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
+        return {
+            "method": "Inverse-Variance Weighted", 
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan, 
+            "nSNP": np.nan
+        }
     
     # Create weights and perform weighted regression
     weights = 1 / (SE_o ** 2)
     try:
         model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
     except:
-        return {"method": "Inverse-Variance Weighted", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
+        return {
+            "method": "Inverse-Variance Weighted", 
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan, 
+            "nSNP": np.nan
+        }
     
     # Extract coefficients
     b = model.params[0]
@@ -333,7 +462,18 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
     Q = model.scale * Q_df
     Q_pval = 1 - chi2.cdf(Q, Q_df)
     
-    return [{"method": "Inverse-Variance Weighted", 'nSNP': l,'b': b, 'se': se, 'pval': pval, "Q_df": Q_df, "Q": Q, "Q_pval": Q_pval}]
+    return [
+        {
+            "method": "Inverse-Variance Weighted", 
+            "nSNP": l,
+            "b": b, 
+            "se": se, 
+            "pval": pval, 
+            "Q_df": Q_df, 
+            "Q": Q, 
+            "Q_pval": Q_pval
+        }
+    ]
 
 
 def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
@@ -348,24 +488,30 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient of the regression, representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
-            - 'Q': Cochran's Q statistic for heterogeneity.
-            - 'Q_df': Degrees of freedom for the Q statistic.
-            - 'Q_pval': P-value for the Q statistic.
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
+            - "Q": Cochran"s Q statistic for heterogeneity.
+            - "Q_df": Degrees of freedom for the Q statistic.
+            - "Q_pval": P-value for the Q statistic.
 
     Notes:
         The function uses weighted least squares regression (WLS) to estimate the causal effect size,
-        weighting by the inverse of the variance of the outcome's effect sizes. 
-        Cochran's Q statistics also computed to assess the heterogeneity across the instrumental variables.
+        weighting by the inverse of the variance of the outcome"s effect sizes. 
+        Cochran"s Q statistics also computed to assess the heterogeneity across the instrumental variables.
     """   
     # If less than 2 valid rows, return NA values
     l = len(BETA_e)
     if l < 2:
-        return {"method": "Inverse-Variance Weighted (Random effects)",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
+        return {
+            "method": "Inverse-Variance Weighted (Random effects)",
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan, 
+            "nSNP": np.nan
+        }
     
     # Create weights and perform weighted regression
     weights = 1 / (SE_o ** 2)
@@ -379,7 +525,18 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
     Q = model.scale * Q_df
     Q_pval = chi2.sf(Q, Q_df)
     
-    return [{"method": "Inverse-Variance Weighted (Random effects)", 'nSNP': l,'b': b, 'se': se, 'pval': pval, "Q_df": Q_df, "Q": Q, "Q_pval": Q_pval}]
+    return [
+        {
+            "method": "Inverse-Variance Weighted (Random effects)", 
+            "nSNP": l,
+            "b": b, 
+            "se": se, 
+            "pval": pval, 
+            "Q_df": Q_df, 
+            "Q": Q, 
+            "Q_pval": Q_pval
+        }
+    ]
 
 def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     """
@@ -393,30 +550,44 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient of the regression, representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
-            - 'Q': Cochran's Q statistic for heterogeneity.
-            - 'Q_df': Degrees of freedom for the Q statistic.
-            - 'Q_pval': P-value for the Q statistic.
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
+            - "Q": Cochran"s Q statistic for heterogeneity.
+            - "Q_df": Degrees of freedom for the Q statistic.
+            - "Q_pval": P-value for the Q statistic.
 
     Notes:
         The function uses weighted least squares regression (WLS) to estimate the causal effect size,
-        weighting by the inverse of the variance of the outcome's effect sizes. 
-        Cochran's Q statistics also computed to assess the heterogeneity across the instrumental variables.
+        weighting by the inverse of the variance of the outcome"s effect sizes. 
+        Cochran"s Q statistics also computed to assess the heterogeneity across the instrumental variables.
     """    
     l = len(BETA_e)
     if l < 2:
-        return [{"method": "Inverse Variance weighted (Fixed effects)",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}]
+        return [
+            {
+                "method": "Inverse Variance weighted (Fixed effects)",
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan, 
+                "nSNP": np.nan
+            }
+        ]
     
     # Create weights and perform weighted regression
     weights = 1 / SE_o ** 2   
     try:
         model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
     except:
-        return {"method": "Inverse-Variance Weighted (Fixed effects)", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
+        return {
+            "method": "Inverse-Variance Weighted (Fixed effects)", 
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan, 
+            "nSNP": np.nan
+        }
     
     # Extract coefficients
     b = model.params[0]
@@ -425,7 +596,18 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     Q_df = l - 1
     Q = model.scale * Q_df
     Q_pval = chi2.sf(Q, Q_df)
-    return [{"method": "Inverse Variance weighted (Fixed effects)", 'nSNP': l,'b': b, 'se': se, 'pval': pval, "Q_df": Q_df, "Q": Q, "Q_pval": Q_pval}]    
+    return [
+        {
+            "method": "Inverse Variance weighted (Fixed effects)", 
+            "nSNP": l,
+            "b": b, 
+            "se": se, 
+            "pval": pval, 
+            "Q_df": Q_df, 
+            "Q": Q, 
+            "Q_pval": Q_pval
+        }
+    ]    
 
 
 def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
@@ -440,24 +622,30 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
 
     Returns:
         list of dict: A list containing a dictionary with the results:
-            - 'method': Name of the analysis method.
-            - 'b': Coefficient of the regression, representing the causal estimate.
-            - 'se': Adjusted standard error of the coefficient.
-            - 'pval': P-value for the causal estimate.
-            - 'nSNP': Number of genetic variants used in the analysis.
-            - 'Q': Cochran's Q statistic for heterogeneity.
-            - 'Q_df': Degrees of freedom for the Q statistic.
-            - 'Q_pval': P-value for the Q statistic.
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate.
+            - "se": Adjusted standard error of the coefficient.
+            - "pval": P-value for the causal estimate.
+            - "nSNP": Number of genetic variants used in the analysis.
+            - "Q": Cochran"s Q statistic for heterogeneity.
+            - "Q_df": Degrees of freedom for the Q statistic.
+            - "Q_pval": P-value for the Q statistic.
 
     Notes:
         The returned causal estimate is not weighted by the inverse variance. 
         The standard error is corrected for under dispersion. 
-        Cochran's Q statistics also computed to assess the heterogeneity across the instrumental variables.
+        Cochran"s Q statistics also computed to assess the heterogeneity across the instrumental variables.
     """
     
     l = len(BETA_e)
     if l < 2:
-        return {"method": "Unweighted regression", 'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}
+        return {
+            "method": "Unweighted regression", 
+            "b": np.nan, 
+            "se": np.nan, 
+            "pval": np.nan, 
+            "nSNP": np.nan
+        }
 
     # Perform regression without weights
     model = sm.OLS(BETA_o, BETA_e).fit()
@@ -470,7 +658,18 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
     Q = model.scale * Q_df
     Q_pval = chi2.sf(Q, Q_df)
 
-    return [{"method": "Unweighted regression",'b': b, 'se': se, 'pval': pval, 'nSNP': l, 'Q': Q, 'Q_df': Q_df, 'Q_pval': Q_pval}]
+    return [
+        {
+            "method": "Unweighted regression",
+            "b": b, 
+            "se": se, 
+            "pval": pval, 
+            "nSNP": l, 
+            "Q": Q, 
+            "Q_df": Q_df, 
+            "Q_pval": Q_pval
+        }
+    ]
 
 
 """ 
@@ -491,12 +690,12 @@ def mr_sign(BETA_e, BETA_o):
 
     Returns:
         list of dict: A list containing dictionaries with the following keys:
-            - 'method': Name of the method.
-            - 'nSNP': Number of genetic variants used in the analysis.
-            - 'b': Proportion of concordant signs between exposure and outcome effect 
+            - "method": Name of the method.
+            - "nSNP": Number of genetic variants used in the analysis.
+            - "b": Proportion of concordant signs between exposure and outcome effect 
                    sizes minus 0.5, multiplied by 2.
-            - 'se': Not applicable for this method (returns NaN).
-            - 'pval': P-value for the sign concordance test based on a binomial distribution.
+            - "se": Not applicable for this method (returns NaN).
+            - "pval": P-value for the sign concordance test based on a binomial distribution.
 
     Notes:
         Effect sizes that are exactly zero are replaced with NaN and are not included in the analysis. A binomial test is then performed to evaluate the probability of observing the given number of concordant signs by chance alone, assuming a null expectation of 50% concordance.
@@ -509,7 +708,15 @@ def mr_sign(BETA_e, BETA_o):
     # Check for enough non-missing values
     valid_data = (~np.isnan(BETA_e)) & (~np.isnan(BETA_o))
     if np.sum(valid_data) < 6:
-        return [{"method": "Sign concordance test",'b': np.nan, 'se': np.nan, 'pval': np.nan, 'nSNP': np.nan}]
+        return [
+            {
+                "method": "Sign concordance test",
+                "b": np.nan, 
+                "se": np.nan, 
+                "pval": np.nan, 
+                "nSNP": np.nan
+            }
+        ]
     
     # Count the number of consistent signs
     x = np.sum(np.sign(BETA_e[valid_data]) == np.sign(BETA_o[valid_data]))
@@ -519,7 +726,15 @@ def mr_sign(BETA_e, BETA_o):
     pval = binom_test(x, n, p=0.5)
     b = (x / n - 0.5) * 2
     
-    return [{"method": "Sign concordance test", 'nSNP': n, 'b': b, 'se': np.nan, 'pval': pval}]
+    return [
+        {
+            "method": "Sign concordance test", 
+            "nSNP": n, 
+            "b": b, 
+            "se": np.nan, 
+            "pval": pval
+        }
+    ]
     
 
     

@@ -62,7 +62,7 @@ def mrpresso_func(data,
     na_rows = df_mr[df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].isna().any(axis=1)]
     if len(na_rows) > 0:
         print(
-            f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows["SNP"]}"
+            f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows['SNP']}"
         )
         df_mr = df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].dropna(inplace=True)
     else:
@@ -146,7 +146,7 @@ def MR_func(data,
     na_rows = df_mr[df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].isna().any(axis=1)]
     if len(na_rows) > 0:
         print(
-            f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows["SNP"]}"
+            f"Deleting {len(na_rows)} SNPs with NA values in exposure or outcome BETA/SE columns: {na_rows['SNP']}"
         )
         df_mr = df_mr[["BETA_e","SE_e","BETA_o","SE_o"]].dropna(inplace=True)
     else:

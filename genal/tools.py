@@ -205,7 +205,7 @@ def set_plink(path=""):
         raise TypeError("You need to provide a path.")
 
     if not os.path.isfile(path):
-        path = os.path.join(path, "plink19")
+        path = os.path.join(path, "plink")
         
     try:
         process = subprocess.run(
