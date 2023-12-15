@@ -7,7 +7,7 @@ Submodules
 genal.GENO module
 -----------------
 
-.. automodule:: genal.GENO
+.. automodule:: genal.Geno
    :members:
    :undoc-members:
    :show-inheritance:
