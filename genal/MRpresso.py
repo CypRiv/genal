@@ -12,14 +12,17 @@ from functools import partial
 
 ##todo: implement the multivariable option, for the moment we assume only 1 BETA_e column
 
-#MR-PRESSO main function
-def mr_presso(data, 
-              BETA_e_columns = ["BETA_e"], 
-              n_iterations = 1000, 
-              outlier_test = True, 
-              distortion_test = True, 
-              significance_p = 0.05, 
-              cpus = 5):
+
+# MR-PRESSO main function
+def mr_presso(
+    data,
+    BETA_e_columns=["BETA_e"],
+    n_iterations=1000,
+    outlier_test=True,
+    distortion_test=True,
+    significance_p=0.05,
+    cpus=5,
+):
     """
     Perform the MR-PRESSO algorithm for detection of horizontal pleiotropy.
 
@@ -41,7 +44,7 @@ def mr_presso(data,
     # Transforming the data
     data = data[["BETA_o", *BETA_e_columns, "SE_o", "SE_e"]].dropna()
     data[["BETA_o", *BETA_e_columns]] = data[["BETA_o", *BETA_e_columns]].multiply(
-        np.sign(data[BETA_e_columns[0]]),axis=0
+        np.sign(data[BETA_e_columns[0]]), axis=0
     )
     data["Weights"] = 1 / (data["SE_o"] ** 2)
 
@@ -56,19 +59,19 @@ def mr_presso(data,
     # 1- Computing the observed residual sum of squares (RSS)
     print(f"Computing the observed residual sum of squares...")
     RSSobs = getRSS_LOO(data, BETA_e_columns, outlier_test)
-    
+
     # 2- Computing the distribution of expected residual sum of squares (RSS)
     print("Computing the global MRPRESSO p-value...")
     partial_parallel_RSS_LOO = partial(
-        parallel_RSS_LOO, data = data, BETA_e_columns = BETA_e_columns
-    ) # Wrapper function freezing the parallel_RSS_LOO call
-    with ProcessPoolExecutor(max_workers = cpus) as executor:
+        parallel_RSS_LOO, data=data, BETA_e_columns=BETA_e_columns
+    )  # Wrapper function freezing the parallel_RSS_LOO call
+    with ProcessPoolExecutor(max_workers=cpus) as executor:
         results = list(
             tqdm(
-            executor.map(partial_parallel_RSS_LOO, range(n_iterations)), 
-            total=n_iterations, 
-            desc="Generating random data", 
-            ncols=100
+                executor.map(partial_parallel_RSS_LOO, range(n_iterations)),
+                total=n_iterations,
+                desc="Generating random data",
+                ncols=100,
             )
         )
 
@@ -78,7 +81,7 @@ def mr_presso(data,
 
     global_p = np.sum([r > RSSobs[0] for r in RSSexp]) / n_iterations
     global_p_str = (
-        global_p if global_p > 1/n_iterations else f"< {1/n_iterations:.1e}"
+        global_p if global_p > 1 / n_iterations else f"< {1/n_iterations:.1e}"
     )
     if outlier_test:
         GlobalTest = {"RSSobs": RSSobs[0], "Global_test_p": global_p_str}
@@ -87,57 +90,55 @@ def mr_presso(data,
 
     # 3- Computing the single IV outlier test
     if global_p < significance_p and outlier_test:
-        print("Running the Outlier test.") 
-        
+        print("Running the Outlier test.")
+
         if len(BETA_e_columns) == 1:
             Dif = data["BETA_o"].values - data["BETA_e"].values * RSSobs[1]
             Exp = Random_data_o - (Random_data_e * RSSobs[1])
         else:
             raise ValueError("Outlier test not done for multi MR.")
-            
+
         abs_diffs = np.abs(Exp.T) > np.abs(Dif)[:, np.newaxis]
         pvals = np.sum(abs_diffs, axis=1) / Exp.shape[0]
-        
-        OutlierTest = pd.DataFrame({"RSSobs": Dif ** 2, "Pvalue": pvals})
-    
+
+        OutlierTest = pd.DataFrame({"RSSobs": Dif**2, "Pvalue": pvals})
+
         OutlierTest.index = data.index
         OutlierTest["Pvalue"] = np.minimum(
             OutlierTest["Pvalue"] * len(data), 1
         )  # Bonferroni correction
-        if (data.shape[0]/n_iterations > significance_p):
+        if data.shape[0] / n_iterations > significance_p:
             print(
                 f"Warning: the Outlier test in unstable. The {significance_p} significance threshold cannot be obtained with {n_iterations} Distributions. Increase n_iterations."
             )
-           
+
     else:
         outlier_test = False
-        
+
     # 4- Computing the test of the distortion of the causal estimate
     print("Running the Distortion test.")
     formula = f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}"
     mod_all = smf.wls(formula, data=data, weights=data["Weights"]).fit()
-    
+
     BiasTest = {}
-    
+
     if distortion_test and outlier_test:
         ## Is there an error in the MRPRESSO code? The outlier indices are supposed to be excluded from the expected bias computation (as per the paper).
-        def get_random_bias(BETA_e_columns, 
-                            data, 
-                            ref_outlier):
+        def get_random_bias(BETA_e_columns, data, ref_outlier):
             indices = np.concatenate(
                 [
-                    ref_outlier, 
+                    ref_outlier,
                     np.random.choice(
                         list(set(range(len(data))) - set(ref_outlier)),
-                        len(data) - len(ref_outlier)
-                    )
+                        len(data) - len(ref_outlier),
+                    ),
                 ]
             )
-            subset_data = data.iloc[indices[:-len(ref_outlier)]]
+            subset_data = data.iloc[indices[: -len(ref_outlier)]]
             mod_random = smf.wls(
-                f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}", 
-                data=subset_data, 
-                weights=subset_data["Weights"]
+                f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}",
+                data=subset_data,
+                weights=subset_data["Weights"],
             ).fit()
             return mod_random.params[BETA_e_columns]
 
@@ -146,20 +147,21 @@ def mr_presso(data,
         if len(ref_outlier) > 0:
             if len(ref_outlier) < len(data):
                 BiasExp = [
-                    get_random_bias(BETA_e_columns, data, ref_outlier) 
+                    get_random_bias(BETA_e_columns, data, ref_outlier)
                     for _ in range(n_iterations)
                 ]
                 BiasExp = pd.concat(BiasExp, axis=1).transpose()
 
                 subset_data = data.drop(ref_outlier)
                 mod_no_outliers = smf.wls(
-                    f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}", 
-                    data=subset_data, 
-                    weights=subset_data["Weights"]
+                    f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}",
+                    data=subset_data,
+                    weights=subset_data["Weights"],
                 ).fit()
 
                 BiasObs = (
-                    mod_all.params[BETA_e_columns] - mod_no_outliers.params[BETA_e_columns]
+                    mod_all.params[BETA_e_columns]
+                    - mod_no_outliers.params[BETA_e_columns]
                 ) / abs(mod_no_outliers.params[BETA_e_columns])
                 BiasExp = (mod_all.params[BETA_e_columns] - BiasExp) / abs(BiasExp)
 
@@ -168,51 +170,51 @@ def mr_presso(data,
                 BiasTest = {
                     "Outliers Indices": list(ref_outlier),
                     "Distortion test coefficient": 100 * BiasObs.values[0],
-                    "Distortion test p-value": p_value[0]
+                    "Distortion test p-value": p_value[0],
                 }
             else:
                 BiasTest = {
                     "Outliers Indices": "All SNPs considered as outliers",
                     "Distortion test coefficient": np.nan,
-                    "Distortion test p-value": np.nan
+                    "Distortion test p-value": np.nan,
                 }
         else:
             BiasTest = {
                 "Outliers Indices": "No significant outliers",
                 "Distortion test coefficient": np.nan,
-                "Distortion test p-value": np.nan
+                "Distortion test p-value": np.nan,
             }
 
     # 5- Format
     row_original = {
-        "exposure": BETA_e_columns[0], 
-        "method": "Raw", 
+        "exposure": BETA_e_columns[0],
+        "method": "Raw",
         "nSNP": len(data),
-        "b": mod_all.params["BETA_e"], 
-        "se": mod_all.bse["BETA_e"], 
-        "pval": mod_all.pvalues["BETA_e"]
+        "b": mod_all.params["BETA_e"],
+        "se": mod_all.bse["BETA_e"],
+        "pval": mod_all.pvalues["BETA_e"],
     }
     if "mod_no_outliers" in locals():
         row_corrected = {
-            "exposure": BETA_e_columns[0], 
-            "method": "Outlier-corrected", 
-            "nSNP": len(data)-len(ref_outlier),
-            "b": mod_no_outliers.params["BETA_e"], 
-            "se": mod_no_outliers.bse["BETA_e"], 
-            "pval": mod_no_outliers.pvalues["BETA_e"]
+            "exposure": BETA_e_columns[0],
+            "method": "Outlier-corrected",
+            "nSNP": len(data) - len(ref_outlier),
+            "b": mod_no_outliers.params["BETA_e"],
+            "se": mod_no_outliers.bse["BETA_e"],
+            "pval": mod_no_outliers.pvalues["BETA_e"],
         }
     else:
         row_corrected = {
-            "exposure": BETA_e_columns[0], 
-            "method": "Outlier-corrected", 
+            "exposure": BETA_e_columns[0],
+            "method": "Outlier-corrected",
             "nSNP": np.nan,
-            "b": np.nan, 
-            "se": np.nan, 
-            "pval": np.nan
+            "b": np.nan,
+            "se": np.nan,
+            "pval": np.nan,
         }
-        
+
     mod_table = pd.DataFrame([row_original, row_corrected])
-    
+
     return mod_table, GlobalTest, OutlierTest, BiasTest
 
 
@@ -220,12 +222,11 @@ def mr_presso(data,
 # Define the matrix power operator
 def power_eigen(x, n):
     values, vectors = np.linalg.eig(x)
-    return vectors.dot(np.diag(values ** n)).dot(vectors.T)
+    return vectors.dot(np.diag(values**n)).dot(vectors.T)
+
 
 # Function to compute the residual sum of squares in a LOO framework
-def getRSS_LOO(data, 
-               BETA_e_columns, 
-               returnIV):
+def getRSS_LOO(data, BETA_e_columns, returnIV):
     dataW = data[["BETA_o"] + BETA_e_columns].multiply(np.sqrt(data["Weights"]), axis=0)
     X = dataW[BETA_e_columns].values
     Y = dataW["BETA_o"].values
@@ -243,18 +244,18 @@ def getRSS_LOO(data,
         RSS = np.nansum((Y - CausalEstimate_LOO * X.reshape(-1)) ** 2)
     else:
         raise ValueError("Needs to do the getRSS_LOO for multi exposure.")
-        #RSS = np.nansum((Y - np.sum(CausalEstimate_LOO.T * X, axis=1)) ** 2)
+        # RSS = np.nansum((Y - np.sum(CausalEstimate_LOO.T * X, axis=1)) ** 2)
 
     if returnIV:
         return (RSS, CausalEstimate_LOO)
     return RSS
 
+
 # Generate random data based on normal distributions
-def getRandomData(data, 
-                  BETA_e_columns=["BETA_e"]):
+def getRandomData(data, BETA_e_columns=["BETA_e"]):
     rng = default_rng()
 
-    models = []    
+    models = []
     for i in range(len(data)):
         lm = LinearRegression(fit_intercept=False)
         data_i = data.drop(i)
@@ -278,11 +279,10 @@ def getRandomData(data,
     random_data_df = pd.DataFrame(random_data_dict)
     return random_data_df
 
+
 # Function for the parallel executor in step 2: generate random data and compute the expected residual sum of squares
-def parallel_RSS_LOO(i, 
-                     data, 
-                     BETA_e_columns):
+def parallel_RSS_LOO(i, data, BETA_e_columns):
     random_data = getRandomData(data, BETA_e_columns)
-    
+
     rss_exp = getRSS_LOO(random_data, BETA_e_columns, False)
     return (rss_exp, random_data["BETA_e"].values, random_data["BETA_o"].values)
