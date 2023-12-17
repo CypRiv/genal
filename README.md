@@ -8,8 +8,15 @@
 1. [Introduction](#introduction)
 2. [Requirements for the GENAL module](#paragraph1)
 3. [Installation and how to use GENAL](#paragraph2)
-    1. [Installation](#subparagraph1)
-4. [Tutorial and presentation of the main tools] 
+    1. [Installation](#paragraph2.1)
+4. [Tutorial and presentation of the main tools](#paragraph3)
+    1. [Data loading](#paragraph3.1)
+    2. [Data preprocessing](#paragraph3.2)
+    3. [Clumping](#paragraph3.3)
+    4. [Polygenic Risk Scoring](#paragraph3.4)
+    5. [Mendelian Randomization](#paragraph3.5)
+    6. [SNP-association testing](#paragraph3.6)
+    7. [Lifting](#paragraph3.7)
 
 
 
@@ -27,7 +34,7 @@ Genal draws on concepts from well-established R packages such as TwoSampleMR, MR
 
 ## Installation and How to use the GENAL module <a name="paragraph2"></a>
 
-### Installation <a name="subparagraph1"></a>
+### Installation <a name="paragraph2.1"></a>
 
 Download and install the package with pip:    
 ```
@@ -41,7 +48,7 @@ Once downloaded, the path to the plink executable can be set with:
 genal.set_plink(path="/path/to/plink/executable/file")
 ```
 
-## Tutorial <a name="subparagraph2"></a>
+## Tutorial <a name="paragraph3"></a>
 For this tutorial, we will build a Polygenic Risk Score (PRS) for systolic blood pressure (SBP) and investigate its genetically-determined effect on the risk of stroke. We will utilize summary statistics from Genome-Wide Association Studies (GWAS) and individual-level data from the UK Biobank. The steps include:
 
 - Data loading
@@ -61,7 +68,7 @@ For this tutorial, we will build a Polygenic Risk Score (PRS) for systolic blood
     - Using LiftOver
   - Phenoscanner (to be added)
 
-### Data loading
+### Data loading <a name="paragraph3.1"></a>
 
 We begin with publicly available summary statistics from a large GWAS study of systolic blood pressure. [Link to study](https://www.nature.com/articles/s41588-018-0205-x). After downloading and unzipping the summary statistics, we load them into a pandas DataFrame:
 
@@ -119,7 +126,7 @@ The last argument (`keep_columns = False`) indicates that we do not wish to keep
 > 
 > Make sure to read the readme file usually provided with the summary statistics to identify the correct columns. It is particularly important to correctly identify the allele that represents the effect allele. Also, you do not need all columns to move forward, as some can be inputted as we will see next.
 
-### Data preprocessing
+### Data preprocessing <a name="paragraph3.2"></a>
 
 Now that we have loaded the data into a `genal.Geno` object, we can begin cleaning and formatting it. Methods such as Polygenic Risk Scoring or Mendelian Randomization require the SNP data to be in a specific format. Also, raw summary statistics can sometimes contain missing or invalid values that need to be handled. Additionally, some columns may be missing from the data (such as the SNP rsid column, or the non-effect allele column) and these columns can be created based on existing ones and a reference panel.
 
@@ -178,7 +185,7 @@ SBP_Geno.preprocess_data(preprocessing = 2, reference_panel = "afr")
 
 You can also use a custom reference panel by specifying to the reference_panel argument a path to bed/bim/fam files (without the extension).
 
-### Clumping
+### Clumping <a name="paragraph3.3"></a>
 
 Clumping is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e., they are not in close linkage disequilibrium). For this step, we again need to use a reference panel.
 
@@ -201,7 +208,7 @@ You can specify the thresholds you want to use for the clumping with the followi
 - **kb**: Genomic window used for the independence check (the unit is thousands of base-pair positions).
 - **reference_panel**: The reference population used to derive linkage disequilibrium values and select independent SNPs.
 
-### Polygenic Risk Scoring
+### Polygenic Risk Scoring <a name="paragraph3.4"></a>
 
 Computing a Polygenic Risk Score (PRS) can be done in one line with the `genal.Geno.prs` method:
 
@@ -308,7 +315,7 @@ You can customize how the proxies are chosen with the following arguments:
 > You can call the `genal.Geno.prs` method on any `Geno` object (containing at least the EA, BETA, and either SNP or CHR/POS columns). The data does not need to be clumped, and there is no limit to the number of instruments used to compute the scores.
 
 
-### Mendelian Randomization
+### Mendelian Randomization <a name="paragraph3.5"></a>
 
 To run MR, we need to load both our exposure and outcome SNP-level data in `genal.Geno` objects. In our case, the genetic instruments of the MR are the SNPs associated with blood pressure at genome-wide significant levels resulting from the clumping of the blood pressure GWAS. They are stored in our `SBP_clumped` `genal.Geno` object which also include their association with the exposure trait (instrument-SBP estimates in the BETA column).
 
@@ -431,7 +438,7 @@ As with the `genal.Geno.MR` method, the `action` argument determines how the ple
     - The coefficient of the distortion test.
     - The p-value of the distortion test.
 
-### SNP-association testing
+### SNP-association testing <a name="paragraph3.6"></a>
 
 We may want to calibrate instrument-trait estimates in a specific population for which we have individual-level data (genetic files as well as phenotypic data). For instance, if the GWAS of SBP was done in a european population, we may want to adjust the estimates based on data coming from a population of a different ancestry. This can be done in 2 steps:
 - Loading the phenotypic data in a dataframe and calling the `genal.Geno.set_phenotype` method
@@ -504,7 +511,7 @@ Genal will print information regarding the number of individuals used in the tes
     
 The SBP_adjusted.data attribute has been updated in the BETA, SE, and P columns with the results of the association tests. 
 
-### Lifting
+### Lifting <a name="paragraph3.7"></a>
 
 It is sometimes necessary to lift the SNP data to a different build. For instance, if the genetic data of our target population is in build 38 (hg38), but the GWAS summary statistics are in build 37 (hg19).
 This can easily be done in Genal using the `genal.Geno.lift` method:
