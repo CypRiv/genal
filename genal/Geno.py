@@ -641,14 +641,16 @@ class Geno:
         # Assign the processed data and inferred phenotype type to the .phenotype attribute
         self.phenotype = (processed_data, inferred_pheno_type)
 
-    def association_test(self, covar=[], standardize=True):
+    def association_test(self, path=None, covar=[], standardize=True):
         """
         Conduct single-SNP association tests against a phenotype.
 
         This method requires the phenotype to be set using the set_phenotype() function.
-        The method also expects the extract_snps method to have been called prior to this.
 
         Args:
+            path (str, optional): Path to a bed/bim/fam set of genetic files.
+                If files are split by chromosomes, replace the chromosome number with '$'.
+                For instance: path = "ukb_chr$_file". Default is None.
             covar (list, optional): List of columns in the phenotype dataframe to be used
                                     as covariates in the association tests. Default is an empty list.
             standardize (bool, optional): If True, it will standardize a quantitative phenotype
@@ -666,9 +668,27 @@ class Geno:
                 "You first need to set a phenotype using .set_phenotype(data, PHENO, PHENO_type, IID)!"
             )
 
+        create_tmp() #Make sure temporary folder exists
+        
+        # Based on column presents, extract the SNP based names or genomic positions (with preference for positions)
+        if "CHR" in self.data.columns and "POS" in self.data.columns:
+            print("CHR/POS columns present: SNPs searched based on genomic positions.")
+            data = self.update_snpids(path = path)
+        elif "SNP" in self.data.columns:
+            print("CHR/POS columns absent: SNPs searched based on SNP name.")
+            data = self.data
+        else:
+            raise ValueError("Either the SNP or the CHR/POS columns need to be present to identify SNPs in genetic data.")
+        
+        # Extract the SNP list
+        snp_list = data["SNP"]
+
+        # Extract SNPs using the provided path and SNP list
+        _ = extract_snps_func(snp_list, self.name, path)
+        
         # Perform the association test
         updated_data = association_test_func(
-            self.data,
+            data,
             covar,
             standardize,
             self.name,

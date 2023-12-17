@@ -21,8 +21,6 @@ Once downloaded, the path to the plink 1.9 executable should be set with::
 
     genal.set_plink(path="/path/to/plink/executable/file")
 
-If you plan to lift large datasets of SNPs to different genomic builds, it may be useful to install the LiftOver executable that will run faster than the pure python version. It can be downloaded here: https://genome-store.ucsc.edu/ You will need to create an account, scroll down to "LiftOver program", add it to your cart, and declare that you are a non-profit user. You don't need to download any chain files as these will be automatically downloaded by genal.
-
 
 ========
 Tutorial
@@ -140,7 +138,18 @@ In our case, the SNP column (for SNP identifier - rsid) was missing from our dat
 You can always check the data of a :class:`~genal.Geno` object by accessing the 'data' attribute::
 
     >>> SBP_Geno.data
-    xxx
+            EA NEA     EAF    BETA      SE         P  CHR        POS         SNP
+    0        A   G  0.5660  0.0523  0.0303  0.083940   10  100000625   rs7899632
+    1        A   C  0.7936  0.0200  0.0372  0.591100   10  100000645  rs61875309
+    2        T   G  0.8831  0.1417  0.0469  0.002526   10  100003242  rs12258651
+    3        A   G  0.9609  0.0245  0.0838  0.769800   10  100003304  rs72828461
+    4        T   C  0.6406 -0.0680  0.0313  0.029870   10  100003785   rs1359508
+    ...     ..  ..     ...     ...     ...       ...  ...        ...         ...
+    7088116  A   G  0.4474  0.0114  0.0307  0.710600    9   99997049  rs10817273
+    7088117  T   C  0.4529 -0.0151  0.0307  0.623900    9   99997707  rs11794422
+    7088118  T   C  0.4511 -0.0224  0.0306  0.463900    9   99998403  rs10981296
+    7088119  C   G  0.8094 -0.0204  0.0389  0.599800    9   99998646  rs10981297
+    7088120  A   G  0.9028 -0.0184  0.0517  0.722300    9   99999468  rs10981301
     
 And we see that the SNP column with the rsids has been added based on the reference data.
 You do not need to obtain the 1000 genome reference panel yourself, Genal will download it the first time you use it. By default, the reference panel used is the european (eur) one. You can specify another valid reference panel (afr, eas, sas, amr) with the reference_panel argument::
@@ -156,6 +165,12 @@ Clumping
 Clumping is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e. they are not in close linkage disequilibrium). For this step, we again need to use a reference panel. The SNP-data loaded in a :class:`~genal.Geno` object can be clumped using the :meth:`~genal.Geno.clump` method. It will return another :class:`~genal.Geno` object containing only the clumped data::
 
     SBP_clumped = SBP_Geno.clump(p1 = 5e-8, r2 = 0.1, kb = 250, reference_panel = "eur")
+    
+It will output the number of instruments obtained::
+
+    Using the EUR reference panel.
+    Warning: 760  top variant IDs missing
+    1545 clumps formed from 73594 top variants.
     
 You can specify the thresholds you want to use for the clumping with the following arguments:
 * p1: P-value threshold during clumping. SNPs with a P-value higher than this value are excluded.
@@ -276,7 +291,12 @@ To get their association with the outcome trait (instrument-stroke estimates), w
 We inspect it to determine the column names::
 
     >>> stroke_gwas.head(5)
-    xxx
+       chromosome  base_pair_location  effect_allele_frequency    beta  standard_error  p_value  odds_ratio  ci_lower  ci_upper effect_allele other_allele
+    0           5            29439275                   0.3569  0.0030          0.0070   0.6658    1.003005  0.989337  1.016861             T            C
+    1           5            85928892                   0.0639 -0.0152          0.0137   0.2686    0.984915  0.958820  1.011720             T            C
+    2          10           128341232                   0.4613  0.0025          0.0065   0.6998    1.002503  0.989812  1.015357             T            C
+    3           3            62707519                   0.0536  0.0152          0.0152   0.3177    1.015316  0.985514  1.046019             T            C
+    4           2            80464120                   0.9789  0.0057          0.0254   0.8223    1.005716  0.956874  1.057052             T            G
     
 We load it in a :class:`~genal.Geno` object::
 
@@ -313,34 +333,133 @@ And Genal will print the number of missing instruments which have been proxied::
     
 After extracting the instruments from the outcome data, the SBP_clumped :class:`~genal.Geno` object contains an 'MR_data' attribute containing the instruments-exposure and instruments-outcome associations necessary to run MR. Running MR is now as simple as calling the :meth:`~genal.Geno.MR` method of the SBP_clumped :class:`~genal.Geno` object::
 
-    SBP_clumped.MR(action = 3, nboot = 10000, exposure_name = "SBP", outcome_name = "Stroke_eur")
+    SBP_clumped.MR(action = 3, exposure_name = "SBP", outcome_name = "Stroke_eur")
 
+The :meth:`~genal.Geno.MR` method returns a dataframe containing the estimates and p-values for different MR methods::
+
+       exposure     outcome                                     method  nSNP         b        se      pval
+    0       SBP  Stroke_eur                  Inverse-Variance Weighted  1312  0.023394  0.001132    <e-100
+    1       SBP  Stroke_eur  Inverse Variance weighted (Fixed effects)  1312  0.023394  0.000807    <e-100
+    2       SBP  Stroke_eur                      Unweighted regression  1312  0.021764  0.078648  0.781986
+    3       SBP  Stroke_eur                            Weighted Median  1312  0.022891  0.001423    <e-100
+    4       SBP  Stroke_eur                  Penalised weighted median  1312  0.021525  0.001432    <e-100
+    5       SBP  Stroke_eur                              Simple median  1312  0.021480  0.001364    <e-100
+    6       SBP  Stroke_eur                      Sign concordance test  1312  0.373476       NaN       0.0
+    7       SBP  Stroke_eur                                   MR Egger  1312  0.029312  0.003063    <e-100
+    8       SBP  Stroke_eur                            Egger Intercept  1312 -0.001799  0.000865  0.037777
+    9       SBP  Stroke_eur                         MR Egger bootstrap  1312  0.030342  0.002093    <e-100
+    10      SBP  Stroke_eur                  Egger Intercept bootstrap  1312 -0.002758  0.000740    0.0015
+    
 You can specify several arguments. We refer to the API for a full list, but the most important one is the 'action' argument. It determines how palindromic SNPs are treated during the exposure-outcome harmonization step. Palindromic SNPs are SNPs where the nucleotide change reads the same forward and backward on complementary strands of DNA (for instance EA = 'A' and NEA = 'T').
 * action = 1: Palindromic SNPs are not treated (assumes all alleles are on the forward strand)
 * action = 2: Uses effect allele frequencies to attempt to flip them (conservative, default)
 * action = 3: Removes all palindromic SNPs (very conservative)
 If you choose the option 2 or 3 (recommended), Genal will print the list of palindromic SNPs that have been removed from the analysis.
-The :meth:`~genal.Geno.MR` method returns a dataframe::
-
-    xxx
+By default, all MR methods (inverse-variance weighted, weighted median, MR-Egger etc) are going to be run. But if you do not wish to run all of them, you can specify a 'methods' argument. More details in the :meth:`~genal.Geno.MR` API. 
+For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API.
     
-If you wish to include the heterogeneity values (Cochran's Q), you can use the heterogeneity argument::
+If you wish to include the heterogeneity values (Cochran's Q), you can use the heterogeneity argument. Here, the heterogeneity for the inverse-variance weighted method::
 
-    SBP_clumped.MR(action = 3, nboot = 10000, exposure_name = "SBP", outcome_name = "Stroke_eur", heterogeneity = True)
+    SBP_clumped.MR(action = 3, methods = ["IVW"], exposure_name = "SBP", outcome_name = "Stroke_eur", heterogeneity = True)
     
 And that will give::
 
-    xx
+      exposure     outcome                     method  nSNP         b        se    pval            Q  Q_df  Q_pval
+    0      SBP  Stroke_eur  Inverse-Variance Weighted  1312  0.023394  0.001132  <e-100  2583.740268  1311  <e-100
     
-As expected
+As expected, many MR methods indicate that SBP is strongly associated with stroke, but there are some signs of horizontal pleiotropy (instruments influencing the outcome through a different pathway than the one used as exposure) given the significant MR-Egger intercept p-value.
+To investigate horizontal pleiotropy in more details, a very useful method is Mendelian Randomization Pleiotropy RESidual Sum and Outlier (MR-PRESSO). MR-PRESSO is a method designed to detect and correct for horizontal pleiotropy. It will identify which instruments are likely to be pleiotropic on their effect on the outcome, and it will rerun an inverse-variance weighted MR after excluding them. It can be run using the :meth:`~genal.Geno.MRpresso` method::
+
+    SBP_clumped.MRpresso(action = 3)
+    
+As with the :meth:`~genal.Geno.MR` method, the action argument determines how the pleiotropic SNPs will be treated. The output is a list containing:
+* A table containing the original and outlier-corrected inverse variance-weighted results
+* The global test p-value indicating the presence of horizontal pleiotropy
+* A dataframe of p-values, one for each instrument, representing the likelihood that this instrument is pleiotropic (only relevant if the global test is significant).
+* A dictionary containing the outputs of the distortion test. This test assesses whether the removal of the pleiotropic instruments has significantly altered the original MR estimate.
+    * An array containing the indices of the pleiotropic SNPs
+    * The coefficient of the distortion test
+    * The p-value of the distortion test
 
 
+SNP-association testing
+=======================
 
-==============
-The Geno class
-==============
+We may want to calibrate instrument-trait estimates in a specific population for which we have individual-level data (genetic files as well as phenotypic data). For instance, if the GWAS of SBP was done in a european population, we may want to adjust the estimates based on data coming from a population of a different ancestry. This can be done in 2 steps:
+* Loading the phenotypic data in a dataframe and calling the :meth:`~genal.Geno.set_phenotype` method
+* Calling the :meth:`~genal.Geno.association_test` method to run the association tests and update the estimates
+Let's start by loading phenotypic data::
 
-The :class:`~genal.Geno` is the central piece of the package. It is made to store Single Nucleotide Polymorphisms (SNP) data and make it easy to preprocess and clean. 
+    df_pheno = pd.read_csv("path/to/trait/data")
+
+.. note::
+
+One important detail is to make sure that the individual IDs are identical between the phenotypic data and the genetic data for the target population.
+Then, it is advised to make a copy of the :class:`~genal.Geno` object containing our instruments as we are going to update their coefficients and to avoid any confusion::
+
+    SBP_adjusted = SBP_clumped.copy()
+
+We can then call the :meth:`~genal.Geno.set_phenotype` method, specifying which column contains our trait of interest (for the association testing) and which column contains the IDs::
+
+    SBP_adjusted.set_phenotype(df_pheno, PHENO = "htn", IID = "IID")
+
+At this point, Genal will identify if the phenotype is binary or quantitative (to determine the regression model. If the phenotype is binary, it will assume that the most frequent value is coding for control (and the other value for case), this can be changed with 'alternate_control=True'::
+
+    Detected a binary phenotype in the 'PHENO' column. Specify 'PHENO_type="quant"' if this is incorrect.
+    Identified 0 as the control code in 'PHENO'. Set 'alternate_control=True' to inverse this interpretation.
+    The phenotype data is stored in the .phenotype attribute.
+    
+We can then run the association tests, specifying the path to the genetic files in plink format, and any columns we may want to include as covariates in the regression tests::
+
+    SBP_adjusted.association_test(covar=["age"], path = "path/to/genetic/files")
+
+Genal will print information regarding the number of individuals used in the tests and the kind of tests performed. It is advised to make sure that these information are consistent with your data::
+
+    CHR/POS columns present: SNPs searched based on genomic positions.
+    Extracting SNPs for each chromosome...
+    SNPs extracted for chr1.
+    SNPs extracted for chr2.
+    SNPs extracted for chr3.
+    SNPs extracted for chr4.
+    SNPs extracted for chr5.
+    SNPs extracted for chr6.
+    SNPs extracted for chr7.
+    SNPs extracted for chr8.
+    SNPs extracted for chr9.
+    SNPs extracted for chr10.
+    SNPs extracted for chr11.
+    SNPs extracted for chr12.
+    SNPs extracted for chr13.
+    SNPs extracted for chr14.
+    SNPs extracted for chr15.
+    SNPs extracted for chr16.
+    SNPs extracted for chr17.
+    SNPs extracted for chr18.
+    SNPs extracted for chr19.
+    SNPs extracted for chr20.
+    SNPs extracted for chr21.
+    SNPs extracted for chr22.
+    Merging SNPs extracted from each chromosome...
+    Created bed/bim/fam fileset with extracted SNPs: tmp_GENAL/e415aab3_allchr
+    39131 individuals are present in the genetic data and have a valid phenotype trait.
+    Running single-SNP logistic regression tests on tmp_GENAL/e415aab3_allchr data with adjustment for: ['age'].
+    The BETA, SE, P columns of the .data attribute have been updated.
+    
+The SBP_adjusted.data attribute has been updated in the BETA, SE, and P columns with the results of the association tests. 
+
+Lifting
+=======
+
+It is sometimes necessary to lift the SNP data to a different build. For instance, if the genetic data of our target population is in build 38 (hg38), but the GWAS summary statistics are in build 37 (hg19).
+This can easily be done in Genal using the :meth:`~genal.Geno.lift` method::
+
+    SBP_clumped.lift(start = "hg19", end = "hg38", replace = False)
+    
+This output a table with the lifted SBP instruments (stored in the SBP_clumped object) from build 37 (hg19) to build 38 (hg38). We specified 'replace = False' to not modify the SBP_clumped.data attribute, but we may want to modify it (before running a PRS in a population stored in build 38 for instance). Genal will download the appropriate chain files required for the lift, and it will be done in pure python by default. However, if you plan to lift large datasets of SNPs (the whole summary statistics for instance), it may be useful to install the LiftOver executable that will run faster than the pure python version. It can be downloaded here: https://genome-store.ucsc.edu/ You will need to create an account, scroll down to "LiftOver program", add it to your cart, and declare that you are a non-profit user. 
+You can need specify the path of the LiftOver executable to the 'liftover_path' argument::
+
+    SBP_Geno.lift(start = "hg19", end = "hg38", replace = False, liftover_path = "path/to/liftover/exec")
+
 
 
 

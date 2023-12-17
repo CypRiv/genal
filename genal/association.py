@@ -158,10 +158,12 @@ def _process_results(output, method, data, pheno_type):
     # Path to PLINK results
     results_path = output + f".assoc." + method
     assoc = pd.read_csv(results_path, delimiter="\s+")
-    n_na = assoc["BETA"].isna().sum()
 
     # If logistic regression, log-transform the odds ratio
     assoc["BETA"] = np.log(assoc.OR) if pheno_type == "binary" else assoc.BETA
+    
+    n_na = assoc["BETA"].isna().sum()
+    
     # Merge results with the clumped data
     data = data.drop(axis=1, columns=["BETA", "CHR", "P"], errors="ignore").merge(
         assoc, how="inner", on="SNP"
