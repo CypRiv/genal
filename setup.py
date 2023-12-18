@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="genal",
+    name="genal-python",
     version="0.0",
     description="Cleaning and processing of GWAS data, polygenic risk scoring, mendelian randomization including a parallel implementation of MR-PRESSO",
     author="Cyprien Rivier",

@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "genal"
+name = "genal-python"  # Updated name for PyPI
 version = "0.0.dev0"
 authors = [{name = "Cyprien Rivier", email = "riviercyprien@gmail.com"}]
 description = "A python toolkit for polygenic risk scoring and mendelian randomization."
@@ -28,6 +28,9 @@ dependencies = [
     "tqdm>=4.66.1",
     "wget>=3.2"
 ]
+
+[tool.flit.module]
+name = "genal"
 
 [project.urls]
 Home = "https://github.com/CypRiv/genal"
