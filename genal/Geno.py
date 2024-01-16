@@ -167,7 +167,7 @@ class Geno:
 
     def preprocess_data(
         self,
-        preprocessing=1,
+        preprocessing='Fill',
         reference_panel="eur",
         effect_column=None,
         keep_multi=None,
@@ -179,11 +179,11 @@ class Geno:
         Clean and preprocess the main dataframe of Single Nucleotide Polymorphisms (SNP) data.
 
         Args:
-            preprocessing (int, optional): Level of preprocessing to apply. Options include:
-                - 0: The dataframe is not modified.
-                - 1: Missing columns are added based on reference data and invalid values set to NaN, but no rows are deleted.
-                - 2: Missing columns are added, and rows with missing, duplicated, or invalid values are deleted.
-                Defaults to 1.
+            preprocessing (str, optional): Level of preprocessing to apply. Options include:
+                - "None": The dataframe is not modified.
+                - "Fill": Missing columns are added based on reference data and invalid values set to NaN, but no rows are deleted.
+                - "Fill_delete": Missing columns are added, and rows with missing, duplicated, or invalid values are deleted.
+                Defaults to 'Fill'.
             reference_panel (str or pd.DataFrame, optional): Reference panel for SNP adjustments. Can be a string representing ancestry classification ("eur", "afr", "eas", "sas", "amr") or a DataFrame with ["CHR","SNP","POS","A1","A2"] columns or a path to a .bim file. Defaults to "eur".
             effect_column (str, optional): Specifies the type of effect column ("BETA" or "OR"). If None, the method tries to determine it. Odds Ratios will be log-transformed and the standard error adjusted. Defaults to None.
             keep_multi (bool, optional): Determines if multiallelic SNPs should be kept. If None, defers to preprocessing value. Defaults to None.
@@ -207,7 +207,7 @@ class Geno:
 
         # Ensure CHR and POS columns are integers if preprocessing is enabled
         for int_col in ["CHR", "POS"]:
-            if int_col in data.columns and preprocessing > 0:
+            if int_col in data.columns and preprocessing in ['Fill', 'Fill_delete']:
                 check_int_column(data, int_col)
                 self.checks[int_col] = True
 
@@ -237,7 +237,7 @@ class Geno:
             and "NEA" not in data.columns
             and "EA" in data.columns
         )
-        if missing_nea_condition and preprocessing > 0:
+        if missing_nea_condition and preprocessing in ['Fill', 'Fill_delete']:
             data = fill_nea(data, self.get_reference_panel(reference_panel))
 
         # Fill missing EA and NEA columns from reference data if necessary and preprocessing is enabled
@@ -247,7 +247,7 @@ class Geno:
             and "NEA" not in data.columns
             and "EA" not in data.columns
         )
-        if missing_ea_nea_condition and preprocessing > 0:
+        if missing_ea_nea_condition and preprocessing in ['Fill', 'Fill_delete']:
             data = fill_ea_nea(data, self.get_reference_panel(reference_panel))
 
         # Convert effect column to Beta estimates if present
@@ -256,18 +256,18 @@ class Geno:
             self.checks["BETA"] = True
 
         # Ensure P column contains valid values
-        if "P" in data.columns and preprocessing > 0:
+        if "P" in data.columns and preprocessing in ['Fill', 'Fill_delete']:
             check_p_column(data)
             self.checks["P"] = True
 
         # Fill missing SE or P columns if necessary
-        if preprocessing > 0:
+        if preprocessing in ['Fill', 'Fill_delete']:
             fill_se_p(data)
 
         # Process allele columns
         for allele_col in ["EA", "NEA"]:
             check_allele_condition = (allele_col in data.columns) and (
-                (preprocessing > 0) or (not keep_multi)
+                (preprocessing in ['Fill', 'Fill_delete']) or (not keep_multi)
             )
             if check_allele_condition:
                 check_allele_column(data, allele_col, keep_multi)
@@ -285,8 +285,8 @@ class Geno:
                     f"Warning: the data doesn't include a {column} column. This may become an issue later on."
                 )
 
-        # Remove missing values if preprocessing level is set to 2
-        if preprocessing == 2:
+        # Remove missing values if preprocessing level is set to 'Fill_delete'
+        if preprocessing == 'Fill_delete':
             remove_na(data)
             self.checks["NA_removal"] = True
 
@@ -547,7 +547,7 @@ class Geno:
         if "EA" not in self.checks:
             check_allele_column(data_prs, "EA", keep_multi=False)
         if "BETA" not in self.checks:
-            check_beta_column(data_prs, effect_column=None, preprocessing=2)
+            check_beta_column(data_prs, effect_column=None, preprocessing='Fill_delete')
 
         initial_rows = data_prs.shape[0]
         data_prs.dropna(subset=["SNP", "P", "BETA"], inplace=True)
