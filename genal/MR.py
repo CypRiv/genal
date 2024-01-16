@@ -10,6 +10,8 @@ from tqdm import tqdm
 from numpy.random import default_rng
 from functools import partial
 
+from .constants import MR_METHODS_NAMES
+
 
 """
 Egger regression methods
@@ -39,14 +41,14 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
     # Initialize null result
     null_result = [
         {
-            "method": "MR Egger",
+            "method": MR_METHODS_NAMES["Egger"][0],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
             "nSNP": np.nan,
         },
         {
-            "method": "Egger Intercept",
+            "method": MR_METHODS_NAMES["Egger"][1],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
@@ -89,7 +91,7 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
 
         return [
             {
-                "method": "MR Egger",
+                "method": MR_METHODS_NAMES["Egger"][0],
                 "b": b,
                 "se": se,
                 "pval": pval,
@@ -99,7 +101,7 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
                 "Q_pval": Q_pval,
             },
             {
-                "method": "Egger Intercept",
+                "method": MR_METHODS_NAMES["Egger"][1],
                 "b": b_i,
                 "se": se_i,
                 "pval": pval_i,
@@ -175,14 +177,14 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
     if l < 3:
         return [
             {
-                "method": "MR Egger bootstrap",
+                "method": MR_METHODS_NAMES["Egger-boot"][0],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
                 "nSNP": np.nan,
             },
             {
-                "method": "Egger Intercept bootstrap",
+                "method": MR_METHODS_NAMES["Egger-boot"][1],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
@@ -208,14 +210,14 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
 
     return [
         {
-            "method": "MR Egger bootstrap",
+            "method": MR_METHODS_NAMES["Egger-boot"][0],
             "b": np.nanmean(res[:, 1]),
             "se": np.nanstd(res[:, 1]),
             "pval": np.sum(np.sign(np.nanmean(res[:, 1])) * res[:, 1] < 0) / nboot,
             "nSNP": l,
         },
         {
-            "method": "Egger Intercept bootstrap",
+            "method": MR_METHODS_NAMES["Egger-boot"][1],
             "b": np.nanmean(res[:, 0]),
             "se": np.nanstd(res[:, 0]),
             "pval": np.sum(np.sign(np.nanmean(res[:, 0])) * res[:, 0] < 0) / nboot,
@@ -282,7 +284,7 @@ def mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     if l < 3:
         return [
             {
-                "method": "Weighted median",
+                "method": MR_METHODS_NAMES["WM"],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
@@ -296,7 +298,7 @@ def mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     b = weighted_median(b_iv, 1 / VBj)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, 1 / VBj, nboot)
     pval = 2 * (1 - norm.cdf(abs(b / se)))
-    return [{"method": "Weighted Median", "nSNP": l, "b": b, "se": se, "pval": pval}]
+    return [{"method": MR_METHODS_NAMES["WM"], "nSNP": l, "b": b, "se": se, "pval": pval}]
 
 
 def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
@@ -323,7 +325,7 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
     if l < 3:
         return [
             {
-                "method": "Penalised weighted median",
+                "method": MR_METHODS_NAMES["WM-pen"],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
@@ -346,7 +348,7 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
 
     return [
         {
-            "method": "Penalised weighted median",
+            "method": MR_METHODS_NAMES["WM-pen"],
             "b": b,
             "se": se,
             "pval": pval,
@@ -381,7 +383,7 @@ def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     if l < 3:
         return [
             {
-                "method": "Simple median",
+                "method": MR_METHODS_NAMES["Simple-median"],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
@@ -394,7 +396,7 @@ def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     b = weighted_median(b_iv, weights)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, weights, nboot)
     pval = 2 * (1 - norm.cdf(abs(b / se)))
-    return [{"method": "Simple median", "b": b, "se": se, "pval": pval, "nSNP": l}]
+    return [{"method": MR_METHODS_NAMES["Simple-median"], "b": b, "se": se, "pval": pval, "nSNP": l}]
 
 
 """
@@ -432,7 +434,7 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
     l = len(BETA_e)
     if l < 2:
         return {
-            "method": "Inverse-Variance Weighted",
+            "method": MR_METHODS_NAMES["IVW"],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
@@ -445,7 +447,7 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
         model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
     except:
         return {
-            "method": "Inverse-Variance Weighted",
+            "method": MR_METHODS_NAMES["IVW"],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
@@ -463,7 +465,7 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
 
     return [
         {
-            "method": "Inverse-Variance Weighted",
+            "method": MR_METHODS_NAMES["IVW"],
             "nSNP": l,
             "b": b,
             "se": se,
@@ -505,7 +507,7 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
     l = len(BETA_e)
     if l < 2:
         return {
-            "method": "Inverse-Variance Weighted (Random effects)",
+            "method": MR_METHODS_NAMES["IVW-RE"],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
@@ -526,7 +528,7 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
 
     return [
         {
-            "method": "Inverse-Variance Weighted (Random effects)",
+            "method": MR_METHODS_NAMES["IVW-RE"],
             "nSNP": l,
             "b": b,
             "se": se,
@@ -568,7 +570,7 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     if l < 2:
         return [
             {
-                "method": "Inverse Variance weighted (Fixed effects)",
+                "method": MR_METHODS_NAMES["IVW-FE"],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
@@ -582,7 +584,7 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
         model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
     except:
         return {
-            "method": "Inverse-Variance Weighted (Fixed effects)",
+            "method": MR_METHODS_NAMES["IVW-FE"],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
@@ -598,7 +600,7 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     Q_pval = chi2.sf(Q, Q_df)
     return [
         {
-            "method": "Inverse Variance weighted (Fixed effects)",
+            "method": MR_METHODS_NAMES["IVW-FE"],
             "nSNP": l,
             "b": b,
             "se": se,
@@ -640,7 +642,7 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
     l = len(BETA_e)
     if l < 2:
         return {
-            "method": "Unweighted regression",
+            "method": MR_METHODS_NAMES["UWR"],
             "b": np.nan,
             "se": np.nan,
             "pval": np.nan,
@@ -660,7 +662,7 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
 
     return [
         {
-            "method": "Unweighted regression",
+            "method": MR_METHODS_NAMES["UWR"],
             "b": b,
             "se": se,
             "pval": pval,
@@ -711,7 +713,7 @@ def mr_sign(BETA_e, BETA_o):
     if np.sum(valid_data) < 6:
         return [
             {
-                "method": "Sign concordance test",
+                "method": MR_METHODS_NAMES["Sign"],
                 "b": np.nan,
                 "se": np.nan,
                 "pval": np.nan,
@@ -729,7 +731,7 @@ def mr_sign(BETA_e, BETA_o):
 
     return [
         {
-            "method": "Sign concordance test",
+            "method": MR_METHODS_NAMES["Sign"],
             "nSNP": n,
             "b": b,
             "se": np.nan,
