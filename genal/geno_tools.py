@@ -21,7 +21,7 @@ def remove_na(data):
     n_del = nrows - data.shape[0]
     if n_del > 0:
         print(
-            f"Deleted {n_del}({n_del/nrows*100:.3f}%) rows containing NA values in columns {columns_na}. Use preprocessing = 1 to keep the rows containing NA values."
+            f"Deleted {n_del}({n_del/nrows*100:.3f}%) rows containing NA values in columns {columns_na}. Use preprocessing = 'Fill' to keep the rows containing NA values."
         )
     return
 
@@ -100,7 +100,7 @@ def check_beta_column(data, effect_column, preprocessing):
     If no effect_column argument is specified, determine if the BETA column are beta estimates or odds ratios.
     """
     if effect_column is None:
-        if preprocessing == 0:
+        if preprocessing == 'None':
             return data
         median = np.median(data.BETA)
         if 0.5 < median < 1.5:
@@ -303,9 +303,9 @@ def check_arguments(
     """
 
     # Validate preprocessing value
-    if preprocessing not in [0, 1, 2]:
+    if preprocessing not in ['None', 'Fill', 'Fill_delete']:
         raise ValueError(
-            "preprocessing must be one of [0, 1, 2]. Refer to the Geno class docstring for details."
+            "preprocessing must be one of ['None', 'Fill', 'Fill_delete']. Refer to the Geno class docstring for details."
         )
 
     # Validate effect_column value
@@ -326,11 +326,11 @@ def check_arguments(
     # Helper functions for preprocessing logic
     def keeptype_column(arg):
         """Helper function to decide whether to keep multi-values/duplicates."""
-        return True if arg is None and preprocessing < 2 else arg
+        return True if arg is None and preprocessing in ['None', 'Fill'] else arg
 
     def filltype_column(arg):
         """Helper function to decide whether to fill snpids/coordinates."""
-        return False if arg is None and preprocessing == 0 else arg
+        return False if arg is None and preprocessing == 'None' else arg
 
     # Apply preprocessing logic
     keep_multi = keeptype_column(keep_multi)
@@ -385,7 +385,7 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     print(f"Data saved to {path_name}")
 
 
-def Combine_Geno(Gs, name="noname", clumped=False, preprocessing=0):
+def Combine_Geno(Gs, name="noname", clumped=False, preprocessing='None'):
     """
     Combine a list of GWAS objects into one.
 
@@ -393,7 +393,7 @@ def Combine_Geno(Gs, name="noname", clumped=False, preprocessing=0):
     - Gs (list): List of GWAS objects.
     - name (str, optional): Name for the combined object. Default is "noname".
     - clumped (bool, optional): If True, uses the clumped data of each object. Default is False.
-    - preprocessing (int, optional): Level of preprocessing to apply. Default is 0.
+    - preprocessing (int, optional): Level of preprocessing to apply. Default is 'None'.
 
     Returns:
     Geno object: Combined Geno object.

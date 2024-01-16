@@ -29,7 +29,7 @@ The module prioritizes user-friendliness and intuitive operation, aiming to redu
 Genal draws on concepts from well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, adapting their proven methodologies to the Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
 
 ## Requirements for the GENAL module <a name="paragraph1"></a> 
-***Python 3.7 or later***. https://www.python.org/ or  https://www.python.org/downloads/release/python-379/ <br> 
+***Python 3.9 or later***. https://www.python.org/ <br> 
 
 
 ## Installation and How to use the GENAL module <a name="paragraph2"></a>
@@ -38,7 +38,11 @@ Genal draws on concepts from well-established R packages such as TwoSampleMR, MR
 
 Download and install the package with pip:    
 ```
-pip install genal
+pip install genal-python
+```
+And it can be imported in a python environment with:
+```python
+import genal
 ```
 
 The main genal functionalities require a working installation of PLINK v1.9 that can be downloaded here: https://www.cog-genomics.org/plink/ 
@@ -59,6 +63,7 @@ For this tutorial, we will build a Polygenic Risk Score (PRS) for systolic blood
   - Include risk score calculations with proxies
 - Perform Mendelian Randomization
   - Analyze SBP as an exposure and acute ischemic stroke as an outcome
+  - Plot the results
   - Conduct sensitivity analyses using the weighted median, MR-Egger, and MR-PRESSO methods
 - Calibrate SNP-trait weights with individual-level genetic data
   - Execute single-SNP association tests for calibrating SBP genetic instruments
@@ -133,15 +138,15 @@ Now that we have loaded the data into a `genal.Geno` object, we can begin cleani
 Genal can run all the basic cleaning and preprocessing steps in one command:
 
 ```python
-SBP_Geno.preprocess_data(preprocessing = 2)
+SBP_Geno.preprocess_data(preprocessing = 'Fill_delete')
 ```
 
 The `preprocessing` argument specifies the global level of preprocessing applied to the data:
-- `preprocessing = 0`: The data won't be modified.
-- `preprocessing = 1`: Missing columns will be added based on reference data and invalid values set to NaN, but no rows will be deleted.
-- `preprocessing = 2`: Missing columns will be added, and all rows containing missing, duplicated, or invalid values will be deleted. This option is recommended before running genetic methods.
+- `preprocessing = 'None'`: The data won't be modified.
+- `preprocessing = 'Fill'`: Missing columns will be added based on reference data and invalid values set to NaN, but no rows will be deleted.
+- `preprocessing = 'Fill_delete'`: Missing columns will be added, and all rows containing missing, duplicated, or invalid values will be deleted. This option is recommended before running genetic methods.
 
-By default, and depending on the global preprocessing level (0, 1, 2) chosen, the `preprocess_data` method of `genal.Geno` will run the following checks:
+By default, and depending on the global preprocessing level ('None', 'Fill', 'Fill_delete') chosen, the `preprocess_data` method of `genal.Geno` will run the following checks:
 - Ensure the CHR (chromosome) and POS (genomic position) columns are integers.
 - Ensure the EA (effect allele) and NEA (non-effect allele) columns are uppercase characters containing A, T, C, G letters. Multiallelic values are set to NaN.
 - Validate the P (p-value) column for proper values.
@@ -180,7 +185,7 @@ And we see that the SNP column with the rsids has been added based on the refere
 You do not need to obtain the 1000 genome reference panel yourself, Genal will download it the first time you use it. By default, the reference panel used is the european (eur) one. You can specify another valid reference panel (afr, eas, sas, amr) with the reference_panel argument:
 
 ```python
-SBP_Geno.preprocess_data(preprocessing = 2, reference_panel = "afr")
+SBP_Geno.preprocess_data(preprocessing = 'Fill_delete', reference_panel = "afr")
 ```
 
 You can also use a custom reference panel by specifying to the reference_panel argument a path to bed/bim/fam files (without the extension).
@@ -344,7 +349,7 @@ Stroke_Geno = genal.Geno(stroke_gwas, CHR = "chromosome", POS = "base_pair_locat
 We preprocess it as well to put it in the correct format and make sure there is no invalid values:
 
 ```python
-Stroke_Geno.preprocess_data(preprocessing = 2)
+Stroke_Geno.preprocess_data(preprocessing = 'Fill_delete')
 ```
 
 Now, we need to extract our instruments (SNPs of the SBP_clumped data) from the outcome data to obtain their association with the outcome trait (stroke). It can be done by calling the `genal.Geno.query_outcome` method:
@@ -409,8 +414,16 @@ By default, all MR methods (inverse-variance weighted, weighted median, MR-Egger
 
 For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API.
 
-If you wish to include the heterogeneity values (Cochran's Q), you can use the heterogeneity argument. Here, the heterogeneity for the inverse-variance weighted method:
+If you want to visualize the obtained MR results, you can use the `genal.Geno.MR_plot` method that will plot each SNP in an effect_on_exposure x effect_on_outcome plane as well as lines corresponding to different MR methods:
 
+```python
+SBP_clumped.MR_plot(filename="MR_plot_SBP_AS")
+```
+
+![MR plot](docs/Images/MR_plot_SBP_AS.png)
+You can select which MR methods you wish to plot with the 'methods' argument. Note that for an MR method to be plotted, they must be included in the latest `genal.Geno.MR` call of this `genal.Geno` object.
+
+If you wish to include the heterogeneity values (Cochran's Q) in the results, you can use the heterogeneity argument in the `genal.Geno.MR` call. Here, the heterogeneity for the inverse-variance weighted method:
 
 ```python
 SBP_clumped.MR(action = 3, methods = ["IVW"], exposure_name = "SBP", outcome_name = "Stroke_eur", heterogeneity = True)
