@@ -228,7 +228,6 @@ def MR_func(
     res["Q_pval"] = res["Q_pval"].replace(0, '<e-100')
     
 
-
     if not heterogeneity:
         res = res[["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]
     else:
@@ -248,7 +247,7 @@ def MR_func(
         ]
         res["Q_df"] = res["Q_df"].astype("Int64")
 
-    return res
+    return res, df_mr
 
 
 def query_outcome_func(
