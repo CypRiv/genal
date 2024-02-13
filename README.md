@@ -2,7 +2,7 @@
 
 
 
-**This project was develop by Cyprien A. Rivier**
+**This project was developed by Cyprien A. Rivier**
 
 # Table of contents
 1. [Introduction](#introduction)
