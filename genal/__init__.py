@@ -3,7 +3,7 @@ import json
 from .tools import default_config, write_config, set_plink, delete_tmp
 from .geno_tools import Combine_Geno
 
-__version__ = "0.1"
+__version__ = "0.2"
 
 config_dir = os.path.expanduser(
     "~/.genal/"
