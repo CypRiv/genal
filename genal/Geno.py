@@ -7,7 +7,7 @@ import psutil
 import uuid
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
-from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs
+from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs, expand_limits
 
 
 from .proxy import find_proxies, apply_proxies, query_outcome_proxy
@@ -549,11 +549,11 @@ class Geno:
             check_beta_column(data_prs, effect_column=None, preprocessing='Fill_delete')
 
         initial_rows = data_prs.shape[0]
-        data_prs.dropna(subset=["SNP", "P", "BETA"], inplace=True)
+        data_prs.dropna(subset=["SNP", "EA", "BETA"], inplace=True)
         deleted_rows = initial_rows - data_prs.shape[0]
         if deleted_rows > 0:
             print(
-                f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP, P, or BETA have been deleted."
+                f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP, EA, or BETA have been deleted."
             )
             
         # If proxy option
@@ -888,6 +888,7 @@ class Geno:
                 axis_text=element_text(size=10),
                 figure_size=(10,6)
             )
+            + expand_limits(x=0)
         )
         
         ## Add the lines corresponding to the specified MR methods (if present in the computation)
