@@ -61,27 +61,7 @@ def mrpresso_func(
         df_exposure, df_outcome, action=action, eaf_threshold=eaf_threshold
     )
     
-    # Delete NAs, infinite or null values and print the SNP names and if the invalid value came from exposure or outcome data.
-    df_mr = df_mr[["SNP", "BETA_e", "SE_e", "BETA_o", "SE_o"]]
-    df_mr.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df_mr.replace(0, np.nan, inplace=True)
-    mask_exposure = df_mr[["BETA_e", "SE_e"]].isna().any(axis=1)
-    mask_outcome = df_mr[["BETA_o", "SE_o"]].isna().any(axis=1)
-    rows_to_delete_exposure = df_mr[mask_exposure]
-    rows_to_delete_outcome = df_mr[mask_outcome]
-    n_deleted_exposure = len(rows_to_delete_exposure)
-    n_deleted_outcome = len(rows_to_delete_outcome)
-    if n_deleted_exposure > 0:
-        print(
-            f"Deleting {n_deleted_exposure} SNPs with NA, infinite, or null values in BETA/SE columns (exposure data): {rows_to_delete_exposure['SNP'].tolist()}"
-        )
-    if n_deleted_outcome > 0:
-        print(
-            f"Deleting {n_deleted_outcome} SNPs with NA, infinite, or null values in BETA/SE columns (outcome data): {rows_to_delete_outcome['SNP'].tolist()}"
-        )
-    
-    df_mr = df_mr[["BETA_e", "SE_e", "BETA_o", "SE_o"]]
-    df_mr = df_mr.dropna().reset_index(drop=True)
+    df_mr = df_mr_formatting(df_mr)
 
     # Call and return the results of MR-PRESSO
     return mr_presso(
@@ -163,27 +143,7 @@ def MR_func(
         df_exposure, df_outcome, action=action, eaf_threshold=eaf_threshold
     )
 
-    # Delete NAs, infinite or null values and print the SNP names and if the invalid value came from exposure or outcome data.
-    df_mr = df_mr[["SNP", "BETA_e", "SE_e", "BETA_o", "SE_o"]]
-    df_mr.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df_mr.replace(0, np.nan, inplace=True)
-    mask_exposure = df_mr[["BETA_e", "SE_e"]].isna().any(axis=1)
-    mask_outcome = df_mr[["BETA_o", "SE_o"]].isna().any(axis=1)
-    rows_to_delete_exposure = df_mr[mask_exposure]
-    rows_to_delete_outcome = df_mr[mask_outcome]
-    n_deleted_exposure = len(rows_to_delete_exposure)
-    n_deleted_outcome = len(rows_to_delete_outcome)
-    if n_deleted_exposure > 0:
-        print(
-            f"Deleting {n_deleted_exposure} SNPs with NA, infinite, or null values in BETA/SE columns (exposure data): {rows_to_delete_exposure['SNP'].tolist()}"
-        )
-    if n_deleted_outcome > 0:
-        print(
-            f"Deleting {n_deleted_outcome} SNPs with NA, infinite, or null values in BETA/SE columns (outcome data): {rows_to_delete_outcome['SNP'].tolist()}"
-        )
-    
-    df_mr = df_mr[["BETA_e", "SE_e", "BETA_o", "SE_o"]]
-    df_mr = df_mr.dropna().reset_index(drop=True)
+    df_mr = df_mr_formatting(df_mr)
 
     # Prepare values for MR methods
     BETA_e, BETA_o, SE_e, SE_o = (
@@ -191,7 +151,7 @@ def MR_func(
         df_mr["BETA_o"],
         df_mr["SE_e"],
         df_mr["SE_o"],
-    )
+    )  
     
     print(
         f"Running Mendelian Randomization with {name_exposure} as exposure and {name_outcome} as outcome."
@@ -223,9 +183,9 @@ def MR_func(
     res = pd.DataFrame(results)
     res["exposure"], res["outcome"] = name_exposure, name_outcome
     
-    res.loc[res['pval'].astype(float) < 1e-100, 'pval'] = 0
-    res["pval"] = res["pval"].replace(0, '<e-100')
-    res["Q_pval"] = res["Q_pval"].replace(0, '<e-100')
+    #res.loc[res['pval'].astype(float) < 1e-100, 'pval'] = 0
+    #res["pval"] = res["pval"].replace(0, '<e-100')
+    #res["Q_pval"] = res["Q_pval"].replace(0, '<e-100')
     
 
     if not heterogeneity:
@@ -248,6 +208,34 @@ def MR_func(
         res["Q_df"] = res["Q_df"].astype("Int64")
 
     return res, df_mr
+
+def df_mr_formatting(df_mr):
+    """
+    Function to delete invalid values from the MR dataframe (after the harmonization step)
+    """
+    # Delete NAs or infinite values (or null values in SE columns, null values in BETA are accepted) and print the SNP names and if the invalid value came from exposure or outcome data.
+    df_mr = df_mr[["SNP", "BETA_e", "SE_e", "BETA_o", "SE_o"]].copy()
+    df_mr.replace([np.inf, -np.inf], np.nan, inplace=True)
+    df_mr.loc[:, ["SE_e", "SE_o"]] = df_mr.loc[:, ["SE_e", "SE_o"]].replace(0, np.nan)
+    mask_exposure = df_mr[["BETA_e", "SE_e"]].isna().any(axis=1)
+    mask_outcome = df_mr[["BETA_o", "SE_o"]].isna().any(axis=1)
+    rows_to_delete_exposure = df_mr[mask_exposure]
+    rows_to_delete_outcome = df_mr[mask_outcome]
+    n_deleted_exposure = len(rows_to_delete_exposure)
+    n_deleted_outcome = len(rows_to_delete_outcome)
+    if n_deleted_exposure > 0:
+        print(
+            f"Deleting {n_deleted_exposure} SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (exposure data): {rows_to_delete_exposure['SNP'].tolist()}"
+        )
+    if n_deleted_outcome > 0:
+        print(
+            f"Deleting {n_deleted_outcome} SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (outcome data): {rows_to_delete_outcome['SNP'].tolist()}"
+        )
+
+    df_mr = df_mr[["BETA_e", "SE_e", "BETA_o", "SE_o"]]
+    df_mr = df_mr.dropna().reset_index(drop=True)
+    
+    return df_mr
 
 
 def query_outcome_func(
@@ -331,7 +319,7 @@ def load_outcome_from_geno_object(outcome):
     """Load outcome data from a Geno object."""
     df_outcome = outcome.data
     name = outcome.name
-    print(f"Outcome data successfully loaded from '{name}' Geno object.")
+    print(f"Outcome data successfully loaded from '{name}' Geno instance.")
     return df_outcome, name
 
 
