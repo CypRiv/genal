@@ -11,6 +11,7 @@ from numpy.random import default_rng
 from functools import partial
 
 ##todo: implement the multivariable option, for the moment we assume only 1 BETA_e column
+# Also: check if we can replace the LinearRegression of sklearn with one from statsmodels to avoid using sklearn just for that
 
 
 # MR-PRESSO main function

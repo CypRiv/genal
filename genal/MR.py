@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy import stats
-from scipy.stats import norm, chi2, binomtest
+from scipy.stats import norm, chi2, binomtest, t
 from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
@@ -79,15 +79,15 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
     if len(mod.params) > 1:
         b = mod.params.iloc[1]
         se = mod.bse.iloc[1] / min(1, np.sqrt(mod.mse_resid))
-        pval = 2 * (1 - stats.t.cdf(np.abs(b / se), df=l - 2))
+        pval = 2 * t.sf(abs(b / se), l - 2)
 
         b_i = mod.params.iloc[0]
         se_i = mod.bse.iloc[0] / min(1, np.sqrt(mod.mse_resid))
-        pval_i = 2 * (1 - stats.t.cdf(np.abs(b_i / se_i), df=l - 2))
+        pval_i = 2 * t.sf(abs(b_i / se_i), l - 2)
 
         Q = mod.mse_resid * (l - 2)
         Q_df = l - 2
-        Q_pval = 1 - chi2.cdf(Q, Q_df)
+        Q_pval = chi2.sf(Q, Q_df)
 
         return [
             {
@@ -147,7 +147,7 @@ def linreg(x, y, w=None):
     se = np.sqrt(
         sum(w * residuals**2) / (np.sum(~np.isnan(yhat)) - 2) / np.sum(w * x**2)
     )
-    pval = 2 * (1 - norm.cdf(abs(bhat / se)))
+    pval = 2 * norm.sf(abs(bhat / se))
 
     return {"ahat": ahat, "bhat": bhat, "se": se, "pval": pval}
 
@@ -297,7 +297,7 @@ def mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
 
     b = weighted_median(b_iv, 1 / VBj)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, 1 / VBj, nboot)
-    pval = 2 * (1 - norm.cdf(abs(b / se)))
+    pval = 2 * norm.sf(abs(b / se))
     return [{"method": MR_METHODS_NAMES["WM"], "nSNP": l, "b": b, "se": se, "pval": pval}]
 
 
@@ -344,7 +344,7 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
 
     b = weighted_median(betaIV, pen_weights)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, pen_weights, nboot)
-    pval = 2 * (1 - norm.cdf(abs(b / se)))
+    pval = 2 * norm.sf(abs(b / se))
 
     return [
         {
@@ -395,7 +395,7 @@ def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     weights = np.repeat(1 / len(BETA_e), len(BETA_e))
     b = weighted_median(b_iv, weights)
     se = weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, weights, nboot)
-    pval = 2 * (1 - norm.cdf(abs(b / se)))
+    pval = 2 * norm.sf(abs(b / se))
     return [{"method": MR_METHODS_NAMES["Simple-median"], "b": b, "se": se, "pval": pval, "nSNP": l}]
 
 
@@ -457,11 +457,11 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
     # Extract coefficients
     b = model.params.iloc[0]
     se = model.bse.iloc[0] / min(1, np.sqrt(model.mse_resid))
-    pval = 2 * (1 - norm.cdf(abs(b / se)))
+    pval = 2 * norm.sf(abs(b / se))
 
     Q_df = l - 1
     Q = model.scale * Q_df
-    Q_pval = 1 - chi2.cdf(Q, Q_df)
+    Q_pval = chi2.sf(Q, Q_df)
 
     return [
         {
@@ -521,7 +521,7 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
     # Extract coefficients
     b = model.params[0]
     se = model.bse[0]
-    pval = 2 * (1 - norm.cdf(abs(b / se)))
+    pval = 2 * norm.sf(abs(b / se))
     Q_df = l - 1
     Q = model.scale * Q_df
     Q_pval = chi2.sf(Q, Q_df)
@@ -594,7 +594,7 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     # Extract coefficients
     b = model.params.iloc[0]
     se = model.bse.iloc[0] / model.mse_resid**0.5
-    pval = 2 * norm.sf(np.abs(b / se))
+    pval = 2 * norm.sf(abs(b / se))
     Q_df = l - 1
     Q = model.scale * Q_df
     Q_pval = chi2.sf(Q, Q_df)
@@ -667,9 +667,9 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
             "se": se,
             "pval": pval,
             "nSNP": l,
-            "Q": Q,
-            "Q_df": Q_df,
-            "Q_pval": Q_pval,
+            "Q": np.nan,
+            "Q_df": np.nan,
+            "Q_pval": np.nan,
         }
     ]
 
