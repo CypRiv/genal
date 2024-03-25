@@ -12,14 +12,16 @@ CHECKS_DICT = {
     "NA_removal": False,
 }
 MR_METHODS_NAMES = {
-    "Egger": ("MR Egger", "Egger Intercept"),
-    "Egger-boot": ("MR Egger bootstrap", "Egger Intercept bootstrap"),
-    "WM": "Weighted Median",
-    "WM-pen": "Penalised Weighted Median",
-    "Simple-median": "Simple Median",
     "IVW": "Inverse-Variance Weighted",
     "IVW-RE": "Inverse Variance Weighted (Random Effects)",
     "IVW-FE": "Inverse Variance Weighted (Fixed Effects)",
     "UWR": "Unweighted Regression",
+    "WM": "Weighted Median",
+    "WM-pen": "Penalised Weighted Median",
+    "Simple-median": "Simple Median",
     "Sign": "Sign concordance test",
+    "Egger": ("MR Egger", "Egger Intercept"),
+    "Egger-boot": ("MR Egger bootstrap", "Egger Intercept bootstrap"),
+    "Simple-mode": "Simple mode",
+    "Weighted-mode": "Weighted mode",
 }

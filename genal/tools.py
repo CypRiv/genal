@@ -186,7 +186,7 @@ def get_reference_panel_path(reference_panel="eur"):
                 f"The {reference_panel.capitalize()} reference panel was not found. Attempting to download it..."
             )
             print(
-                "If you have already downloaded it, use set_reference_folder(path) to avoid downloading again."
+                "If you have already downloaded it, use genal.set_reference_folder(path) to avoid downloading again."
             )
             url = f"https://storage.googleapis.com/genal_files/1kg.v3.tgz"
             try:
@@ -194,7 +194,7 @@ def get_reference_panel_path(reference_panel="eur"):
             except Exception as e:
                 print(f"Download unsuccessful: {e}")
                 print(
-                    "Manually download the reference file and use set_reference_folder(path)."
+                    "Manually download the reference file and use genal.set_reference_folder(path)."
                 )
                 raise FileNotFoundError(f"Reference panel {reference_panel} not found.")
 
