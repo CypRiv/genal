@@ -6,17 +6,186 @@ from scipy import stats
 from scipy.stats import norm, chi2, binomtest, t
 from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import KernelDensity
 from tqdm import tqdm
 from numpy.random import default_rng
 from functools import partial
 
 from .constants import MR_METHODS_NAMES
 
+"""
+Mode methods
+"""
+
+def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
+    """
+    Perform a Mendelian Randomization analysis using the simple mode method.
+    
+    Args:
+    BETA_e (numpy array): Effect sizes of genetic variants on the exposure.
+    SE_e (numpy array): Standard errors corresponding to `BETA_e`.
+    BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.
+    SE_o (numpy array): Standard errors corresponding to `BETA_o`.
+    phi (int): Factor for the bandwidth parameter used in the kernel density estimation
+    nboot (int): Number of boostrap iterations to obtain the standard error and p-value
+    cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
+
+Returns:
+    list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
+        - "method": Name of the analysis method.
+        - "b": Coefficient of the regression, representing the causal estimate or the intercept.
+        - "se": Adjusted standard error of the coefficient or intercept.
+        - "pval": P-value for the causal estimate or intercept.
+        - "nSNP": Number of genetic variants used in the analysis.
+    """
+    l = len(BETA_e)
+    if l < 3:
+        return [
+            {
+                "method": MR_METHODS_NAMES["Simple-mode"],
+                "b": np.nan,
+                "se": np.nan,
+                "pval": np.nan,
+                "nSNP": np.nan,
+            }
+        ]
+    
+    BETA_IV   = BETA_o/BETA_e
+    SE_IV = np.sqrt((SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4))
+    
+    BETA_mode = beta_mode(BETA_IV, np.ones(l), phi, method="Simple") #Point estimate calculated using unweighted KDE
+    BETA_boot = bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method="Simple") #Generating bootstrapped point estimates with normal sampling and unweighted KDE
+    SE_mode = stats.median_abs_deviation(BETA_boot, scale=1/1.4826)
+    P_mode = 2 * t.sf(np.abs(BETA_mode / SE_mode), df=l - 1)
+    
+    return [
+    {
+        "method": MR_METHODS_NAMES["Simple-mode"],
+        "b": BETA_mode[0],
+        "se": SE_mode[0],
+        "pval": P_mode[0],
+        "nSNP": l,
+    }
+]
+
+def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
+    """
+    Perform a Mendelian Randomization analysis using the weighted mode method.
+    
+    Args:
+    BETA_e (numpy array): Effect sizes of genetic variants on the exposure.
+    SE_e (numpy array): Standard errors corresponding to `BETA_e`.
+    BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.
+    SE_o (numpy array): Standard errors corresponding to `BETA_o`.
+    phi (int): Factor for the bandwidth parameter used in the kernel density estimation
+    nboot (int): Number of boostrap iterations to obtain the standard error and p-value
+    cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
+
+Returns:
+    list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
+        - "method": Name of the analysis method.
+        - "b": Coefficient of the regression, representing the causal estimate or the intercept.
+        - "se": Adjusted standard error of the coefficient or intercept.
+        - "pval": P-value for the causal estimate or intercept.
+        - "nSNP": Number of genetic variants used in the analysis.
+    """
+    l = len(BETA_e)
+    if l < 3:
+        return [
+            {
+                "method": MR_METHODS_NAMES["Weighted-mode"],
+                "b": np.nan,
+                "se": np.nan,
+                "pval": np.nan,
+                "nSNP": np.nan,
+            }
+        ]
+    
+    BETA_IV   = BETA_o/BETA_e
+    SE_IV = np.sqrt((SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4))
+    
+    BETA_mode = beta_mode(BETA_IV, SE_IV, phi, method="Weighted") #Point estimate calculated using KDE weighted with standard errors
+    BETA_boot = bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method="Weighted") #Generating bootstrapped point estimates with normal sampling and weighted KDE
+    SE_mode = stats.median_abs_deviation(BETA_boot, scale=1/1.4826)
+    P_mode = 2 * t.sf(np.abs(BETA_mode / SE_mode), df=l - 1)
+    
+    return [
+    {
+        "method": MR_METHODS_NAMES["Weighted-mode"],
+        "b": BETA_mode[0],
+        "se": SE_mode[0],
+        "pval": P_mode[0],
+        "nSNP": l,
+    }
+]
+
+def beta_mode(BETA_IV, SE_IV, phi, method):
+    """Function to compute the point estimate of mode methods."""
+    # Bandwidth rule - modified Silverman's rule proposed by Bickel (2002)
+    s = 0.9 * min(np.std(BETA_IV, ddof=1), stats.median_abs_deviation(BETA_IV, scale=1/1.4826)) / len(BETA_IV) ** (1/5)
+        
+    # Define the actual bandwidth
+    h = max(0.00000001, s * phi)
+
+    # Kernel density estimation (gaussian kernel)
+    kde = KernelDensity(bandwidth=h, kernel='gaussian')
+
+    if method == "Weighted": #Using weighted KDE 
+        weights = SE_IV ** -2 / np.sum(SE_IV ** -2) # Standardised weights
+        kde.fit(np.array(BETA_IV).reshape(-1, 1), sample_weight=weights)
+    elif method == "Simple": #Using unweighted KDE
+        kde.fit(np.array(BETA_IV).reshape(-1, 1))
+
+    # Create points to evaluate the density on (Using 512 points and 3*h as padding to be equivalent to the stas::density function in R)
+    x_range = np.linspace(BETA_IV.min()-3*h, BETA_IV.max()+3*h, 512)[:, np.newaxis]
+
+    # Calculate log density and then convert to actual density
+    log_density = kde.score_samples(x_range)
+    density = np.exp(log_density)
+
+    # Find mode
+    mode = x_range[np.argmax(density)]
+
+    return mode
+
+def bootstrap_mode_iteration(i, BETA_IV, SE_IV, phi, method):
+    """Helper function to run the simple and weighted mode boostrapping in parallel."""
+    BETA_IV_boot = np.random.normal(BETA_IV, SE_IV) #Normally sample BETA_IV
+    
+    if method=="Simple": #If Simple mode: the kernel density estimation is not weighted (SE vector of 1)
+        return beta_mode(BETA_IV_boot, np.ones(len(BETA_IV)), phi, "Simple")
+    elif method=="Weighted": #If Weighted mode: the kernel density estimation is weighted using the standard errors
+        return beta_mode(BETA_IV_boot, SE_IV, phi, "Weighted")
+    else:
+        raise ValueError("Method should be either 'Simple' or 'Weighted'.")
+
+def bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method):
+    """Function to obtain arrays of bootstrapped beta estimates (weighted or unweighted) to estimate SEs of mode methods."""
+    
+    # Declare the array to store results of the bootstrapping
+    BETA_boot = np.ones((nboot, 1))
+    
+    #Wrapper function freezing the bootstrap_iteration for parallel execution
+    partial_bootstrap_iteration = partial(bootstrap_mode_iteration, BETA_IV=BETA_IV, SE_IV=SE_IV, phi=phi, method=method) 
+    
+    #Parallel execution with progress bar
+    with ProcessPoolExecutor(max_workers=cpus) as executor:
+        results = list(
+            tqdm(
+                executor.map(partial_bootstrap_iteration, range(nboot)),
+                total=nboot,
+                desc=f"{method} mode bootstrapping",
+                ncols=100,
+            )
+        )
+    BETA_boot = np.array(results)
+        
+    return BETA_boot
+
 
 """
 Egger regression methods
 """
-
 
 def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
     """
@@ -117,41 +286,6 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
         )
         return null_result
 
-
-def parallel_bootstrap_func(i, BETA_e, SE_e, BETA_o, SE_o):
-    """Helper function to run the egger regression bootstrapping in parallel."""
-    xs = np.random.normal(BETA_e, SE_e)
-    ys = np.random.normal(BETA_o, SE_o)
-
-    # Use absolute values for Egger reg
-    ys *= np.sign(xs)
-    xs = np.abs(xs)
-
-    r = linreg(xs, ys, 1 / SE_o**2)
-    return r["ahat"], r["bhat"]
-
-
-def linreg(x, y, w=None):
-    """Helper function to run linear regressions for the parallel egger bootstrapping."""
-    if w is None:
-        w = np.ones_like(x)
-
-    xp = w * x
-    yp = w * y
-
-    bhat = np.cov(xp, yp)[0, 1] / np.var(xp)
-    ahat = np.nanmean(y) - np.nanmean(x) * bhat
-    yhat = ahat + bhat * x
-
-    residuals = y - yhat
-    se = np.sqrt(
-        sum(w * residuals**2) / (np.sum(~np.isnan(yhat)) - 2) / np.sum(w * x**2)
-    )
-    pval = 2 * norm.sf(abs(bhat / se))
-
-    return {"ahat": ahat, "bhat": bhat, "se": se, "pval": pval}
-
-
 def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
     """
     Perform a Mendelian Randomization analysis using the egger regression method with boostrapped standard errors. See :func:`mr_egger_regression` for a version without bootstrapping.
@@ -225,11 +359,42 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
         },
     ]
 
+def parallel_bootstrap_func(i, BETA_e, SE_e, BETA_o, SE_o):
+    """Helper function to run the egger regression bootstrapping in parallel."""
+    xs = np.random.normal(BETA_e, SE_e)
+    ys = np.random.normal(BETA_o, SE_o)
+
+    # Use absolute values for Egger reg
+    ys *= np.sign(xs)
+    xs = np.abs(xs)
+
+    r = linreg(xs, ys, 1 / SE_o**2)
+    return r["ahat"], r["bhat"]
+
+
+def linreg(x, y, w=None):
+    """Helper function to run linear regressions for the parallel egger bootstrapping."""
+    if w is None:
+        w = np.ones_like(x)
+
+    xp = w * x
+    yp = w * y
+
+    bhat = np.cov(xp, yp)[0, 1] / np.var(xp)
+    ahat = np.nanmean(y) - np.nanmean(x) * bhat
+    yhat = ahat + bhat * x
+
+    residuals = y - yhat
+    se = np.sqrt(
+        sum(w * residuals**2) / (np.sum(~np.isnan(yhat)) - 2) / np.sum(w * x**2)
+    )
+    pval = 2 * norm.sf(abs(bhat / se))
+
+    return {"ahat": ahat, "bhat": bhat, "se": se, "pval": pval}
 
 """
 Median methods
 """
-
 
 def weighted_median(b_iv, weights):
     """Helper function to compute the weighted median estimate."""
@@ -248,9 +413,10 @@ def weighted_median(b_iv, weights):
 def weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, weights, nboot):
     """Helper function to generate boostrapped replications."""
     med = np.zeros(nboot)
-    for i in tqdm(
-        range(nboot), total=nboot, desc="Weighted median bootstrapping", ncols=100
-    ):
+    #for i in tqdm(
+    #    range(nboot), total=nboot, desc="Weighted median bootstrapping", ncols=100
+    #):
+    for i in range(nboot):
         BETA_e_boot = np.random.normal(loc=BETA_e, scale=SE_e)
         BETA_o_boot = np.random.normal(loc=BETA_o, scale=SE_o)
         betaIV_boot = BETA_o_boot / BETA_e_boot
@@ -334,7 +500,7 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
         ]
 
     betaIV = BETA_o / BETA_e
-    betaIVW = np.sum(BETA_o * BETA_e / SE_o**2) / np.sum(BETA_e**2 / SE_o**2)
+    #betaIVW = np.sum(BETA_o * BETA_e / SE_o**2) / np.sum(BETA_e**2 / SE_o**2)
     VBj = (SE_o**2) / (BETA_e**2) + (BETA_o**2) * (SE_e**2) / (BETA_e**4)
     weights = 1 / VBj
 
@@ -402,7 +568,6 @@ def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
 """
 Regression methods
 """
-
 
 def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
     """
@@ -677,7 +842,6 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
 """ 
 Sign method
 """
-
 
 def mr_sign(BETA_e, BETA_o):
     """

@@ -8,6 +8,7 @@ from pandas.api.types import is_numeric_dtype
 from .proxy import find_proxies, query_outcome_proxy
 from .MR import *
 from .MRpresso import mr_presso
+from .constants import MR_METHODS_NAMES
 
 REQUIRED_COLUMNS = ["SNP", "BETA", "SE", "EA", "NEA"]
 
@@ -83,6 +84,7 @@ def MR_func(
     eaf_threshold,
     nboot,
     penk,
+    phi,
     name_exposure,
     cpus,
 ):
@@ -102,19 +104,10 @@ def MR_func(
     if action not in [1, 2, 3]:
         raise ValueError("The action argument only takes 1,2 or 3 as value")
 
-    # Check the methods argument
-    valid_methods = [
-        "IVW",
-        "IVW-FE",
-        "IVW-RE",
-        "UWR",
-        "WM",
-        "WM-pen",
-        "Simple-median",
-        "Sign",
-        "Egger",
-        "Egger-boot",
-    ]
+    # Check the methods argument (contains either MR method names or "all")
+    valid_methods = list(MR_METHODS_NAMES.keys())
+    valid_methods.append("all")
+    methods = methods if isinstance(methods, list) else [methods]
     if not all(m in valid_methods for m in methods):
         raise ValueError(
             f"The list of methods can only contain strings in {valid_methods}"
@@ -171,10 +164,14 @@ def MR_func(
         "IVW-FE": partial(mr_ivw_fe, BETA_e, SE_e, BETA_o, SE_o),
         "UWR": partial(mr_uwr, BETA_e, SE_e, BETA_o, SE_o),
         "Sign": partial(mr_sign, BETA_e, BETA_o),
+        "Simple-mode": partial(mr_simple_mode, BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus),
+        "Weighted-mode": partial(mr_weighted_mode, BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus),
     }
 
     # Compute required MR methods and gather results
     results = []
+    if "all" in methods:
+        methods = list(MR_METHODS_NAMES.keys())
     for method in methods:
         func = FUNCTION_MAP.get(method, None)
         result = func()
@@ -182,11 +179,6 @@ def MR_func(
 
     res = pd.DataFrame(results)
     res["exposure"], res["outcome"] = name_exposure, name_outcome
-    
-    #res.loc[res['pval'].astype(float) < 1e-100, 'pval'] = 0
-    #res["pval"] = res["pval"].replace(0, '<e-100')
-    #res["Q_pval"] = res["Q_pval"].replace(0, '<e-100')
-    
 
     if not heterogeneity:
         res = res[["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]

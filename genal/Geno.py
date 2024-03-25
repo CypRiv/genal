@@ -756,24 +756,16 @@ class Geno:
 
     def MR(
         self,
-        methods=[
-            "IVW",
-            "IVW-FE",
-            "UWR",
-            "WM",
-            "WM-pen",
-            "Simple-median",
-            "Sign",
-            "Egger",
-            "Egger-boot",
-        ],
+        methods=["IVW","IVW-FE","WM","Simple-mode","Egger"],
         action=2,
         eaf_threshold=0.42,
         heterogeneity=False,
-        nboot=10000,
+        nboot=1000,
         penk=20,
+        phi=1,
         exposure_name=None,
         outcome_name=None,
+        cpus=-1
     ):
         """
         Executes Mendelian Randomization (MR) using the `data_clumped` attribute as exposure data and `MR_data` attribute as outcome data queried using the `query_outcome` method.
@@ -790,7 +782,9 @@ class Geno:
                 "Sign": sign concordance test
                 "Egger": egger regression
                 "Egger-boot": egger regression with bootstrapped standard errors
-                Default is ["IVW","IVW-FE","UWR","WM","WM-pen","Simple-median","Sign","Egger","Egger-boot"].
+                "Simple-mode": simple mode method
+                "Weighted-mode": weighted mode method
+                Default is ["IVW","IVW-FE","WM","Simple-mode","Weighted-mode","Egger"].
             action (int, optional): How to treat palindromes during harmonizing between
                 exposure and outcome data. Accepts:
                 1: Doesn't flip them (Assumes all alleles are on the forward strand)
@@ -799,8 +793,9 @@ class Geno:
             eaf_threshold (float, optional): Max effect allele frequency accepted when
                 flipping palindromic SNPs (relevant if action=2). Default is 0.42.
             heterogeneity (bool, optional): If True, includes heterogeneity tests in the results (Cochran's Q test).Default is False.
-            nboot (int, optional): Number of bootstrap replications for methods with bootstrapping. Default is 10000.
+            nboot (int, optional): Number of bootstrap replications for methods with bootstrapping. Default is 1000.
             penk (int, optional): Penalty value for the WM-pen method. Default is 20.
+            phi (int, optional): Factor for the bandwidth parameter used in the kernel density estimation of the mode methods
             exposure_name (str, optional): Name of the exposure data (only for display purposes).
             outcome_name (str, optional): Name of the outcome data (only for display purposes).
 
@@ -815,6 +810,7 @@ class Geno:
         if outcome_name:
             self.MR_data[2] = outcome_name
         exp_name = exposure_name if exposure_name else self.name
+        cpus = self.cpus if cpus == -1 else cpus
         res, df_mr = MR_func(
             self.MR_data,
             methods,
@@ -823,6 +819,7 @@ class Geno:
             eaf_threshold,
             nboot,
             penk,
+            phi,
             exp_name,
             self.cpus,
         )

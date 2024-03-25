@@ -172,7 +172,7 @@ def mr_presso(
                 BiasTest = {
                     "Outliers Indices": list(ref_outlier),
                     "Distortion test coefficient": 100 * BiasObs.values[0],
-                    "Distortion test p-value": p_value[0],
+                    "Distortion test p-value": p_value.iloc[0],
                 }
             else:
                 BiasTest = {
