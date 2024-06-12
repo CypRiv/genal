@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Geno class &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=90b5f367"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Geno class</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#genal.Geno"><code class="docutils literal notranslate"><span class="pre">Geno</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.data"><code class="docutils literal notranslate"><span class="pre">Geno.data</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.phenotype"><code class="docutils literal notranslate"><span class="pre">Geno.phenotype</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.MR_data"><code class="docutils literal notranslate"><span class="pre">Geno.MR_data</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.MR_results"><code class="docutils literal notranslate"><span class="pre">Geno.MR_results</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.ram"><code class="docutils literal notranslate"><span class="pre">Geno.ram</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.cpus"><code class="docutils literal notranslate"><span class="pre">Geno.cpus</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.checks"><code class="docutils literal notranslate"><span class="pre">Geno.checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.name"><code class="docutils literal notranslate"><span class="pre">Geno.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.reference_panel"><code class="docutils literal notranslate"><span class="pre">Geno.reference_panel</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.preprocess_data"><code class="docutils literal notranslate"><span class="pre">Geno.preprocess_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.clump"><code class="docutils literal notranslate"><span class="pre">Geno.clump()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.prs"><code class="docutils literal notranslate"><span class="pre">Geno.prs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.set_phenotype"><code class="docutils literal notranslate"><span class="pre">Geno.set_phenotype()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.association_test"><code class="docutils literal notranslate"><span class="pre">Geno.association_test()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.query_outcome"><code class="docutils literal notranslate"><span class="pre">Geno.query_outcome()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.MR"><code class="docutils literal notranslate"><span class="pre">Geno.MR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.MRpresso"><code class="docutils literal notranslate"><span class="pre">Geno.MRpresso()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.lift"><code class="docutils literal notranslate"><span class="pre">Geno.lift()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">Geno.MR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.MR_forest"><code class="docutils literal notranslate"><span class="pre">Geno.MR_forest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.MR_plot"><code class="docutils literal notranslate"><span class="pre">Geno.MR_plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">Geno.MRpresso()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">Geno.association_test()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">Geno.clump()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.copy"><code class="docutils literal notranslate"><span class="pre">Geno.copy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.extract_snps"><code class="docutils literal notranslate"><span class="pre">Geno.extract_snps()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.get_reference_panel"><code class="docutils literal notranslate"><span class="pre">Geno.get_reference_panel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">Geno.lift()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id5"><code class="docutils literal notranslate"><span class="pre">Geno.preprocess_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6"><code class="docutils literal notranslate"><span class="pre">Geno.prs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id7"><code class="docutils literal notranslate"><span class="pre">Geno.query_outcome()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.save"><code class="docutils literal notranslate"><span class="pre">Geno.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id8"><code class="docutils literal notranslate"><span class="pre">Geno.set_phenotype()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.sort_group"><code class="docutils literal notranslate"><span class="pre">Geno.sort_group()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.standardize"><code class="docutils literal notranslate"><span class="pre">Geno.standardize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#genal.Geno.update_snpids"><code class="docutils literal notranslate"><span class="pre">Geno.update_snpids()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#clumping-function">Clumping function</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#genal.clump.clump_data"><code class="docutils literal notranslate"><span class="pre">clump_data()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#extract-and-prs-functions">Extract and PRS functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#genal.extract_prs.extract_snps_func"><code class="docutils literal notranslate"><span class="pre">extract_snps_func()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">The Geno class</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="the-geno-class">
+<h1>The Geno class<a class="headerlink" href="#the-geno-class" title="Link to this heading">¶</a></h1>
+<p>The main object of the package is the <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> class that contains the SNP-level data and manipulates it through its methods.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="genal.Geno">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">genal.</span></span><span class="sig-name descname"><span class="pre">Geno</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">CHR</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'CHR'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">POS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'POS'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SNP</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SNP'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EA</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'EA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">NEA</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'NEA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BETA</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'BETA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SE</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SE'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'P'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EAF</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'EAF'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno" title="Link to this definition">¶</a></dt>
+<dd><p>A class to handle GWAS-derived data, including SNP rsID, genome position,
+SNP-trait effects, and effect allele frequencies.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.data">
+<span class="sig-name descname"><span class="pre">data</span></span><a class="headerlink" href="#genal.Geno.data" title="Link to this definition">¶</a></dt>
+<dd><p>Main DataFrame containing SNP data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.phenotype">
+<span class="sig-name descname"><span class="pre">phenotype</span></span><a class="headerlink" href="#genal.Geno.phenotype" title="Link to this definition">¶</a></dt>
+<dd><p>Tuple with a DataFrame of individual-level phenotype
+data and a string representing the phenotype trait column. Initialized after
+running the ‘set_phenotype’ method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.MR_data">
+<span class="sig-name descname"><span class="pre">MR_data</span></span><a class="headerlink" href="#genal.Geno.MR_data" title="Link to this definition">¶</a></dt>
+<dd><p>Tuple containing DataFrames for associations
+with exposure and outcome, and a string for the outcome name. Initialized after
+running the ‘query_outcome’ method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, pd.DataFrame, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.MR_results">
+<span class="sig-name descname"><span class="pre">MR_results</span></span><a class="headerlink" href="#genal.Geno.MR_results" title="Link to this definition">¶</a></dt>
+<dd><p>Contains an MR results dataframe, a dataframe of harmonized SNPs, an exposure name, an outcome name. Assigned after calling the MR method and used for plotting with the MR_plot method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, pd.DataFrame, str, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.ram">
+<span class="sig-name descname"><span class="pre">ram</span></span><a class="headerlink" href="#genal.Geno.ram" title="Link to this definition">¶</a></dt>
+<dd><p>Available memory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.cpus">
+<span class="sig-name descname"><span class="pre">cpus</span></span><a class="headerlink" href="#genal.Geno.cpus" title="Link to this definition">¶</a></dt>
+<dd><p>Number of available CPUs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.checks">
+<span class="sig-name descname"><span class="pre">checks</span></span><a class="headerlink" href="#genal.Geno.checks" title="Link to this definition">¶</a></dt>
+<dd><p>Dictionary of checks performed on the main DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#genal.Geno.name" title="Link to this definition">¶</a></dt>
+<dd><p>ID of the object (for internal reference and debugging purposes).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="genal.Geno.reference_panel">
+<span class="sig-name descname"><span class="pre">reference_panel</span></span><a class="headerlink" href="#genal.Geno.reference_panel" title="Link to this definition">¶</a></dt>
+<dd><p>Reference population SNP data used for SNP info
+adjustments. Initialized when first needed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.preprocess_data">
+<span class="sig-name descname"><span class="pre">preprocess_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.preprocess_data" title="Link to this definition">¶</a></dt>
+<dd><p>Clean and preprocess dataframe of SNP data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.clump">
+<span class="sig-name descname"><span class="pre">clump</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.clump" title="Link to this definition">¶</a></dt>
+<dd><p>Clumps the main data and stores the result in data_clumped.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.prs">
+<span class="sig-name descname"><span class="pre">prs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.prs" title="Link to this definition">¶</a></dt>
+<dd><p>Computes Polygenic Risk Score on genomic data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.set_phenotype">
+<span class="sig-name descname"><span class="pre">set_phenotype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.set_phenotype" title="Link to this definition">¶</a></dt>
+<dd><p>Assigns a DataFrame with individual-level data and a phenotype trait to
+the phenotype attribute.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.association_test">
+<span class="sig-name descname"><span class="pre">association_test</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.association_test" title="Link to this definition">¶</a></dt>
+<dd><p>Computes SNP-trait effect estimates, standard errors, and p-values.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.query_outcome">
+<span class="sig-name descname"><span class="pre">query_outcome</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.query_outcome" title="Link to this definition">¶</a></dt>
+<dd><p>Extracts SNPs from outcome data with proxying and initializes MR_data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.MR">
+<span class="sig-name descname"><span class="pre">MR</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.MR" title="Link to this definition">¶</a></dt>
+<dd><p>Performs Mendelian Randomization between SNP-exposure and SNP-outcome data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.MRpresso">
+<span class="sig-name descname"><span class="pre">MRpresso</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.MRpresso" title="Link to this definition">¶</a></dt>
+<dd><p>Executes the MR-PRESSO algorithm for horizontal pleiotropy correction between
+SNP-exposure and SNP-outcome data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.lift">
+<span class="sig-name descname"><span class="pre">lift</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.lift" title="Link to this definition">¶</a></dt>
+<dd><p>Lifts SNP data from one genomic build to another.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">MR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">methods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['IVW',</span> <span class="pre">'IVW-FE',</span> <span class="pre">'WM',</span> <span class="pre">'Simple-mode',</span> <span class="pre">'Egger']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterogeneity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nboot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">penk</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposure_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outcome_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id0" title="Link to this definition">¶</a></dt>
+<dd><p>Executes Mendelian Randomization (MR) using the <cite>data_clumped</cite> attribute as exposure data and <cite>MR_data</cite> attribute as outcome data queried using the <cite>query_outcome</cite> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>methods</strong> (<em>list</em><em>, </em><em>optional</em>) – List of MR methods to run. Possible options include:
+“IVW”: inverse variance-weighted with random effects and under-dispersion correction
+“IVW-FE”: inverse variance-weighted with fixed effects
+“IVW-RE”: inverse variance-weighted with random effects and without under-dispersion correction
+“UWR”: unweighted regression
+“WM”: weighted median (bootstrapped standard errors)
+“WM-pen”: penalised weighted median (bootstrapped standard errors)
+“Simple-median”: simple median (bootstrapped standard errors)
+“Sign”: sign concordance test
+“Egger”: egger regression
+“Egger-boot”: egger regression with bootstrapped standard errors
+“Simple-mode”: simple mode method
+“Weighted-mode”: weighted mode method
+Default is [“IVW”,”IVW-FE”,”WM”,”Simple-mode”,”Weighted-mode”,”Egger”].</p></li>
+<li><p><strong>action</strong> (<em>int</em><em>, </em><em>optional</em>) – How to treat palindromes during harmonizing between
+exposure and outcome data. Accepts:
+1: Doesn’t flip them (Assumes all alleles are on the forward strand)
+2: Uses allele frequencies to attempt to flip (conservative, default)
+3: Removes all palindromic SNPs (very conservative)</p></li>
+<li><p><strong>eaf_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Max effect allele frequency accepted when
+flipping palindromic SNPs (relevant if action=2). Default is 0.42.</p></li>
+<li><p><strong>heterogeneity</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, includes heterogeneity tests in the results (Cochran’s Q test).Default is False.</p></li>
+<li><p><strong>nboot</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of bootstrap replications for methods with bootstrapping. Default is 1000.</p></li>
+<li><p><strong>penk</strong> (<em>int</em><em>, </em><em>optional</em>) – Penalty value for the WM-pen method. Default is 20.</p></li>
+<li><p><strong>phi</strong> (<em>int</em><em>, </em><em>optional</em>) – Factor for the bandwidth parameter used in the kernel density estimation of the mode methods</p></li>
+<li><p><strong>exposure_name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of the exposure data (only for display purposes).</p></li>
+<li><p><strong>outcome_name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of the outcome data (only for display purposes).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A table with MR results.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.MR_forest">
+<span class="sig-name descname"><span class="pre">MR_forest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">methods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['IVW',</span> <span class="pre">'WM',</span> <span class="pre">'Simple-median',</span> <span class="pre">'Egger']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposure_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outcome_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.MR_forest" title="Link to this definition">¶</a></dt>
+<dd><p>Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the ‘methods’ argument is represented as a line in the plot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>methods</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – A list of MR methods to be included in the plot. Default methods are “IVW”, “WM”, “Simple-median”, and “Egger”.</p></li>
+<li><p><strong>exposure_name</strong> (<em>str</em><em>, </em><em>optional</em>) – A custom label for the exposure effect axis. If None, uses the label provided in the MR function call or a default label.</p></li>
+<li><p><strong>outcome_name</strong> (<em>str</em><em>, </em><em>optional</em>) – A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.</p></li>
+<li><p><strong>filename</strong> (<em>str</em><em>, </em><em>optional</em>) – The filename where the plot will be saved. If None, the plot is not saved.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>plotnine.ggplot.ggplot</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If MR analysis has not been performed prior to calling this function.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function requires prior execution of the <cite>MR</cite> method to compute MR results. Make sure the MR analysis is performed on the data before calling <cite>MR_plot</cite>.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.MR_plot">
+<span class="sig-name descname"><span class="pre">MR_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">methods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['IVW',</span> <span class="pre">'WM',</span> <span class="pre">'Simple-median',</span> <span class="pre">'Egger']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposure_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outcome_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.MR_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the ‘methods’ argument is represented as a line in the plot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>methods</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – A list of MR methods to be included in the plot. Default methods are “IVW”, “WM”, “Simple-median”, and “Egger”.</p></li>
+<li><p><strong>exposure_name</strong> (<em>str</em><em>, </em><em>optional</em>) – A custom label for the exposure effect axis. If None, uses the label provided in the MR function call or a default label.</p></li>
+<li><p><strong>outcome_name</strong> (<em>str</em><em>, </em><em>optional</em>) – A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.</p></li>
+<li><p><strong>filename</strong> (<em>str</em><em>, </em><em>optional</em>) – The filename where the plot will be saved. If None, the plot is not saved.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>plotnine.ggplot.ggplot</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If MR analysis has not been performed prior to calling this function.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function requires prior execution of the <cite>MR</cite> method to compute MR results. Make sure the MR analysis is performed on the data before calling <cite>MR_plot</cite>.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">MRpresso</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eaf_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outlier_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distortion_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">significance_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpus</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id1" title="Link to this definition">¶</a></dt>
+<dd><p>Executes the MR-PRESSO Mendelian Randomization algorithm for detection and correction of horizontal pleiotropy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>action</strong> (<em>int</em><em>, </em><em>optional</em>) – Treatment for palindromes during harmonizing between
+exposure and outcome data. Options:
+- 1: Don’t flip (assume all alleles are on the forward strand)
+- 2: Use allele frequencies to flip (default)
+- 3: Remove all palindromic SNPs</p></li>
+<li><p><strong>eaf_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Max effect allele frequency when flipping
+palindromic SNPs (relevant if action=2). Default is 0.42.</p></li>
+<li><p><strong>n_iterations</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of random data generation steps for
+improved result stability. Default is 10000.</p></li>
+<li><p><strong>outlier_test</strong> (<em>bool</em><em>, </em><em>optional</em>) – Identify outlier SNPs responsible for horizontal
+pleiotropy if global test p_value &lt; significance_p. Default is True.</p></li>
+<li><p><strong>distortion_test</strong> (<em>bool</em><em>, </em><em>optional</em>) – Test significant distortion in causal estimates
+before and after outlier removal if global test p_value &lt; significance_p.
+Default is True.</p></li>
+<li><p><strong>significance_p</strong> (<em>float</em><em>, </em><em>optional</em>) – Statistical significance threshold for
+horizontal pleiotropy detection (both global test and outlier identification).
+Default is 0.05.</p></li>
+<li><p><strong>cpus</strong> (<em>int</em><em>, </em><em>optional</em>) – number of cpu cores to be used for the parallel random data generation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Contains the following elements:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>mod_table: DataFrame containing the original (before outlier removal)</dt><dd><p>and outlier-corrected (after outlier removal) inverse variance-weighted MR results.</p>
+</dd>
+</dl>
+</li>
+<li><p>GlobalTest: p-value of the global MR-PRESSO test indicating the presence of horizontal pleiotropy.</p></li>
+<li><dl class="simple">
+<dt>OutlierTest: DataFrame assigning a p-value to each SNP representing the likelihood of this</dt><dd><p>SNP being responsible for the global pleiotropy. Set to NaN if global test p_value &gt; significance_p.</p>
+</dd>
+</dl>
+</li>
+<li><p>DistortionTest: p-value for the distortion test.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">association_test</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">standardize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id2" title="Link to this definition">¶</a></dt>
+<dd><p>Conduct single-SNP association tests against a phenotype.</p>
+<p>This method requires the phenotype to be set using the set_phenotype() function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a bed/bim/fam set of genetic files.
+If files are split by chromosomes, replace the chromosome number with ‘$’.
+For instance: path = “ukb_chr$_file”. Default is None.</p></li>
+<li><p><strong>covar</strong> (<em>list</em><em>, </em><em>optional</em>) – List of columns in the phenotype dataframe to be used
+as covariates in the association tests. Default is an empty list.</p></li>
+<li><p><strong>standardize</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, it will standardize a quantitative phenotype
+before performing association tests. This is typically done
+to make results more interpretable. Default is True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Updates the BETA, SE, and P columns of the data attribute based on the results</dt><dd><p>of the association tests.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">clump</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">250</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5e-08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id3" title="Link to this definition">¶</a></dt>
+<dd><p>Clump the data based on linkage disequilibrium and return another Geno object with the clumped data.
+The clumping process is executed using plink.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Clumping window in thousands of SNPs. Default is 250.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.</p></li>
+<li><p><strong>p1</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold during clumping. SNPs with a P-value higher than this value are excluded. Default is 5e-8.</p></li>
+<li><p><strong>p2</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold post-clumping to further filter the clumped SNPs. If p2 &lt; p1, it won’t be considered. Default is 0.01.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The reference population for linkage disequilibrium values. Accepts values “eur”, “sas”, “afr”, “eas”, “amr”. Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is “eur”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new Geno object based on the clumped data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>genal.Geno</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.copy" title="Link to this definition">¶</a></dt>
+<dd><p>Create a deep copy of the Geno instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A deep copy of the instance.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="genal.html#genal.Geno.Geno" title="genal.Geno.Geno">Geno</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.extract_snps">
+<span class="sig-name descname"><span class="pre">extract_snps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.extract_snps" title="Link to this definition">¶</a></dt>
+<dd><p>Extract the list of SNPs of this Geno object from the genetic data provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a bed/bim/fam set of genetic files.
+If files are split by chromosomes, replace the chromosome number with ‘$’.
+For instance: path = “ukb_chr$_file”. Default is None.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The output is a bed/bim/fam triple in the tmp_GENAL folder
+with the format “{name}_extract_allchr” which includes the SNPs from the UKB.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The provided path is saved to the config file. If this function is called again,
+you don’t need to specify the path if you want to use the same genomic files.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.get_reference_panel">
+<span class="sig-name descname"><span class="pre">get_reference_panel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.get_reference_panel" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve or set the reference panel for the Geno object.</p>
+<p>If the Geno object does not have a reference panel attribute set,
+this method will try to set it based on the provided <cite>reference_panel</cite>
+argument. This can be either a string indicating a predefined reference panel
+or a DataFrame with specific columns or a path to a .bim file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>reference_panel</strong> (<em>str</em><em> or </em><em>pd.DataFrame</em><em>, </em><em>optional</em>) – Either a string indicating a predefined
+reference panel (default is “eur”, options are “afr”, “amr”, “eas”, “sas”) or a DataFrame with necessary columns or a valid path to a .bim file</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The reference panel DataFrame for the Geno object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the provided DataFrame doesn’t have the necessary columns.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-name descname"><span class="pre">lift</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg19'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hg38'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraction_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">liftover_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id4" title="Link to this definition">¶</a></dt>
+<dd><p>Perform a liftover from one genetic build to another.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start</strong> (<em>str</em><em>, </em><em>optional</em>) – Current build of the data. Default is “hg19”.</p></li>
+<li><p><strong>end</strong> (<em>str</em><em>, </em><em>optional</em>) – Target build for the liftover. Default is “hg38”.</p></li>
+<li><p><strong>replace</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, updates the data attribute in place. Default is False.</p></li>
+<li><p><strong>extraction_file</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, prints a CHR POS SNP space-delimited
+file. Default is False.</p></li>
+<li><p><strong>chain_file</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a local chain file for the lift.
+If provided, <cite>start</cite> and <cite>end</cite> arguments are not considered. Default is None.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Filename or filepath (without extension) to save the lifted dataframe.
+If not provided, the data is not saved.</p></li>
+<li><p><strong>liftover_path</strong> (<em>str</em><em>, </em><em>optional</em>) – Specify the path to the USCS liftover executable. If not provided, the lift will be done in python (slower for large amount of SNPs).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Data after being lifted.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id5">
+<span class="sig-name descname"><span class="pre">preprocess_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">preprocessing</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Fill'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effect_column</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_multi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_dups</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_snpids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_coordinates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id5" title="Link to this definition">¶</a></dt>
+<dd><p>Clean and preprocess the main dataframe of Single Nucleotide Polymorphisms (SNP) data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>preprocessing</strong> (<em>str</em><em>, </em><em>optional</em>) – Level of preprocessing to apply. Options include:
+- “None”: The dataframe is not modified.
+- “Fill”: Missing columns are added based on reference data and invalid values set to NaN, but no rows are deleted.
+- “Fill_delete”: Missing columns are added, and rows with missing, duplicated, or invalid values are deleted.
+Defaults to ‘Fill’.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em> or </em><em>pd.DataFrame</em><em>, </em><em>optional</em>) – Reference panel for SNP adjustments. Can be a string representing ancestry classification (“eur”, “afr”, “eas”, “sas”, “amr”) or a DataFrame with [“CHR”,”SNP”,”POS”,”A1”,”A2”] columns or a path to a .bim file. Defaults to “eur”.</p></li>
+<li><p><strong>effect_column</strong> (<em>str</em><em>, </em><em>optional</em>) – Specifies the type of effect column (“BETA” or “OR”). If None, the method tries to determine it. Odds Ratios will be log-transformed and the standard error adjusted. Defaults to None.</p></li>
+<li><p><strong>keep_multi</strong> (<em>bool</em><em>, </em><em>optional</em>) – Determines if multiallelic SNPs should be kept. If None, defers to preprocessing value. Defaults to None.</p></li>
+<li><p><strong>keep_dups</strong> (<em>bool</em><em>, </em><em>optional</em>) – Determines if rows with duplicate SNP IDs should be kept. If None, defers to preprocessing value. Defaults to None.</p></li>
+<li><p><strong>fill_snpids</strong> (<em>bool</em><em>, </em><em>optional</em>) – Decides if the SNP (rsID) column should be created or replaced based on CHR/POS columns and a reference genome. If None, defers to preprocessing value. Defaults to None.</p></li>
+<li><p><strong>fill_coordinates</strong> (<em>bool</em><em>, </em><em>optional</em>) – Decides if CHR and/or POS should be created or replaced based on SNP column and a reference genome. If None, defers to preprocessing value. Defaults to None.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id6">
+<span class="sig-name descname"><span class="pre">prs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weighted</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_snps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id6" title="Link to this definition">¶</a></dt>
+<dd><p>Compute a Polygenic Risk Score (PRS) and save it as a CSV file in the current directory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name or path of the saved PRS file.</p></li>
+<li><p><strong>weighted</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, performs a PRS weighted by the BETA column estimates.
+If False, performs an unweighted PRS. Default is True.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a bed/bim/fam set of genetic files for PRS calculation.
+If files are split by chromosomes, replace the chromosome number
+with ‘$’. For instance: path = “ukb_chr$_file”.
+If not provided, it will use the genetic path most recently used
+(if any). Default is None.</p></li>
+<li><p><strong>position</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use the genomic positions instead of the SNP names to find the
+SNPs in the genetic data (recommended).</p></li>
+<li><p><strong>proxy</strong> (<em>bool</em><em>, </em><em>optional</em>) – If true, proxies are searched. Default is True.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The reference population used to derive linkage
+disequilibrium values and find proxies (only if proxy=True). Acceptable values
+include “EUR”, “SAS”, “AFR”, “EAS”, “AMR” or a path to a specific bed/bim/fam panel.
+Default is “EUR”.</p></li>
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the genomic window to look for proxies. Default is 5000.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum linkage disequilibrium value with the main SNP
+for a proxy to be included. Default is 0.6.</p></li>
+<li><p><strong>window_snps</strong> (<em>int</em><em>, </em><em>optional</em>) – Compute the LD value for SNPs that are not
+more than x SNPs away from the main SNP. Default is 5000.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The computed PRS data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the data hasn’t been clumped and ‘clumped’ parameter is True.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id7">
+<span class="sig-name descname"><span class="pre">query_outcome</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outcome</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_snps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id7" title="Link to this definition">¶</a></dt>
+<dd><p>Prepares dataframes required for Mendelian Randomization (MR) with the SNP information in <cite>data</cite> as exposure.</p>
+<p>Queries the outcome data, with or without proxying, and assigns a tuple to
+the outcome attribute: (exposure_data, outcome_data, name) ready for MR methods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>outcome</strong> – Can be a Geno object (from a GWAS) or a filepath of types: .h5 or .hdf5 (created with the <a class="reference internal" href="#genal.Geno.save" title="genal.Geno.save"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Geno.save()</span></code></a> method.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name for the outcome data. Defaults to None.</p></li>
+<li><p><strong>proxy</strong> (<em>bool</em><em>, </em><em>optional</em>) – If true, proxies are searched. Default is True.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em><em>, </em><em>optional</em>) – The reference population to get linkage
+disequilibrium values and find proxies (only if proxy=True). Acceptable values
+include “EUR”, “SAS”, “AFR”, “EAS”, “AMR” or a path to a specific bed/bim/fam panel.
+Default is “EUR”.</p></li>
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the genomic window to look for proxies. Default is 5000.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum linkage disequilibrium value with the main SNP
+for a proxy to be included. Default is 0.6.</p></li>
+<li><p><strong>window_snps</strong> (<em>int</em><em>, </em><em>optional</em>) – Compute the LD value for SNPs that are not
+more than x SNPs away from the main SNP. Default is 5000.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sets the <cite>MR_data</cite> attribute for the instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'h5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sep</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'\t'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.save" title="Link to this definition">¶</a></dt>
+<dd><p>Save the Geno data to a file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Folder path to save the file. Defaults to the current directory.</p></li>
+<li><p><strong>fmt</strong> (<em>str</em><em>, </em><em>optional</em>) – File format. Options: .h5 (default), .csv, .txt. Future: .vcf, .vcf.gz.</p></li>
+<li><p><strong>sep</strong> (<em>str</em><em>, </em><em>optional</em>) – Delimiter for .csv and .txt formats. Default is tab.</p></li>
+<li><p><strong>header</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save column names for .csv and .txt formats. Default is True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If clumped data is requested but data is not clumped.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id8">
+<span class="sig-name descname"><span class="pre">set_phenotype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IID</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PHENO</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PHENO_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alternate_control</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#id8" title="Link to this definition">¶</a></dt>
+<dd><p>Assign a phenotype dataframe to the .phenotype attribute.</p>
+<p>This method sets the .phenotype attribute which is essential to perform
+single-SNP association tests using the association_test method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – DataFrame containing individual-level row data with at least an individual IDs column
+and one phenotype column.</p></li>
+<li><p><strong>IID</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of the individual IDs column in ‘data’. These IDs should
+correspond to the genetic IDs in the FAM file that will be used for association testing.</p></li>
+<li><p><strong>PHENO</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of the phenotype column in ‘data’ which will be used
+as the dependent variable for association tests.</p></li>
+<li><p><strong>PHENO_type</strong> (<em>str</em><em>, </em><em>optional</em>) – If not specified, the function will try to infer if
+the phenotype is binary or quantitative. To bypass this,
+use “quant” for quantitative or “binary” for binary phenotypes.
+Default is None.</p></li>
+<li><p><strong>alternate_control</strong> (<em>bool</em><em>, </em><em>optional</em>) – By default, the function assumes that for a binary
+trait, the controls have the most frequent value.
+Set to True if this is not the case. Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sets the .phenotype attribute for the instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.sort_group">
+<span class="sig-name descname"><span class="pre">sort_group</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lowest_p'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.sort_group" title="Link to this definition">¶</a></dt>
+<dd><p>Handle duplicate SNPs. Useful if the instance combines different Genos.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>method</strong> (<em>str</em><em>, </em><em>optional</em>) – How to handle duplicates. Default is “lowest_p”,
+which retains the lowest P-value for each SNP.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.standardize">
+<span class="sig-name descname"><span class="pre">standardize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.standardize" title="Link to this definition">¶</a></dt>
+<dd><p>Standardize the Betas and adjust the SE column accordingly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If the required columns are not found in the data.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="genal.Geno.update_snpids">
+<span class="sig-name descname"><span class="pre">update_snpids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.Geno.update_snpids" title="Link to this definition">¶</a></dt>
+<dd><p>Update or create the column of SNP name based on genetic data and genomic position.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to a bed/bim/fam set of genetic files.
+If files are split by chromosomes, replace the chromosome number with ‘$’.
+For instance: path = “ukb_chr$_file”. Defaults to the path from the configuration.</p></li>
+<li><p><strong>replace</strong> (<em>bool</em><em>, </em><em>optional</em>) – To update the .data attribute with the updated SNP column or not.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>It updates the dataframe in the .data attribute.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This can be used before extracting SNPs from the genetic data if there is possibility of a mismatch between the SNP name contained in the Geno dataframe (SNP-level data) and the SNP name used in the genetic data (individual-level data). Notably, this can avoid losing SNPs due to ID mismatch during polygenic risk scoring or single-SNP association testing.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="clumping-function">
+<h1>Clumping function<a class="headerlink" href="#clumping-function" title="Link to this heading">¶</a></h1>
+<p>Clumping is performed with the <a class="reference internal" href="genal.html#genal.clump.clump_data" title="genal.clump.clump_data"><code class="xref py py-func docutils literal notranslate"><span class="pre">clump_data()</span></code></a> function:</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.clump.clump_data">
+<span class="sig-prename descclassname"><span class="pre">genal.clump.</span></span><span class="sig-name descname"><span class="pre">clump_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_panel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'eur'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">250</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5e-08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ram</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.clump.clump_data" title="Link to this definition">¶</a></dt>
+<dd><p>Perform clumping on the given data using plink. Corresponds to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">Geno.clump()</span></code> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em>) – Input data with at least ‘SNP’ and ‘P’ columns.</p></li>
+<li><p><strong>reference_panel</strong> (<em>str</em>) – The reference population for linkage disequilibrium values. Accepts values “eur”, “sas”, “afr”, “eas”, “amr”. Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is “eur”.</p></li>
+<li><p><strong>kb</strong> (<em>int</em><em>, </em><em>optional</em>) – Clumping window in terms of thousands of SNPs. Default is 250.</p></li>
+<li><p><strong>r2</strong> (<em>float</em><em>, </em><em>optional</em>) – Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.</p></li>
+<li><p><strong>p1</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold during clumping. SNPs above this value are not considered. Default is 5e-8.</p></li>
+<li><p><strong>p2</strong> (<em>float</em><em>, </em><em>optional</em>) – P-value threshold post-clumping to further filter the clumped SNPs. If p2 &lt; p1, it won’t be considered. Default is 0.01.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name used for the files created in the tmp_GENAL folder.</p></li>
+<li><p><strong>ram</strong> (<em>int</em><em>, </em><em>optional</em>) – Amount of RAM in MB to be used by plink.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Data after clumping, if any.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="extract-and-prs-functions">
+<h1>Extract and PRS functions<a class="headerlink" href="#extract-and-prs-functions" title="Link to this heading">¶</a></h1>
+<p>The SNP extraction from genetic files is done with <a class="reference internal" href="genal.html#genal.extract_prs.extract_snps_func" title="genal.extract_prs.extract_snps_func"><code class="xref py py-func docutils literal notranslate"><span class="pre">extract_snps_func()</span></code></a>:</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="genal.extract_prs.extract_snps_func">
+<span class="sig-prename descclassname"><span class="pre">genal.extract_prs.</span></span><span class="sig-name descname"><span class="pre">extract_snps_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snp_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#genal.extract_prs.extract_snps_func" title="Link to this definition">¶</a></dt>
+<dd><p>Extracts a list of SNPs from the given path. This function corresponds to the following Geno method: <code class="xref py py-meth docutils literal notranslate"><span class="pre">Geno.extract_snps()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>snp_list</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of SNPs to extract.</p></li>
+<li><p><strong>name</strong> (<em>str</em>) – Name prefix for the output files.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to the dataset. Defaults to the path from the configuration.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – Raises an error when no valid path is saved or when there’s an incorrect format in the provided path.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>…</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

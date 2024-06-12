@@ -3,6 +3,7 @@ import numpy as np
 import scipy.stats as st
 import os, subprocess
 import shutil
+import warnings
 from collections import Counter
 
 from .constants import STANDARD_COLUMNS
@@ -129,8 +130,8 @@ def check_beta_column(data, effect_column, preprocessing):
 def fill_ea_nea(data, reference_panel_df):
     """Fill in the EA and NEA columns based on reference data."""
     if "BETA" in data.columns:
-        print(
-            "Warning: You have specified an effect (BETA) column but no effect allele (EA) column. An effect estimate is only meaningful if paired with its corresponding allele."
+        warnings.warn(
+            "Warning: You have specified an effect (BETA) column but no effect allele (EA) column. An effect estimate is only meaningful if paired with the corresponding effect allele."
         )
     data = data.merge(
         reference_panel_df[["CHR", "POS", "A1", "A2"]], on=["CHR", "POS"], how="left"
@@ -143,8 +144,8 @@ def fill_ea_nea(data, reference_panel_df):
         f"Alleles columns created: effect (EA) and non-effect allele (NEA). {n_missing}({perc_missing:.3f}%) values are set to nan because SNPs were not found in the reference data."
     )
     if perc_missing > 50:
-        print(
-            f"Are you sure the CHR/POS provided are in the correct genomic build (reference files are in build GRCh37)"
+        warnings.warn(
+            f"The EA (Effect Allele) and NEA (Non-Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
         )
     return data
 
@@ -165,8 +166,8 @@ def fill_nea(data, reference_panel_df):
         f"The NEA (Non Effect Allele) column has been created. {n_missing}({perc_missing:.3f}%) values are set to nan because SNPs were not found in the reference data."
     )
     if perc_missing > 50:
-        print(
-            f"Are you sure the CHR/POS provided are in the correct genomic build (reference files are in build GRCh37)"
+        warnings.warn(
+            f"The NEA (Non Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
         )
     return data
 
@@ -183,7 +184,7 @@ def fill_coordinates_func(data, reference_panel_df):
     data["CHR"] = data["CHR"].astype("Int32")
     data["POS"] = data["POS"].astype("Int32")
     print(
-        f"The coordinates columns (CHR for chromosome and POS for position) have been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data and their values  set to nan."
+        f"The coordinates columns (CHR for chromosome and POS for position) have been created following build GRCh37 (hg19). {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data and their values set to nan."
     )
     return data
 
@@ -217,12 +218,19 @@ def fill_snpids_func(data, reference_panel_df):
         print_statement = f" and their ID set to CHR:POS:EA"
 
     perc_missing = n_missing / data.shape[0] * 100
-    print(
-        f"The SNP column (rsID) has been created. {n_missing}({perc_missing:.3f}%) SNPs were not found in the reference data{print_statement if standard_name_condition else ''}."
-    )
-    if perc_missing > 50:
+    
+    if n_missing == 0:
         print(
-            f"Are you sure the CHR/POS provided are in the correct genomic build (reference files are in build GRCh37)?"
+        f"The SNP column (rsID) has been created. All SNPs were found in the reference data."
+    )
+    else:
+        print(
+            f"The SNP column (rsID) has been created. {n_missing}({perc_missing:.3f}%) SNPs were not found in the reference data{print_statement if standard_name_condition else ''}."
+        )
+        
+    if perc_missing > 50:
+        warnings.warn(
+            f"The SNPid for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
         )
 
     return data

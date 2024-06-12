@@ -191,7 +191,7 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
         df_post[0]
         .str.split("chr", expand=True)[1]
         .str.split("_", expand=True)[0]
-        .replace({"X": 99, "Un": 99})
+        .replace({"X": 99, "Y": 99, "Un": 99})
         .astype(int)
     )
     nrow_before = data.shape[0]

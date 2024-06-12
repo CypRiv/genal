@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=90b5f367"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="The Geno class" href="api.html" />
+    <link rel="prev" title="genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#tutorial">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#data-loading">Data loading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-preprocessing">Data preprocessing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#clumping">Clumping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#polygenic-risk-scoring">Polygenic Risk Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mendelian-randomization">Mendelian Randomization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#snp-association-testing">SNP-association testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#lifting">Lifting</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h1>
+<p>Genal is a python module designed to make it easy to run genetic risk scores and mendelian randomization analyses. It integrates a collection of tools that facilitate the cleaning of single nucleotide polymorphisms (SNP) data and enable the execution of clinical population genetic workflows. The functionalities provided by genal include clumping, lifting, association testing, Polygenic Risk Scoring, and Mendelian Randomization analyses (including a parallel python implementation of MR-PRESSO), all within a single Python module.</p>
+<p>The module prioritizes user-friendliness and intuitive operation, aiming to reduce the complexity of genetic analysis for researchers. Despite its focus on simplicity, Genal does not sacrifice customization or the precision of analysis. Researchers can expect to maintain analytical rigour while benefiting from the streamlined python experience.</p>
+<p>This page provides installation steps followed by a short tutorial in using genal.</p>
+</section>
+<section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
+<p>The genal package can be easily installed with pip:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">genal</span>
+</pre></div>
+</div>
+<p>The main genal functionalities require a working installation of PLINK v1.9 (and not 2.0 as certain functionalities have not been updated yet) that can be downloaded here: <a class="reference external" href="https://www.cog-genomics.org/plink/">https://www.cog-genomics.org/plink/</a>
+Once downloaded, the path to the plink 1.9 executable should be set with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">genal</span><span class="o">.</span><span class="n">set_plink</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;/path/to/plink/executable/file&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="tutorial">
+<h1>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h1>
+<p>For the purpose of this tutorial, we are going to build a PRS of systolic blood pressure (SBP) and investigate the genetically-determined effect of SBP on the risk of stroke. We will use both summary statistics from Genome-Wide Association Studies (GWAS) and individual-level data from the UK Biobank as our test population. We are going to go through the following steps:</p>
+<ul class="simple">
+<li><p>Data loading</p></li>
+<li><dl class="simple">
+<dt>Data preprocessing</dt><dd><ul>
+<li><p>Perform a series of checks and cleaning operations on the SNP-level data to ensure it is in appropriate format</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Clump the data to obtain genome-wide significant and independent SNPs that will serve as our genetic instruments for SBP</p></li>
+<li><dl class="simple">
+<dt>Build a genomic risk score of SBP in a test population</dt><dd><ul>
+<li><p>Build a risk score with proxies</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Perform Mendelian Randomization</dt><dd><ul>
+<li><p>Run a mendelian randomization analysis of SBP as exposure and acute ischemic stroke as outcome (using summary statistics for both SBP and stroke)</p></li>
+<li><p>Run sensitivity analyses of the previous mendelian randomization using the weighted median, MR-Egger, and MR-PRESSO</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Calibrate SNP-trait weights with individual level genetic data</dt><dd><ul>
+<li><p>Run single-SNP association tests to calibrate the SBP genetic instruments in a test population</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Show some utility tools</dt><dd><ul>
+<li><dl class="simple">
+<dt>Lift the data to another genomic build</dt><dd><ul>
+<li><p>In pure python</p></li>
+<li><p>Using LiftOver</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Phenoscanner (todo)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<section id="data-loading">
+<h2>Data loading<a class="headerlink" href="#data-loading" title="Link to this heading">¶</a></h2>
+<p>We start this tutorial with publicly available summary statistics data from a large GWAS of systolic blood pressure (<a class="reference external" href="https://www.nature.com/articles/s41588-018-0205-x">https://www.nature.com/articles/s41588-018-0205-x</a>). After downloading and unzipping the summary statistics, we load the data in a pandas dataframe:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="n">sbp_gwas</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;Evangelou_30224653_SBP.txt&quot;</span><span class="p">,</span><span class="n">sep</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The loaded dataframe:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sbp_gwas</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="go">         MarkerName Allele1 Allele2   Freq1  Effect  StdErr         P  TotalSampleSize  N_effective</span>
+<span class="go">0  10:100000625:SNP       a       g  0.5660  0.0523  0.0303  0.083940           738170       736847</span>
+<span class="go">1  10:100000645:SNP       a       c  0.7936  0.0200  0.0372  0.591100           738168       735018</span>
+<span class="go">2  10:100003242:SNP       t       g  0.8831  0.1417  0.0469  0.002526           738168       733070</span>
+<span class="go">3  10:100003304:SNP       a       g  0.9609  0.0245  0.0838  0.769800           737054       663809</span>
+<span class="go">4  10:100003785:SNP       t       c  0.6406 -0.0680  0.0313  0.029870           738169       735681</span>
+</pre></div>
+</div>
+<p>We can now load this data in a <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object. The <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> class is the central piece of the package. It is made to store Single Nucleotide Polymorphisms (SNP) data and make it easy to preprocess and clean.
+The <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> takes as input a pandas dataframe where each row corresponds to a SNP, and with columns describing the position and possibly the effect of the SNP for the given trait (SBP in our case). To indicate the name of the columns, the following arguments can be passed:
+* CHR: Column name for chromosome. Defaults to “CHR”.
+* POS: Column name for genomic position. Defaults to “POS”.
+* SNP: Column name for SNP identifier (rsid). Defaults to “SNP”.
+* EA: Column name for effect allele. Defaults to “EA”.
+* NEA: Column name for non-effect allele. Defaults to “NEA”.
+* BETA: Column name for effect estimate. Defaults to “BETA”.
+* SE: Column name for effect standard error. Defaults to “SE”.
+* P: Column name for effect p-value. Defaults to “P”.
+* EAF: Column name for effect allele frequency. Defaults to “EAF”.</p>
+<p>In our case, and after inspecting the dataframe, we must first extract the chromosome and position information from the “MarkerName” column into two new columns “CHR” and “POS”:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sbp_gwas</span><span class="p">[[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span> <span class="s2">&quot;Filler&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">sbp_gwas</span><span class="p">[</span><span class="s2">&quot;MarkerName&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">expand</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The resulting dataframe has now separate columns for the chromosome and genomic position:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sbp_gwas</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="go">         MarkerName Allele1 Allele2   Freq1  Effect  StdErr         P  TotalSampleSize  N_effective CHR        POS Filler</span>
+<span class="go">0  10:100000625:SNP       a       g  0.5660  0.0523  0.0303  0.083940           738170       736847  10  100000625    SNP</span>
+<span class="go">1  10:100000645:SNP       a       c  0.7936  0.0200  0.0372  0.591100           738168       735018  10  100000645    SNP</span>
+<span class="go">2  10:100003242:SNP       t       g  0.8831  0.1417  0.0469  0.002526           738168       733070  10  100003242    SNP</span>
+<span class="go">3  10:100003304:SNP       a       g  0.9609  0.0245  0.0838  0.769800           737054       663809  10  100003304    SNP</span>
+<span class="go">4  10:100003785:SNP       t       c  0.6406 -0.0680  0.0313  0.029870           738169       735681  10  100003785    SNP</span>
+</pre></div>
+</div>
+<p>and it can now be loaded in a <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">genal</span>
+<span class="n">SBP_Geno</span> <span class="o">=</span> <span class="n">genal</span><span class="o">.</span><span class="n">Geno</span><span class="p">(</span><span class="n">sbp_gwas</span><span class="p">,</span> <span class="n">CHR</span> <span class="o">=</span> <span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="n">POS</span> <span class="o">=</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span> <span class="n">EA</span> <span class="o">=</span> <span class="s2">&quot;Allele1&quot;</span><span class="p">,</span> <span class="n">NEA</span> <span class="o">=</span> <span class="s2">&quot;Allele2&quot;</span><span class="p">,</span> <span class="n">BETA</span> <span class="o">=</span> <span class="s2">&quot;Effect&quot;</span><span class="p">,</span> <span class="n">SE</span> <span class="o">=</span> <span class="s2">&quot;StdErr&quot;</span><span class="p">,</span> <span class="n">P</span> <span class="o">=</span> <span class="s2">&quot;P&quot;</span><span class="p">,</span> <span class="n">EAF</span> <span class="o">=</span> <span class="s2">&quot;Freq1&quot;</span><span class="p">,</span> <span class="n">keep_columns</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The last argument (keep_columns = False) indicates that we do not wish to keep the other (non-main) columns in the dataframe.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Make sure to read the readme file usually provided with the summary statistics to identify the correct columns. It is particularly important to correctly identify the allele that represents the effect allele. Also, you do not need all columns to move forward, as some can be inputed as we will see next.</p>
+</div>
+</section>
+<section id="data-preprocessing">
+<h2>Data preprocessing<a class="headerlink" href="#data-preprocessing" title="Link to this heading">¶</a></h2>
+<p>Now that we have loaded the data in a <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object, we can clean and format it. Methods such as Polygenic Risk Scoring or Mendelian Randomization require the SNP data to be in a specific format. Also, raw summary statistics can sometimes contain missing or invalid values that need to be handled. Finally, some columns may be missing from the data (such as the SNP rsid column, or the non-effect allele column…) and these columns can be created based on existing ones and a reference panel.
+Genal can run all the basic cleaning and preprocessing steps in one command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_Geno</span><span class="o">.</span><span class="n">preprocess_data</span><span class="p">(</span><span class="n">preprocessing</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The preprocessing argument specifies the global level of preprocessing applied to the data:
+* preprocessing = 0 means that the data won’t be modified.
+* preprocessing = 1 means that missing columns will be added based on reference data and invalid values set to NaN, but no rows will be deleted.
+* preprocessing = 2 means that missing columns will be added, and all rows containing missing, duplicated, or invalid values will be deleted. This option is recommended before running genetic methods.</p>
+<p>By default, and depending on the global preprocessing level (0, 1, 2) chosen, the <a class="reference internal" href="api.html#id5" title="genal.Geno.preprocess_data"><code class="xref py py-meth docutils literal notranslate"><span class="pre">preprocess_data()</span></code></a> method will run the following checks:
+* Make sure the CHR (chromosome) and POS (genomic position) columns are integers.
+* Ensure the EA (effect allele) and NEA (non-effect allele) columns are upper case characters containing A, T, C, G letters. Set multiallelic values to NaN.
+* Ensure the P (p-value) column contains valid values.
+* Ensure there are no duplicated SNPs based on rsid.
+* Determines if the BETA (effect) column contains beta estimates or odds ratios. Log-transform odds ratios if necessary.
+* Create SNP column using a reference panel if CHR and POS columns are present.
+* Create CHR and/or POS column using a reference panel if SNP column is present.
+* Create NEA (non-effect allele) column using a reference panel if EA (effect allele) column is present.
+* Create the SE (standard-error) column if the BETA and P (p-value) columns are present.
+* Create the P column if the BETA and SE columns are present.</p>
+<p>If you do not wish to run certain steps, or wish to run only certain steps, you can use additional arguments. Please refer to the API for more info: <a class="reference internal" href="api.html#id5" title="genal.Geno.preprocess_data"><code class="xref py py-meth docutils literal notranslate"><span class="pre">preprocess_data()</span></code></a>.</p>
+<p>In our case, the SNP column (for SNP identifier - rsid) was missing from our dataframe and has been added based on a 1000 genome reference panel:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Using</span> <span class="n">the</span> <span class="n">EUR</span> <span class="n">reference</span> <span class="n">panel</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">SNP</span> <span class="n">column</span> <span class="p">(</span><span class="n">rsID</span><span class="p">)</span> <span class="n">has</span> <span class="n">been</span> <span class="n">created</span><span class="o">.</span> <span class="mi">197511</span><span class="p">(</span><span class="mf">2.787</span><span class="o">%</span><span class="p">)</span> <span class="n">SNPs</span> <span class="n">were</span> <span class="ow">not</span> <span class="n">found</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">reference</span> <span class="n">data</span> <span class="ow">and</span> <span class="n">their</span> <span class="n">ID</span> <span class="nb">set</span> <span class="n">to</span> <span class="n">CHR</span><span class="p">:</span><span class="n">POS</span><span class="p">:</span><span class="n">EA</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">BETA</span> <span class="n">column</span> <span class="n">looks</span> <span class="n">like</span> <span class="n">Beta</span> <span class="n">estimates</span><span class="o">.</span> <span class="n">Use</span> <span class="n">effect_column</span><span class="o">=</span><span class="s1">&#39;OR&#39;</span> <span class="k">if</span> <span class="n">it</span> <span class="ow">is</span> <span class="n">a</span> <span class="n">column</span> <span class="n">of</span> <span class="n">Odds</span> <span class="n">Ratios</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>You can always check the data of a <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object by accessing the ‘data’ attribute:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">SBP_Geno</span><span class="o">.</span><span class="n">data</span>
+<span class="go">        EA NEA     EAF    BETA      SE         P  CHR        POS         SNP</span>
+<span class="go">0        A   G  0.5660  0.0523  0.0303  0.083940   10  100000625   rs7899632</span>
+<span class="go">1        A   C  0.7936  0.0200  0.0372  0.591100   10  100000645  rs61875309</span>
+<span class="go">2        T   G  0.8831  0.1417  0.0469  0.002526   10  100003242  rs12258651</span>
+<span class="go">3        A   G  0.9609  0.0245  0.0838  0.769800   10  100003304  rs72828461</span>
+<span class="go">4        T   C  0.6406 -0.0680  0.0313  0.029870   10  100003785   rs1359508</span>
+<span class="go">...     ..  ..     ...     ...     ...       ...  ...        ...         ...</span>
+<span class="go">7088116  A   G  0.4474  0.0114  0.0307  0.710600    9   99997049  rs10817273</span>
+<span class="go">7088117  T   C  0.4529 -0.0151  0.0307  0.623900    9   99997707  rs11794422</span>
+<span class="go">7088118  T   C  0.4511 -0.0224  0.0306  0.463900    9   99998403  rs10981296</span>
+<span class="go">7088119  C   G  0.8094 -0.0204  0.0389  0.599800    9   99998646  rs10981297</span>
+<span class="go">7088120  A   G  0.9028 -0.0184  0.0517  0.722300    9   99999468  rs10981301</span>
+</pre></div>
+</div>
+<p>And we see that the SNP column with the rsids has been added based on the reference data.
+You do not need to obtain the 1000 genome reference panel yourself, Genal will download it the first time you use it. By default, the reference panel used is the european (eur) one. You can specify another valid reference panel (afr, eas, sas, amr) with the reference_panel argument:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_Geno</span><span class="o">.</span><span class="n">preprocess_data</span><span class="p">(</span><span class="n">preprocessing</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="n">reference_panel</span> <span class="o">=</span> <span class="s2">&quot;afr&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can also use a custom reference panel by specifying to the reference_panel argument a path to bed/bim/fam files (without the extension).</p>
+</section>
+<section id="clumping">
+<h2>Clumping<a class="headerlink" href="#clumping" title="Link to this heading">¶</a></h2>
+<p>Clumping is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e. they are not in close linkage disequilibrium). For this step, we again need to use a reference panel. The SNP-data loaded in a <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object can be clumped using the <a class="reference internal" href="api.html#id3" title="genal.Geno.clump"><code class="xref py py-meth docutils literal notranslate"><span class="pre">clump()</span></code></a> method. It will return another <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object containing only the clumped data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span> <span class="o">=</span> <span class="n">SBP_Geno</span><span class="o">.</span><span class="n">clump</span><span class="p">(</span><span class="n">p1</span> <span class="o">=</span> <span class="mf">5e-8</span><span class="p">,</span> <span class="n">r2</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">kb</span> <span class="o">=</span> <span class="mi">250</span><span class="p">,</span> <span class="n">reference_panel</span> <span class="o">=</span> <span class="s2">&quot;eur&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It will output the number of instruments obtained:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Using</span> <span class="n">the</span> <span class="n">EUR</span> <span class="n">reference</span> <span class="n">panel</span><span class="o">.</span>
+<span class="ne">Warning</span><span class="p">:</span> <span class="mi">760</span>  <span class="n">top</span> <span class="n">variant</span> <span class="n">IDs</span> <span class="n">missing</span>
+<span class="mi">1545</span> <span class="n">clumps</span> <span class="n">formed</span> <span class="kn">from</span> <span class="mi">73594</span> <span class="n">top</span> <span class="n">variants</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>You can specify the thresholds you want to use for the clumping with the following arguments:
+* p1: P-value threshold during clumping. SNPs with a P-value higher than this value are excluded.
+* r2: Linkage disequilibrium threshold for the independence check. Takes values between 0 and 1.
+* kb: Genomic window used for the independence check (the unit is thousands of base-pair positions).
+* reference_panel: The reference population used to derive linkage disequilibrium values and select independent SNPs</p>
+</section>
+<section id="polygenic-risk-scoring">
+<h2>Polygenic Risk Scoring<a class="headerlink" href="#polygenic-risk-scoring" title="Link to this heading">¶</a></h2>
+<p>Computing a Polygenic Risk Score (PRS) can be done in one line with the <a class="reference internal" href="api.html#id6" title="genal.Geno.prs"><code class="xref py py-meth docutils literal notranslate"><span class="pre">prs()</span></code></a> method:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">prs</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;SBP_prs&quot;</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">genetic</span><span class="o">/</span><span class="n">files</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The genetic files of the target population can be either one triple of bed/bim/fam files containing information for all SNPs, or they can be divided by chromosome (one bed/bim/fam triple for chr 1, another for chr 2 etc…). In the latter case, provide the path by replacing the chromosome number by ‘$’ and Genal will extract the necessary SNPs from each chromosome and merge them before running the PRS. For instance, if the genetic files are named Pop_chr1.bed, Pop_chr1.bim, Pop_chr1.fam, Pop_chr2.bed …, you can use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">prs</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;SBP_prs&quot;</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;Pop_chr$&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The name argument specifies the name of the .csv file that will be saved with the individual risk scores.
+The output of the <a class="reference internal" href="api.html#id6" title="genal.Geno.prs"><code class="xref py py-meth docutils literal notranslate"><span class="pre">prs()</span></code></a> method will include how many SNPs were used to compute the risk score. It can happen that some of the SNPs are multiallelic in the genetic data (even if they are not multiallelic in our SNP data) and need to be excluded. It can also happen that some of the SNPs are missing from the genetic files of the target population (for instance if the data has not been imputed):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CHR</span><span class="o">/</span><span class="n">POS</span> <span class="n">columns</span> <span class="n">present</span><span class="p">:</span> <span class="n">SNPs</span> <span class="n">searched</span> <span class="n">based</span> <span class="n">on</span> <span class="n">genomic</span> <span class="n">positions</span><span class="o">.</span>
+<span class="n">Extracting</span> <span class="n">SNPs</span> <span class="k">for</span> <span class="n">each</span> <span class="n">chromosome</span><span class="o">...</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr1</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr2</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr3</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr4</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr5</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr6</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr7</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr8</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr9</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr10</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr11</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr12</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr13</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr14</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr15</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr16</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr17</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr18</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr19</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr20</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr21</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr22</span><span class="o">.</span>
+<span class="n">Merging</span> <span class="n">SNPs</span> <span class="n">extracted</span> <span class="kn">from</span> <span class="nn">each</span> <span class="n">chromosome</span><span class="o">...</span>
+<span class="n">Created</span> <span class="n">bed</span><span class="o">/</span><span class="n">bim</span><span class="o">/</span><span class="n">fam</span> <span class="n">fileset</span> <span class="k">with</span> <span class="n">extracted</span> <span class="n">SNPs</span><span class="p">:</span> <span class="n">tmp_GENAL</span><span class="o">/</span><span class="mi">4</span><span class="n">f4ce6a7_allchr</span>
+<span class="n">Extraction</span> <span class="n">completed</span><span class="o">.</span> <span class="mi">786</span><span class="p">(</span><span class="mf">50.874</span><span class="o">%</span><span class="p">)</span> <span class="n">SNPs</span> <span class="n">were</span> <span class="ow">not</span> <span class="n">extracted</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">genetic</span> <span class="n">data</span><span class="o">.</span>
+<span class="n">Computing</span> <span class="n">a</span> <span class="n">weighted</span> <span class="n">PRS</span> <span class="n">using</span> <span class="n">tmp_GENAL</span><span class="o">/</span><span class="mi">4</span><span class="n">f4ce6a7_allchr</span> <span class="n">data</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">PRS</span> <span class="n">computation</span> <span class="n">was</span> <span class="n">successful</span> <span class="ow">and</span> <span class="n">used</span> <span class="mi">759</span><span class="o">/</span><span class="mi">1545</span> <span class="p">(</span><span class="mf">49.126</span><span class="o">%</span><span class="p">)</span> <span class="n">SNPs</span><span class="o">.</span>
+<span class="n">PRS</span> <span class="n">data</span> <span class="n">saved</span> <span class="n">to</span> <span class="n">SBP_prs</span><span class="o">.</span><span class="n">csv</span>
+</pre></div>
+</div>
+<p>Here, we see that about half of the SNPs were not extracted from the data. In such cases, we may want to try and salvage some of these SNPs by looking for proxies (SNPs in high linkage disequilibrium, i.e. highly correlated SNPs). This can be done by specifying the ‘proxy = True’ argument:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">prs</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;SBP_prs&quot;</span> <span class="p">,</span><span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;Pop_chr$&quot;</span><span class="p">,</span> <span class="n">proxy</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">reference_panel</span> <span class="o">=</span> <span class="s2">&quot;eur&quot;</span><span class="p">,</span> <span class="n">r2</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">kb</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span> <span class="n">window_snps</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and the output is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CHR</span><span class="o">/</span><span class="n">POS</span> <span class="n">columns</span> <span class="n">present</span><span class="p">:</span> <span class="n">SNPs</span> <span class="n">searched</span> <span class="n">based</span> <span class="n">on</span> <span class="n">genomic</span> <span class="n">positions</span><span class="o">.</span>
+<span class="n">Identifying</span> <span class="n">the</span> <span class="n">SNPs</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">genetic</span> <span class="n">data</span><span class="o">...</span>
+<span class="mi">759</span> <span class="n">SNPs</span> <span class="n">out</span> <span class="n">of</span> <span class="mi">1545</span> <span class="n">are</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">genetic</span> <span class="n">data</span><span class="o">.</span>
+<span class="n">Searching</span> <span class="n">proxies</span> <span class="k">for</span> <span class="mi">786</span> <span class="n">SNPs</span><span class="o">...</span>
+<span class="n">Using</span> <span class="n">the</span> <span class="n">EUR</span> <span class="n">reference</span> <span class="n">panel</span><span class="o">.</span>
+<span class="n">Filtering</span> <span class="n">the</span> <span class="n">potential</span> <span class="n">proxies</span> <span class="k">with</span> <span class="n">the</span> <span class="n">searchspace</span> <span class="n">provided</span><span class="o">.</span>
+<span class="n">Found</span> <span class="n">proxies</span> <span class="k">for</span> <span class="mi">578</span> <span class="n">missing</span> <span class="n">SNPs</span><span class="o">.</span>
+<span class="mi">7</span><span class="p">(</span><span class="mf">0.455</span><span class="o">%</span><span class="p">)</span> <span class="n">duplicated</span> <span class="n">SNPs</span> <span class="n">have</span> <span class="n">been</span> <span class="n">removed</span><span class="o">.</span> <span class="n">Use</span> <span class="n">keep_dups</span><span class="o">=</span><span class="kc">True</span> <span class="n">to</span> <span class="n">keep</span> <span class="n">them</span><span class="o">.</span>
+<span class="n">Extracting</span> <span class="n">SNPs</span> <span class="k">for</span> <span class="n">each</span> <span class="n">chromosome</span><span class="o">...</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr1</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr2</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr3</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr4</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr5</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr6</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr7</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr8</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr9</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr10</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr11</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr12</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr13</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr14</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr15</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr16</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr17</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr18</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr19</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr20</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr21</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr22</span><span class="o">.</span>
+<span class="n">Merging</span> <span class="n">SNPs</span> <span class="n">extracted</span> <span class="kn">from</span> <span class="nn">each</span> <span class="n">chromosome</span><span class="o">...</span>
+<span class="n">Created</span> <span class="n">bed</span><span class="o">/</span><span class="n">bim</span><span class="o">/</span><span class="n">fam</span> <span class="n">fileset</span> <span class="k">with</span> <span class="n">extracted</span> <span class="n">SNPs</span><span class="p">:</span> <span class="n">tmp_GENAL</span><span class="o">/</span><span class="mi">4</span><span class="n">f4ce6a7_allchr</span>
+<span class="n">Extraction</span> <span class="n">completed</span><span class="o">.</span> <span class="mi">208</span><span class="p">(</span><span class="mf">13.524</span><span class="o">%</span><span class="p">)</span> <span class="n">SNPs</span> <span class="n">were</span> <span class="ow">not</span> <span class="n">extracted</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">genetic</span> <span class="n">data</span><span class="o">.</span>
+<span class="n">Computing</span> <span class="n">a</span> <span class="n">weighted</span> <span class="n">PRS</span> <span class="n">using</span> <span class="n">tmp_GENAL</span><span class="o">/</span><span class="mi">4</span><span class="n">f4ce6a7_allchr</span> <span class="n">data</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">PRS</span> <span class="n">computation</span> <span class="n">was</span> <span class="n">successful</span> <span class="ow">and</span> <span class="n">used</span> <span class="mi">1330</span><span class="o">/</span><span class="mi">1538</span> <span class="p">(</span><span class="mf">86.476</span><span class="o">%</span><span class="p">)</span> <span class="n">SNPs</span><span class="o">.</span>
+<span class="n">PRS</span> <span class="n">data</span> <span class="n">saved</span> <span class="n">to</span> <span class="n">SBP_prs</span><span class="o">.</span><span class="n">csv</span>
+</pre></div>
+</div>
+<p>In our case, we have been able to find proxies for 571 of the 786 SNPs that were missing in the population genetic data (7 potential proxies have been removed because they were identical to SNPs already present in our data).
+You can customize how the proxies are chosen with the following arguments:
+* reference_panel: The reference population used to derive linkage disequilibrium values and find proxies
+* kb: Width of the genomic window to look for proxies (in thousands of base-pair positions)
+* r2: Minimum linkage disequilibrium value with the original SNP for a proxy to be included
+* window_snps: Width of the window to look for proxies (in number of SNPs)</p>
+<p>You can call the <a class="reference internal" href="api.html#id6" title="genal.Geno.prs"><code class="xref py py-meth docutils literal notranslate"><span class="pre">prs()</span></code></a> method on any Geno object (containing at least the EA, BETA and either SNP or CHR/POS columns). The data does not need to be clumped and there is no limit to the number of instruments used to compute the scores.</p>
+</section>
+<section id="mendelian-randomization">
+<h2>Mendelian Randomization<a class="headerlink" href="#mendelian-randomization" title="Link to this heading">¶</a></h2>
+<p>To run MR, we need to load both our exposure and outcome SNP-level data in <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> objects. In our case, the genetic instruments of the MR are the SNPs associated with blood pressure at genome-wide significant levels resulting from the clumping of the blood pressure GWAS. They are stored in our SBP_clumped <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object which also include their association with the exposure trait (instrument-SBP estimates in the BETA column).</p>
+<p>To get their association with the outcome trait (instrument-stroke estimates), we are going to use SNP-level data from a large GWAS of stroke performed by the GIGASTROKE consortium (<a class="reference external" href="https://www.nature.com/articles/s41586-022-05165-3">https://www.nature.com/articles/s41586-022-05165-3</a>):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">stroke_gwas</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;GCST90104539_buildGRCh37.tsv&quot;</span><span class="p">,</span><span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We inspect it to determine the column names:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">stroke_gwas</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="go">   chromosome  base_pair_location  effect_allele_frequency    beta  standard_error  p_value  odds_ratio  ci_lower  ci_upper effect_allele other_allele</span>
+<span class="go">0           5            29439275                   0.3569  0.0030          0.0070   0.6658    1.003005  0.989337  1.016861             T            C</span>
+<span class="go">1           5            85928892                   0.0639 -0.0152          0.0137   0.2686    0.984915  0.958820  1.011720             T            C</span>
+<span class="go">2          10           128341232                   0.4613  0.0025          0.0065   0.6998    1.002503  0.989812  1.015357             T            C</span>
+<span class="go">3           3            62707519                   0.0536  0.0152          0.0152   0.3177    1.015316  0.985514  1.046019             T            C</span>
+<span class="go">4           2            80464120                   0.9789  0.0057          0.0254   0.8223    1.005716  0.956874  1.057052             T            G</span>
+</pre></div>
+</div>
+<p>We load it in a <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Stroke_Geno</span> <span class="o">=</span> <span class="n">genal</span><span class="o">.</span><span class="n">Geno</span><span class="p">(</span><span class="n">stroke_gwas</span><span class="p">,</span> <span class="n">CHR</span> <span class="o">=</span> <span class="s2">&quot;chromosome&quot;</span><span class="p">,</span> <span class="n">POS</span> <span class="o">=</span> <span class="s2">&quot;base_pair_location&quot;</span><span class="p">,</span> <span class="n">EA</span> <span class="o">=</span> <span class="s2">&quot;effect_allele&quot;</span><span class="p">,</span> <span class="n">NEA</span> <span class="o">=</span> <span class="s2">&quot;other_allele&quot;</span><span class="p">,</span> <span class="n">BETA</span> <span class="o">=</span> <span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">SE</span> <span class="o">=</span> <span class="s2">&quot;standard_error&quot;</span><span class="p">,</span> <span class="n">P</span> <span class="o">=</span> <span class="s2">&quot;p_value&quot;</span><span class="p">,</span> <span class="n">EAF</span> <span class="o">=</span> <span class="s2">&quot;effect_allele_frequency&quot;</span><span class="p">,</span> <span class="n">keep_columns</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We preprocess it as well to put it in the correct format and make sure there is no invalid values:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Stroke_Geno</span><span class="o">.</span><span class="n">preprocess_data</span><span class="p">(</span><span class="n">preprocessing</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now, we need to extract our instruments (SNPs of the SBP_clumped data) from the outcome data to obtain their association with the outcome trait (stroke). It can be done by calling the <a class="reference internal" href="api.html#id7" title="genal.Geno.query_outcome"><code class="xref py py-meth docutils literal notranslate"><span class="pre">query_outcome()</span></code></a> method:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">query_outcome</span><span class="p">(</span><span class="n">Stroke_Geno</span><span class="p">,</span> <span class="n">proxy</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Genal will print how many SNPs were successfully found and extracted from the outcome data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Outcome</span> <span class="n">data</span> <span class="n">successfully</span> <span class="n">loaded</span> <span class="kn">from</span> <span class="s1">&#39;b352e412&#39;</span> <span class="n">geno</span> <span class="nb">object</span><span class="o">.</span>
+<span class="n">Identifying</span> <span class="n">the</span> <span class="n">exposure</span> <span class="n">SNPs</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">outcome</span> <span class="n">data</span><span class="o">...</span>
+<span class="mi">1541</span> <span class="n">SNPs</span> <span class="n">out</span> <span class="n">of</span> <span class="mi">1545</span> <span class="n">are</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">outcome</span> <span class="n">data</span><span class="o">.</span>
+<span class="p">(</span><span class="n">Exposure</span> <span class="n">data</span><span class="p">,</span> <span class="n">Outcome</span> <span class="n">data</span><span class="p">,</span> <span class="n">Outcome</span> <span class="n">name</span><span class="p">)</span> <span class="n">stored</span> <span class="ow">in</span> <span class="n">the</span> <span class="o">.</span><span class="n">MR_data</span> <span class="n">attribute</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>Here as well you have the option to use proxies for the instruments that are not present in the outcome data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">query_outcome</span><span class="p">(</span><span class="n">Stroke_geno</span><span class="p">,</span> <span class="n">proxy</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">reference_panel</span> <span class="o">=</span> <span class="s2">&quot;eur&quot;</span><span class="p">,</span> <span class="n">kb</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">,</span> <span class="n">r2</span> <span class="o">=</span> <span class="mf">0.6</span><span class="p">,</span> <span class="n">window_snps</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And Genal will print the number of missing instruments which have been proxied:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Outcome</span> <span class="n">data</span> <span class="n">successfully</span> <span class="n">loaded</span> <span class="kn">from</span> <span class="s1">&#39;b352e412&#39;</span> <span class="n">geno</span> <span class="nb">object</span><span class="o">.</span>
+<span class="n">Identifying</span> <span class="n">the</span> <span class="n">exposure</span> <span class="n">SNPs</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">outcome</span> <span class="n">data</span><span class="o">...</span>
+<span class="mi">1541</span> <span class="n">SNPs</span> <span class="n">out</span> <span class="n">of</span> <span class="mi">1545</span> <span class="n">are</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">outcome</span> <span class="n">data</span><span class="o">.</span>
+<span class="n">Searching</span> <span class="n">proxies</span> <span class="k">for</span> <span class="mi">4</span> <span class="n">SNPs</span><span class="o">...</span>
+<span class="n">Using</span> <span class="n">the</span> <span class="n">EUR</span> <span class="n">reference</span> <span class="n">panel</span><span class="o">.</span>
+<span class="n">Found</span> <span class="n">proxies</span> <span class="k">for</span> <span class="mi">4</span> <span class="n">SNPs</span><span class="o">.</span>
+<span class="p">(</span><span class="n">Exposure</span> <span class="n">data</span><span class="p">,</span> <span class="n">Outcome</span> <span class="n">data</span><span class="p">,</span> <span class="n">Outcome</span> <span class="n">name</span><span class="p">)</span> <span class="n">stored</span> <span class="ow">in</span> <span class="n">the</span> <span class="o">.</span><span class="n">MR_data</span> <span class="n">attribute</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>After extracting the instruments from the outcome data, the SBP_clumped <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object contains an ‘MR_data’ attribute containing the instruments-exposure and instruments-outcome associations necessary to run MR. Running MR is now as simple as calling the <a class="reference internal" href="api.html#id0" title="genal.Geno.MR"><code class="xref py py-meth docutils literal notranslate"><span class="pre">MR()</span></code></a> method of the SBP_clumped <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">MR</span><span class="p">(</span><span class="n">action</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">exposure_name</span> <span class="o">=</span> <span class="s2">&quot;SBP&quot;</span><span class="p">,</span> <span class="n">outcome_name</span> <span class="o">=</span> <span class="s2">&quot;Stroke_eur&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="api.html#id0" title="genal.Geno.MR"><code class="xref py py-meth docutils literal notranslate"><span class="pre">MR()</span></code></a> method returns a dataframe containing the estimates and p-values for different MR methods:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>   <span class="n">exposure</span>     <span class="n">outcome</span>                                     <span class="n">method</span>  <span class="n">nSNP</span>         <span class="n">b</span>        <span class="n">se</span>      <span class="n">pval</span>
+<span class="mi">0</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                  <span class="n">Inverse</span><span class="o">-</span><span class="n">Variance</span> <span class="n">Weighted</span>  <span class="mi">1312</span>  <span class="mf">0.023394</span>  <span class="mf">0.001132</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">1</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>  <span class="n">Inverse</span> <span class="n">Variance</span> <span class="n">weighted</span> <span class="p">(</span><span class="n">Fixed</span> <span class="n">effects</span><span class="p">)</span>  <span class="mi">1312</span>  <span class="mf">0.023394</span>  <span class="mf">0.000807</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">2</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                      <span class="n">Unweighted</span> <span class="n">regression</span>  <span class="mi">1312</span>  <span class="mf">0.021764</span>  <span class="mf">0.078648</span>  <span class="mf">0.781986</span>
+<span class="mi">3</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                            <span class="n">Weighted</span> <span class="n">Median</span>  <span class="mi">1312</span>  <span class="mf">0.022891</span>  <span class="mf">0.001423</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">4</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                  <span class="n">Penalised</span> <span class="n">weighted</span> <span class="n">median</span>  <span class="mi">1312</span>  <span class="mf">0.021525</span>  <span class="mf">0.001432</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">5</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                              <span class="n">Simple</span> <span class="n">median</span>  <span class="mi">1312</span>  <span class="mf">0.021480</span>  <span class="mf">0.001364</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">6</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                      <span class="n">Sign</span> <span class="n">concordance</span> <span class="n">test</span>  <span class="mi">1312</span>  <span class="mf">0.373476</span>       <span class="n">NaN</span>       <span class="mf">0.0</span>
+<span class="mi">7</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                                   <span class="n">MR</span> <span class="n">Egger</span>  <span class="mi">1312</span>  <span class="mf">0.029312</span>  <span class="mf">0.003063</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">8</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                            <span class="n">Egger</span> <span class="n">Intercept</span>  <span class="mi">1312</span> <span class="o">-</span><span class="mf">0.001799</span>  <span class="mf">0.000865</span>  <span class="mf">0.037777</span>
+<span class="mi">9</span>       <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                         <span class="n">MR</span> <span class="n">Egger</span> <span class="n">bootstrap</span>  <span class="mi">1312</span>  <span class="mf">0.030342</span>  <span class="mf">0.002093</span>    <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+<span class="mi">10</span>      <span class="n">SBP</span>  <span class="n">Stroke_eur</span>                  <span class="n">Egger</span> <span class="n">Intercept</span> <span class="n">bootstrap</span>  <span class="mi">1312</span> <span class="o">-</span><span class="mf">0.002758</span>  <span class="mf">0.000740</span>    <span class="mf">0.0015</span>
+</pre></div>
+</div>
+<p>You can specify several arguments. We refer to the API for a full list, but the most important one is the ‘action’ argument. It determines how palindromic SNPs are treated during the exposure-outcome harmonization step. Palindromic SNPs are SNPs where the nucleotide change reads the same forward and backward on complementary strands of DNA (for instance EA = ‘A’ and NEA = ‘T’).
+* action = 1: Palindromic SNPs are not treated (assumes all alleles are on the forward strand)
+* action = 2: Uses effect allele frequencies to attempt to flip them (conservative, default)
+* action = 3: Removes all palindromic SNPs (very conservative)
+If you choose the option 2 or 3 (recommended), Genal will print the list of palindromic SNPs that have been removed from the analysis.
+By default, all MR methods (inverse-variance weighted, weighted median, MR-Egger etc) are going to be run. But if you do not wish to run all of them, you can specify a ‘methods’ argument. More details in the <a class="reference internal" href="api.html#id0" title="genal.Geno.MR"><code class="xref py py-meth docutils literal notranslate"><span class="pre">MR()</span></code></a> API.
+For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API.</p>
+<p>If you wish to include the heterogeneity values (Cochran’s Q), you can use the heterogeneity argument. Here, the heterogeneity for the inverse-variance weighted method:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">MR</span><span class="p">(</span><span class="n">action</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;IVW&quot;</span><span class="p">],</span> <span class="n">exposure_name</span> <span class="o">=</span> <span class="s2">&quot;SBP&quot;</span><span class="p">,</span> <span class="n">outcome_name</span> <span class="o">=</span> <span class="s2">&quot;Stroke_eur&quot;</span><span class="p">,</span> <span class="n">heterogeneity</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And that will give:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">exposure</span>     <span class="n">outcome</span>                     <span class="n">method</span>  <span class="n">nSNP</span>         <span class="n">b</span>        <span class="n">se</span>    <span class="n">pval</span>            <span class="n">Q</span>  <span class="n">Q_df</span>  <span class="n">Q_pval</span>
+<span class="mi">0</span>      <span class="n">SBP</span>  <span class="n">Stroke_eur</span>  <span class="n">Inverse</span><span class="o">-</span><span class="n">Variance</span> <span class="n">Weighted</span>  <span class="mi">1312</span>  <span class="mf">0.023394</span>  <span class="mf">0.001132</span>  <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>  <span class="mf">2583.740268</span>  <span class="mi">1311</span>  <span class="o">&lt;</span><span class="n">e</span><span class="o">-</span><span class="mi">100</span>
+</pre></div>
+</div>
+<p>As expected, many MR methods indicate that SBP is strongly associated with stroke, but there are some signs of horizontal pleiotropy (instruments influencing the outcome through a different pathway than the one used as exposure) given the significant MR-Egger intercept p-value.
+To investigate horizontal pleiotropy in more details, a very useful method is Mendelian Randomization Pleiotropy RESidual Sum and Outlier (MR-PRESSO). MR-PRESSO is a method designed to detect and correct for horizontal pleiotropy. It will identify which instruments are likely to be pleiotropic on their effect on the outcome, and it will rerun an inverse-variance weighted MR after excluding them. It can be run using the <a class="reference internal" href="api.html#id1" title="genal.Geno.MRpresso"><code class="xref py py-meth docutils literal notranslate"><span class="pre">MRpresso()</span></code></a> method:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">MRpresso</span><span class="p">(</span><span class="n">action</span> <span class="o">=</span> <span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>As with the <a class="reference internal" href="api.html#id0" title="genal.Geno.MR"><code class="xref py py-meth docutils literal notranslate"><span class="pre">MR()</span></code></a> method, the action argument determines how the pleiotropic SNPs will be treated. The output is a list containing:
+* A table containing the original and outlier-corrected inverse variance-weighted results
+* The global test p-value indicating the presence of horizontal pleiotropy
+* A dataframe of p-values, one for each instrument, representing the likelihood that this instrument is pleiotropic (only relevant if the global test is significant).
+* A dictionary containing the outputs of the distortion test. This test assesses whether the removal of the pleiotropic instruments has significantly altered the original MR estimate.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>An array containing the indices of the pleiotropic SNPs</p></li>
+<li><p>The coefficient of the distortion test</p></li>
+<li><p>The p-value of the distortion test</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="snp-association-testing">
+<h2>SNP-association testing<a class="headerlink" href="#snp-association-testing" title="Link to this heading">¶</a></h2>
+<p>We may want to calibrate instrument-trait estimates in a specific population for which we have individual-level data (genetic files as well as phenotypic data). For instance, if the GWAS of SBP was done in a european population, we may want to adjust the estimates based on data coming from a population of a different ancestry. This can be done in 2 steps:
+* Loading the phenotypic data in a dataframe and calling the <a class="reference internal" href="api.html#id8" title="genal.Geno.set_phenotype"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_phenotype()</span></code></a> method
+* Calling the <a class="reference internal" href="api.html#id2" title="genal.Geno.association_test"><code class="xref py py-meth docutils literal notranslate"><span class="pre">association_test()</span></code></a> method to run the association tests and update the estimates
+Let’s start by loading phenotypic data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">df_pheno</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;path/to/trait/data&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>One important detail is to make sure that the individual IDs are identical between the phenotypic data and the genetic data for the target population.
+Then, it is advised to make a copy of the <a class="reference internal" href="genal.html#module-genal.Geno" title="genal.Geno"><code class="xref py py-class docutils literal notranslate"><span class="pre">Geno</span></code></a> object containing our instruments as we are going to update their coefficients and to avoid any confusion:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_adjusted</span> <span class="o">=</span> <span class="n">SBP_clumped</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>We can then call the <a class="reference internal" href="api.html#id8" title="genal.Geno.set_phenotype"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_phenotype()</span></code></a> method, specifying which column contains our trait of interest (for the association testing) and which column contains the IDs:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_adjusted</span><span class="o">.</span><span class="n">set_phenotype</span><span class="p">(</span><span class="n">df_pheno</span><span class="p">,</span> <span class="n">PHENO</span> <span class="o">=</span> <span class="s2">&quot;htn&quot;</span><span class="p">,</span> <span class="n">IID</span> <span class="o">=</span> <span class="s2">&quot;IID&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>At this point, Genal will identify if the phenotype is binary or quantitative (to determine the regression model. If the phenotype is binary, it will assume that the most frequent value is coding for control (and the other value for case), this can be changed with ‘alternate_control=True’:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Detected</span> <span class="n">a</span> <span class="n">binary</span> <span class="n">phenotype</span> <span class="ow">in</span> <span class="n">the</span> <span class="s1">&#39;PHENO&#39;</span> <span class="n">column</span><span class="o">.</span> <span class="n">Specify</span> <span class="s1">&#39;PHENO_type=&quot;quant&quot;&#39;</span> <span class="k">if</span> <span class="n">this</span> <span class="ow">is</span> <span class="n">incorrect</span><span class="o">.</span>
+<span class="n">Identified</span> <span class="mi">0</span> <span class="k">as</span> <span class="n">the</span> <span class="n">control</span> <span class="n">code</span> <span class="ow">in</span> <span class="s1">&#39;PHENO&#39;</span><span class="o">.</span> <span class="n">Set</span> <span class="s1">&#39;alternate_control=True&#39;</span> <span class="n">to</span> <span class="n">inverse</span> <span class="n">this</span> <span class="n">interpretation</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">phenotype</span> <span class="n">data</span> <span class="ow">is</span> <span class="n">stored</span> <span class="ow">in</span> <span class="n">the</span> <span class="o">.</span><span class="n">phenotype</span> <span class="n">attribute</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>We can then run the association tests, specifying the path to the genetic files in plink format, and any columns we may want to include as covariates in the regression tests:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_adjusted</span><span class="o">.</span><span class="n">association_test</span><span class="p">(</span><span class="n">covar</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;age&quot;</span><span class="p">],</span> <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;path/to/genetic/files&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Genal will print information regarding the number of individuals used in the tests and the kind of tests performed. It is advised to make sure that these information are consistent with your data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CHR</span><span class="o">/</span><span class="n">POS</span> <span class="n">columns</span> <span class="n">present</span><span class="p">:</span> <span class="n">SNPs</span> <span class="n">searched</span> <span class="n">based</span> <span class="n">on</span> <span class="n">genomic</span> <span class="n">positions</span><span class="o">.</span>
+<span class="n">Extracting</span> <span class="n">SNPs</span> <span class="k">for</span> <span class="n">each</span> <span class="n">chromosome</span><span class="o">...</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr1</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr2</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr3</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr4</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr5</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr6</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr7</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr8</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr9</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr10</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr11</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr12</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr13</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr14</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr15</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr16</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr17</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr18</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr19</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr20</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr21</span><span class="o">.</span>
+<span class="n">SNPs</span> <span class="n">extracted</span> <span class="k">for</span> <span class="n">chr22</span><span class="o">.</span>
+<span class="n">Merging</span> <span class="n">SNPs</span> <span class="n">extracted</span> <span class="kn">from</span> <span class="nn">each</span> <span class="n">chromosome</span><span class="o">...</span>
+<span class="n">Created</span> <span class="n">bed</span><span class="o">/</span><span class="n">bim</span><span class="o">/</span><span class="n">fam</span> <span class="n">fileset</span> <span class="k">with</span> <span class="n">extracted</span> <span class="n">SNPs</span><span class="p">:</span> <span class="n">tmp_GENAL</span><span class="o">/</span><span class="n">e415aab3_allchr</span>
+<span class="mi">39131</span> <span class="n">individuals</span> <span class="n">are</span> <span class="n">present</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">genetic</span> <span class="n">data</span> <span class="ow">and</span> <span class="n">have</span> <span class="n">a</span> <span class="n">valid</span> <span class="n">phenotype</span> <span class="n">trait</span><span class="o">.</span>
+<span class="n">Running</span> <span class="n">single</span><span class="o">-</span><span class="n">SNP</span> <span class="n">logistic</span> <span class="n">regression</span> <span class="n">tests</span> <span class="n">on</span> <span class="n">tmp_GENAL</span><span class="o">/</span><span class="n">e415aab3_allchr</span> <span class="n">data</span> <span class="k">with</span> <span class="n">adjustment</span> <span class="k">for</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;age&#39;</span><span class="p">]</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">BETA</span><span class="p">,</span> <span class="n">SE</span><span class="p">,</span> <span class="n">P</span> <span class="n">columns</span> <span class="n">of</span> <span class="n">the</span> <span class="o">.</span><span class="n">data</span> <span class="n">attribute</span> <span class="n">have</span> <span class="n">been</span> <span class="n">updated</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>The SBP_adjusted.data attribute has been updated in the BETA, SE, and P columns with the results of the association tests.</p>
+</section>
+<section id="lifting">
+<h2>Lifting<a class="headerlink" href="#lifting" title="Link to this heading">¶</a></h2>
+<p>It is sometimes necessary to lift the SNP data to a different build. For instance, if the genetic data of our target population is in build 38 (hg38), but the GWAS summary statistics are in build 37 (hg19).
+This can easily be done in Genal using the <a class="reference internal" href="api.html#id4" title="genal.Geno.lift"><code class="xref py py-meth docutils literal notranslate"><span class="pre">lift()</span></code></a> method:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_clumped</span><span class="o">.</span><span class="n">lift</span><span class="p">(</span><span class="n">start</span> <span class="o">=</span> <span class="s2">&quot;hg19&quot;</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="s2">&quot;hg38&quot;</span><span class="p">,</span> <span class="n">replace</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This output a table with the lifted SBP instruments (stored in the SBP_clumped object) from build 37 (hg19) to build 38 (hg38). We specified ‘replace = False’ to not modify the SBP_clumped.data attribute, but we may want to modify it (before running a PRS in a population stored in build 38 for instance). Genal will download the appropriate chain files required for the lift, and it will be done in pure python by default. However, if you plan to lift large datasets of SNPs (the whole summary statistics for instance), it may be useful to install the LiftOver executable that will run faster than the pure python version. It can be downloaded here: <a class="reference external" href="https://genome-store.ucsc.edu/">https://genome-store.ucsc.edu/</a> You will need to create an account, scroll down to “LiftOver program”, add it to your cart, and declare that you are a non-profit user.
+You can need specify the path of the LiftOver executable to the ‘liftover_path’ argument:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SBP_Geno</span><span class="o">.</span><span class="n">lift</span><span class="p">(</span><span class="n">start</span> <span class="o">=</span> <span class="s2">&quot;hg19&quot;</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="s2">&quot;hg38&quot;</span><span class="p">,</span> <span class="n">replace</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">liftover_path</span> <span class="o">=</span> <span class="s2">&quot;path/to/liftover/exec&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api.html" class="btn btn-neutral float-right" title="The Geno class" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

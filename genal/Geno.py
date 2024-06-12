@@ -929,107 +929,107 @@ class Geno:
         
         return plot
   
-    def MR_forest(
-        self,
-        methods=[
-            "IVW",
-            "WM",
-            "Simple-median",
-            "Egger",
-        ],
-        exposure_name=None,
-        outcome_name=None,
-        filename=None
-    ):
-        """
-        Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the 'methods' argument is represented as a line in the plot.
-
-        Args:
-            methods (list of str, optional): A list of MR methods to be included in the plot. Default methods are "IVW", "WM", "Simple-median", and "Egger".
-            exposure_name (str, optional): A custom label for the exposure effect axis. If None, uses the label provided in the MR function call or a default label.
-            outcome_name (str, optional): A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.
-            filename (str, optional): The filename where the plot will be saved. If None, the plot is not saved.
-
-        Returns:
-            plotnine.ggplot.ggplot: A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.
-
-        Raises:
-            ValueError: If MR analysis has not been performed prior to calling this function.
-
-        Note:
-            This function requires prior execution of the `MR` method to compute MR results. Make sure the MR analysis is performed on the data before calling `MR_plot`.
-        """
-        if not hasattr(self, "MR_results"):
-            raise ValueError("You need to run an MR analysis with the MR method before calling the MR_plot function.")
-        
-        ## Extract the previously computed MR results
-        df_mr = self.MR_results[1]
-        res = self.MR_results[0]
-        exposure_name = self.MR_results[2] if not exposure_name else exposure_name
-        exposure_name = "Effect on the exposure" if not exposure_name else f"Effect on {exposure_name}"
-        outcome_name = self.MR_results[3] if not outcome_name else outcome_name
-        outcome_name = "Effect on the outcome" if not outcome_name else f"Effect on {outcome_name}"
-        
-        ## Switch all exposure betas to >= 0
-        df_mr['BETA_e'], df_mr['BETA_o'] = np.where(df_mr['BETA_e'] < 0, (-df_mr['BETA_e'], -df_mr['BETA_o']), (df_mr['BETA_e'], df_mr['BETA_o']))
-
-        ## Create the scatter plot with error bars
-        plot = (
-            ggplot(df_mr, aes('BETA_e', 'BETA_o'))
-
-            + geom_errorbarh(aes(xmin='BETA_e-SE_e', xmax='BETA_e+SE_e'), height=0, color="gray", size=0.1) 
-            + geom_errorbar(aes(ymin='BETA_o-SE_o', ymax='BETA_o+SE_o'), width=0, color="gray", size=0.1)
-            + geom_point(color='black', size=0.2) 
-            + geom_abline(slope=0, intercept=0, color='black')
-            + labs(x=exposure_name, y=outcome_name) 
-            + theme(
-                axis_title=element_text(size=12),
-                axis_text=element_text(size=10),
-                figure_size=(10,6)
-            )
-            + expand_limits(x=0)
-        )
-        
-        ## Add the lines corresponding to the specified MR methods (if present in the computation)
-        lines = []
-        for method in methods:
-            if method not in MR_METHODS_NAMES.keys():
-                warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
-                continue
-            ## If not an Egger method: simply need to get the slope
-            if not method.startswith("Egger"):
-                method_name = MR_METHODS_NAMES[method]
-                res_row = res[res.method == method_name]
-                if res_row.shape[0] == 0:
-                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-                elif res_row.shape[0] == 1:
-                    lines.append({
-                        'slope': res_row["b"].values[0], 
-                        'intercept': 0, 
-                        'MR Methods': method_name  # Use method_name as the color label
-                    })
-            ## For Egger methods: need to get the slope and the intercept
-            else:
-                method_name = MR_METHODS_NAMES[method][0]
-                method_name_intercept = MR_METHODS_NAMES[method][1]
-                res_row = res[res.method == method_name]
-                res_row_intercept = res[res.method == method_name_intercept]
-                if res_row.shape[0] == 0:
-                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-                elif res_row.shape[0] == 1 and res_row_intercept.shape[0] == 1:
-                    lines.append({
-                        'slope': res_row["b"].values[0], 
-                        'intercept': res_row_intercept["b"].values[0], 
-                        'MR Methods': method_name  # Use method_name as the color label
-                    })
-        line_data = pd.DataFrame(lines)
-        plot += geom_abline(aes(slope='slope', intercept='intercept', color='MR Methods'), data=line_data)
-        
-        ## Save plot if filename is specified
-        if filename:
-            plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
-        
-        return plot
+#    def MR_forest(
+#        self,
+#        methods=[
+#            "IVW",
+#            "WM",
+#            "Simple-median",
+#            "Egger",
+#        ],
+#        exposure_name=None,
+#        outcome_name=None,
+#        filename=None
+#    ):
+#        """
+#        Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the 'methods' argument is represented as a line in the plot.
+#
+#        Args:
+#            methods (list of str, optional): A list of MR methods to be included in the plot. Default methods are "IVW", "WM", "Simple-median", and "Egger".
+#            exposure_name (str, optional): A custom label for the exposure effect axis. If None, uses the label provided in the MR function call or a default label.
+#            outcome_name (str, optional): A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.
+#            filename (str, optional): The filename where the plot will be saved. If None, the plot is not saved.
+#
+#        Returns:
+#            plotnine.ggplot.ggplot: A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.
+#
+#        Raises:
+#            ValueError: If MR analysis has not been performed prior to calling this function.
+#
+#        Note:
+#            This function requires prior execution of the `MR` method to compute MR results. Make sure the MR analysis is performed on the data before calling `MR_plot`.
+#        """
+#        if not hasattr(self, "MR_results"):
+#            raise ValueError("You need to run an MR analysis with the MR method before calling the MR_plot function.")
+#        
+#        ## Extract the previously computed MR results
+#        df_mr = self.MR_results[1]
+#        res = self.MR_results[0]
+#        exposure_name = self.MR_results[2] if not exposure_name else exposure_name
+#        exposure_name = "Effect on the exposure" if not exposure_name else f"Effect on {exposure_name}"
+#        outcome_name = self.MR_results[3] if not outcome_name else outcome_name
+#        outcome_name = "Effect on the outcome" if not outcome_name else f"Effect on {outcome_name}"
+#        
+#        ## Switch all exposure betas to >= 0
+#        df_mr['BETA_e'], df_mr['BETA_o'] = np.where(df_mr['BETA_e'] < 0, (-df_mr['BETA_e'], -df_mr['BETA_o']), (df_mr['BETA_e'], df_mr['BETA_o']))
+#
+#        ## Create the scatter plot with error bars
+#        plot = (
+#            ggplot(df_mr, aes('BETA_e', 'BETA_o'))
+#
+#            + geom_errorbarh(aes(xmin='BETA_e-SE_e', xmax='BETA_e+SE_e'), height=0, color="gray", size=0.1) 
+#            + geom_errorbar(aes(ymin='BETA_o-SE_o', ymax='BETA_o+SE_o'), width=0, color="gray", size=0.1)
+#            + geom_point(color='black', size=0.2) 
+#            + geom_abline(slope=0, intercept=0, color='black')
+#            + labs(x=exposure_name, y=outcome_name) 
+#            + theme(
+#                axis_title=element_text(size=12),
+#                axis_text=element_text(size=10),
+#                figure_size=(10,6)
+#            )
+#            + expand_limits(x=0)
+#        )
+#        
+#        ## Add the lines corresponding to the specified MR methods (if present in the computation)
+#        lines = []
+#        for method in methods:
+#            if method not in MR_METHODS_NAMES.keys():
+#                warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
+#                continue
+#            ## If not an Egger method: simply need to get the slope
+#            if not method.startswith("Egger"):
+#                method_name = MR_METHODS_NAMES[method]
+#                res_row = res[res.method == method_name]
+#                if res_row.shape[0] == 0:
+#                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
+#                elif res_row.shape[0] == 1:
+#                    lines.append({
+#                        'slope': res_row["b"].values[0], 
+#                        'intercept': 0, 
+#                        'MR Methods': method_name  # Use method_name as the color label
+#                    })
+#            ## For Egger methods: need to get the slope and the intercept
+#            else:
+#                method_name = MR_METHODS_NAMES[method][0]
+#                method_name_intercept = MR_METHODS_NAMES[method][1]
+#                res_row = res[res.method == method_name]
+#                res_row_intercept = res[res.method == method_name_intercept]
+#                if res_row.shape[0] == 0:
+#                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
+#                elif res_row.shape[0] == 1 and res_row_intercept.shape[0] == 1:
+#                    lines.append({
+#                        'slope': res_row["b"].values[0], 
+#                        'intercept': res_row_intercept["b"].values[0], 
+#                        'MR Methods': method_name  # Use method_name as the color label
+#                    })
+#        line_data = pd.DataFrame(lines)
+#        plot += geom_abline(aes(slope='slope', intercept='intercept', color='MR Methods'), data=line_data)
+#        
+#        ## Save plot if filename is specified
+#        if filename:
+#            plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
+#        
+#        return plot
     
     
 
