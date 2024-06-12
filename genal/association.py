@@ -128,6 +128,9 @@ def _handle_covariates(covar_list, data_pheno, name):
                 data_cov.drop(axis=1, columns=[col], inplace=True, errors="ignore")
         # Define the covariate filename
         covar_filename = os.path.join("tmp_GENAL", f"{name}_covar.cov")
+        # Ensure FID and IID are in integer format and write the covariate file
+        data_cov["IID"] = data_cov["IID"].astype("Int64")
+        data_cov["FID"] = data_cov["FID"].astype("Int64")
         data_cov.to_csv(covar_filename, sep=" ", header=True, index=False)
         covar = True
     else:

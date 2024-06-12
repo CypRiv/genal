@@ -4,12 +4,14 @@
 
 **This project was developed by Cyprien A. Rivier**
 
+
 # Table of contents
 1. [Introduction](#introduction)
-2. [Requirements for the genal module](#paragraph1)
-3. [Installation and how to use genal](#paragraph2)
+2. [Citation] (#citation)
+3. [Requirements for the genal module](#paragraph1)
+4. [Installation and how to use genal](#paragraph2)
     1. [Installation](#paragraph2.1)
-4. [Tutorial and presentation of the main tools](#paragraph3)
+5. [Tutorial and presentation of the main tools](#paragraph3)
     1. [Data loading](#paragraph3.1)
     2. [Data preprocessing](#paragraph3.2)
     3. [Clumping](#paragraph3.3)
@@ -19,14 +21,16 @@
     7. [Lifting](#paragraph3.7)
 
 
-
-
 ## Introduction <a name="introduction"></a>
 Genal is a python module designed to make it easy to run genetic risk scores and mendelian randomization analyses. It integrates a collection of tools that facilitate the cleaning of single nucleotide polymorphism data (usually derived from Genome-Wide Association Studies) and enable the execution of clinical population genetic workflows. The functionalities provided by genal include clumping, lifting, association testing, polygenic risk scoring, and Mendelian randomization analyses, all within a single Python module.
 
 The module prioritizes user-friendliness and intuitive operation, aiming to reduce the complexity of data analysis for researchers. Despite its focus on simplicity, Genal does not sacrifice the depth of customization or the precision of analysis. Researchers can expect to maintain analytical rigour while benefiting from the streamlined experience.
 
 Genal draws on concepts from well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, adapting their proven methodologies to the Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
+
+## Citation <a name="citation"></a> 
+If you're using genal, please cite the following paper:
+**Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. medRxiv 2024.05.23.24307776; doi: https://doi.org/10.1101/2024.05.23.24307776
 
 ## Requirements for the genal module <a name="paragraph1"></a> 
 ***Python 3.9 or later***. https://www.python.org/ <br> 
@@ -498,7 +502,7 @@ At this point, genal will identify if the phenotype is binary or quantitative in
     Identified 0 as the control code in 'PHENO'. Set 'alternate_control=True' to inverse this interpretation.
     The phenotype data is stored in the .phenotype attribute.
     
-We can then run the association tests, specifying the path to the genetic files in plink format, and any columns we may want to include as covariates in the regression tests:
+We can then run the association tests, specifying the path to the genetic files in plink format, and any columns we may want to include as covariates in the regression tests (making sure that the covariates are all numerical):
 
 ```python
 SBP_adjusted.association_test(covar=["age"], path = "path/to/genetic/files")
