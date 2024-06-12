@@ -7,7 +7,7 @@
 
 # Table of contents
 1. [Introduction](#introduction)
-2. [Citation] (#citation)
+2. [Citation](#citation)
 3. [Requirements for the genal module](#paragraph1)
 4. [Installation and how to use genal](#paragraph2)
     1. [Installation](#paragraph2.1)
