@@ -98,7 +98,7 @@ def set_reference_folder(path=""):
         None: The function prints messages to inform the user of the status and any errors.
     """
 
-    # If no path is provided, set default path to 'tmp_GENAL' in the current directory
+    # If no path is provided, set default path to root/.genal/Reference_files
     if not path:
         path = default_ref_path
         print(f"No path provided, defaulting to {default_ref_path}.")
@@ -188,9 +188,9 @@ def get_reference_panel_path(reference_panel="eur"):
             print(
                 "If you have already downloaded it, use genal.set_reference_folder(path) to avoid downloading again."
             )
-            url = f"https://storage.googleapis.com/genal_files/1kg.v3.tgz"
+            url = f"https://storage.googleapis.com/genal_files/reference_panels.tgz"
             try:
-                wget.download(url, out=os.path.join(ref_path, "1kg.v3.tgz"))
+                wget.download(url, out=os.path.join(ref_path, "reference_panels.tgz"))
             except Exception as e:
                 print(f"Download unsuccessful: {e}")
                 print(
@@ -199,7 +199,7 @@ def get_reference_panel_path(reference_panel="eur"):
                 raise FileNotFoundError(f"Reference panel {reference_panel} not found.")
 
             print("Download successful. Decompressing...")
-            with tarfile.open(os.path.join(ref_path, "1kg.v3.tgz"), "r:gz") as tar_ref:
+            with tarfile.open(os.path.join(ref_path, "reference_panels.tgz"), "r:gz") as tar_ref:
                 tar_ref.extractall(ref_path)
         else:
             print(f"Using the {ref_panel_name} reference panel.")
@@ -207,7 +207,6 @@ def get_reference_panel_path(reference_panel="eur"):
     return ref_panel_path
 
 
-## Need to do the multi option
 def load_reference_panel(reference_panel="eur"):
     """Load the bim file from the reference panel specified."""
     
@@ -227,7 +226,7 @@ def load_reference_panel(reference_panel="eur"):
             
     #Load it and return it
     reference_panel_df = pd.read_csv(
-        ref_panel_path + ".bim", sep ="\t", names=["CHR","SNP","F","POS","A1","A2"]
+        ref_panel_path + ".bim", sep="\t", names=["CHR","SNP","F","POS","A1","A2"]
     )
     return reference_panel_df
 

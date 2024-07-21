@@ -457,7 +457,7 @@ As expected, many MR methods indicate that SBP is strongly associated with strok
 To investigate horizontal pleiotropy in more details, a very useful method is Mendelian Randomization Pleiotropy RESidual Sum and Outlier (MR-PRESSO). MR-PRESSO is a method designed to detect and correct for horizontal pleiotropy. It will identify which instruments are likely to be pleiotropic on their effect on the outcome, and it will rerun an inverse-variance weighted MR after excluding them. It can be run using the `genal.Geno.MRpresso` method:
 
 ```python
-SBP_clumped.MRpresso(action = 2, n_iterations = 30000)
+mod_table, GlobalTest, OutlierTest, BiasTest = SBP_clumped.MRpresso(action = 2, n_iterations = 30000)
 ```
 
 As with the `genal.Geno.MR` method, the `action` argument determines how the pleiotropic SNPs will be treated. The output is a list containing:
