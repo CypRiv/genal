@@ -33,6 +33,7 @@ from .geno_tools import (
 )
 from .association import set_phenotype_func, association_test_func
 from .extract_prs import extract_snps_func, prs_func
+from .snp_query import async_query_gwas_catalog
 from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METHODS_NAMES
 
 # Do all the MR steps (query_outcome, harmonize etc) based on CHR/POS and not SNPs
@@ -40,7 +41,6 @@ from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METH
 # Get proxies (simply return a list of proxies)
 # Multi-MR with python MR
 # Warning that users might not have shell (for the .ram attribute)
-# Phenoscanner
 
 
 
@@ -64,6 +64,7 @@ class Geno:
         name (str): ID of the object (for internal reference and debugging purposes).
         reference_panel (pd.DataFrame): Reference population SNP data used for SNP info
             adjustments. Initialized when first needed.
+        reference_panel_name (str): string to identify the reference_panel (path or population string)
 
     Methods:
         preprocess_data():
@@ -313,24 +314,27 @@ class Geno:
         Raises:
             ValueError: If the provided DataFrame doesn't have the necessary columns.
         """
-
-        # Check if the object already has a reference panel set
-        if not hasattr(self, "reference_panel"):
+        # Check if the user provided a dataframe
+        if isinstance(reference_panel, pd.DataFrame):
             # If the provided reference_panel is a DataFrame, verify its structure and dtypes
-            if isinstance(reference_panel, pd.DataFrame):
-                for col in REF_PANEL_COLUMNS:
-                    if col not in reference_panel.columns:
-                        raise ValueError(
-                            f"The {col} column is not present in the reference_panel provided and is necessary."
-                        )
+            for col in REF_PANEL_COLUMNS:
+                if col not in reference_panel.columns:
+                    raise ValueError(
+                        f"The {col} column is not present in the reference_panel provided and is necessary."
+                    )
 
-                print(
-                    "Using the provided reference_panel dataframe as the reference panel."
-                )
-                self.reference_panel = reference_panel.copy()
-            else:
-                # Load the reference panel based on the provided string identifier
-                self.reference_panel = load_reference_panel(reference_panel)
+            print(
+                "Using the provided reference_panel dataframe as the reference panel."
+            )
+            self.reference_panel = reference_panel.copy()
+            self.reference_panel_name = "USER_PROVIDED"
+            
+        # Else, check if there is already a reference_panel with the same ID. If not, load it based on provided string
+        elif not (hasattr(self, "reference_panel") and 
+                  hasattr(self, "reference_panel_name") and
+                  self.reference_panel_name==reference_panel):
+            self.reference_panel = load_reference_panel(reference_panel)
+            self.reference_panel_name = reference_panel   
 
         return self.reference_panel
 
@@ -1067,7 +1071,7 @@ class Geno:
             cpus (int, optional): number of cpu cores to be used for the parallel random data generation.
 
         Returns:
-            list: Contains the following elements:
+            tuple: Contains the following elements:
                 - mod_table: DataFrame containing the original (before outlier removal)
                              and outlier-corrected (after outlier removal) inverse variance-weighted MR results.
                 - GlobalTest: p-value of the global MR-PRESSO test indicating the presence of horizontal pleiotropy.
@@ -1163,6 +1167,58 @@ class Geno:
             )
 
         return data
+    
+    def query_gwas_catalog(
+        self,
+        p_threshold=5e-8,
+        return_p=False,
+        return_study=False,
+        replace=True):
+        """
+        Queries the GWAS Catalog Rest API and add an "ASSOC" column containing associated traits for each SNP.
+        
+        Args:
+            p_threshold (float, optional): Only associations that are at least as significant are reported. Default is 5e-8.
+            return_p (bool, optional): If True, include the p-value in the results. Default is False.
+            return_study (bool, optional): If True, include the ID of the study from which the association is derived in the results. Default is False.
+            replace (bool, optional): If True, updates the data attribute in place. Default is True.
+
+        Returns:
+            pd.DataFrame: Data attribute with an additional column "ASSOC".
+                The elements of this column are lists of strings or tuples depending on the `return_p` and `return_study` flags. If the SNP could not be queried, the value is set to "FAILED_QUERY".
+        """
+        # Ensure mandatory column is present in the input data
+        if "SNP" not in self.data.columns:
+            raise ValueError(f"The SNP column is necessary for the GWAS query!")
+            
+        # Select appropriate data or copy of data depending on replace argument
+        if not replace:
+            data = self.data.copy()
+        else:
+            data = self.data
+            
+        print(
+            f"Querying the GWAS Catalog and creating the ASSOC column. "
+            f"Only associations with a p-value <= {p_threshold} are reported. Use the p_threshold argument to change the threshold. "
+            f"To report the p-value of each association, use return_p=True. To report the study ID of the association, use return_study=True. "
+            f"The .data attribute will {'be' if replace else 'not be'} modified. "
+            f"{'Use replace=False to leave it as is.' if replace else ''}"
+        )
+        
+        # Call the async function to query all SNPs
+        results_snps, errors = async_query_gwas_catalog(
+            data.SNP.to_list(), 
+            p_threshold=p_threshold, 
+            return_p=return_p, 
+            return_study=return_study)
+        
+        # Create the column
+        data["ASSOC"] = data['SNP'].map(results_snps).fillna("FAILED_QUERY")
+        
+        print("The ASSOC column has been successfully created.")
+            
+        return data, errors
+        
 
     def standardize(self):
         """

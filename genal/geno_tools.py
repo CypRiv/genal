@@ -213,9 +213,11 @@ def fill_snpids_func(data, reference_panel_df):
             + ":"
             + data.loc[missing_snp_condition, "POS"].astype(str)
             + ":"
+            + data.loc[missing_snp_condition, "NEA"].astype(str)
+            + ":"
             + data.loc[missing_snp_condition, "EA"].astype(str)
         )
-        print_statement = f" and their ID set to CHR:POS:EA"
+        print_statement = f" and their ID set to CHR:POS:NEA:EA"
 
     perc_missing = n_missing / data.shape[0] * 100
     
@@ -239,7 +241,8 @@ def fill_snpids_func(data, reference_panel_df):
 def check_int_column(data, int_col):
     """Set the type of the int_col column to Int32 and non-numeric values to NA."""
     nrows = data.shape[0]
-    data[int_col] = pd.to_numeric(data[int_col], errors="coerce")
+    if not pd.api.types.is_integer_dtype(data[int_col].dtype):
+        data[int_col] = pd.to_numeric(data[int_col].astype(str).str.strip(), errors="coerce")
     data[int_col] = data[int_col].round(0).astype("Int32")
     n_nan = data[int_col].isna().sum()
     if n_nan > 0:
