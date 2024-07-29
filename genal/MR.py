@@ -30,13 +30,13 @@ def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     nboot (int): Number of boostrap iterations to obtain the standard error and p-value
     cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
 
-Returns:
-    list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
-        - "method": Name of the analysis method.
-        - "b": Coefficient of the regression, representing the causal estimate or the intercept.
-        - "se": Adjusted standard error of the coefficient or intercept.
-        - "pval": P-value for the causal estimate or intercept.
-        - "nSNP": Number of genetic variants used in the analysis.
+    Returns:
+        list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate or the intercept.
+            - "se": Adjusted standard error of the coefficient or intercept.
+            - "pval": P-value for the causal estimate or intercept.
+            - "nSNP": Number of genetic variants used in the analysis.
     """
     l = len(BETA_e)
     if l < 3:
@@ -81,13 +81,13 @@ def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     nboot (int): Number of boostrap iterations to obtain the standard error and p-value
     cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
 
-Returns:
-    list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
-        - "method": Name of the analysis method.
-        - "b": Coefficient of the regression, representing the causal estimate or the intercept.
-        - "se": Adjusted standard error of the coefficient or intercept.
-        - "pval": P-value for the causal estimate or intercept.
-        - "nSNP": Number of genetic variants used in the analysis.
+    Returns:
+        list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):
+            - "method": Name of the analysis method.
+            - "b": Coefficient of the regression, representing the causal estimate or the intercept.
+            - "se": Adjusted standard error of the coefficient or intercept.
+            - "pval": P-value for the causal estimate or intercept.
+            - "nSNP": Number of genetic variants used in the analysis.
     """
     l = len(BETA_e)
     if l < 3:

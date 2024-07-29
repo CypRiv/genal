@@ -118,6 +118,11 @@ def MR_func(
     df_outcome = data[1]
     name_outcome = data[2]
 
+    # Check number of instruments
+    if df_exposure.shape[0] < 2:
+        print("Not enough instruments to run MR. At least 2 are required.")
+        return pd.DataFrame(), pd.DataFrame()
+
     # Check EAF columns if action = 2
     if action == 2:
         if "EAF" not in df_exposure.columns:
@@ -137,6 +142,12 @@ def MR_func(
     )
 
     df_mr = df_mr_formatting(df_mr)
+
+    # Check number of remaining instruments
+    n_snps = df_mr.shape[0]
+    if n_snps < 2:
+        print(f"{n_snps} SNPs remaining after harmonization step but at least 2 are required to run MR.")
+        return pd.DataFrame(), df_mr
 
     # Prepare values for MR methods
     BETA_e, BETA_o, SE_e, SE_o = (

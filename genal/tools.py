@@ -5,7 +5,7 @@ import wget
 import shutil
 import tarfile
 
-from .constants import REF_PANELS
+from .constants import REF_PANELS, REF_PANELS_URL
 
 config_path = os.path.join(os.path.expanduser("~/.genal/"), "config.json")
 # default_ref_path = os.path.join(os.getcwd(), "tmp_GENAL", "Reference_files")
@@ -188,9 +188,9 @@ def get_reference_panel_path(reference_panel="eur"):
             print(
                 "If you have already downloaded it, use genal.set_reference_folder(path) to avoid downloading again."
             )
-            url = f"https://storage.googleapis.com/genal_files/reference_panels.tgz"
+            
             try:
-                wget.download(url, out=os.path.join(ref_path, "reference_panels.tgz"))
+                wget.download(REF_PANELS_URL, out=os.path.join(ref_path, "reference_panels.tgz"))
             except Exception as e:
                 print(f"Download unsuccessful: {e}")
                 print(

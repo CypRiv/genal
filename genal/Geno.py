@@ -40,8 +40,9 @@ from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METH
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
 # Get proxies (simply return a list of proxies)
 # Multi-MR with python MR
-# Warning that users might not have shell (for the .ram attribute)
-
+# When reading bim files (reference panels or update_snipds): handle the case where the chr column of the bim starts with chr
+# Handle genetic files in pgen
+# Switch to plink2.0 (but check that all functions exist)
 
 
 class Geno:
