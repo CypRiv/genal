@@ -63,7 +63,7 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=""):
     log_file = output_path + ".log"
     if os.path.isfile(prs_file): #If the profile file exists: PRS was successful
         #Extracts the number of SNPs used for the PRS computation
-        pattern = r'--score: (\d+) valid predictors loaded.'
+        pattern = r'--score: (\d+) valid predictor'
         with open(log_file, 'r') as file:
             for line in file:
                 match = re.search(pattern, line)
