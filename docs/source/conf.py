@@ -13,7 +13,16 @@ sys.path.insert(0, os.path.abspath('../../'))
 project = 'genal'
 copyright = '2023, Cyprien A. Rivier'
 author = 'Cyprien A. Rivier'
-release = 'v0.0'
+release = 'v0.8'
+
+########### TRICK FOUND ON SOME TUTORIAL : ADD IN THE MOCK_MODULES ANY EXTERNAL MODULE YOU'RE USING IN YOUR PACKAGE.
+
+import mock
+
+MOCK_MODULES = ['numpy', 'pandas', 'aiohttp', 'nest_asyncio', 'plotnine', 'psutil', 'pyliftover', 'scikit_learn', 'scipy', 'statsmodels', 'tqdm', 'wget']
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
+
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -31,12 +40,3 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
-
-autodoc_default_options = {
-    'members': True,
-    'undoc-members': True,
-    'private-members': True,
-    'special-members': True,
-    'inherited-members': True,
-    'show-inheritance': True,
-}

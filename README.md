@@ -453,7 +453,7 @@ If you want to visualize the obtained MR results, you can use the `genal.Geno.MR
 SBP_clumped.MR_plot(filename="MR_plot_SBP_AS")
 ```
 
-![MR plot](docs/build/_images_/MR_plot_SBP_AS.png)
+![MR plot](docs/build/_images/MR_plot_SBP_AS.png)
 You can select which MR methods you wish to plot with the `methods` argument. Note that for an MR method to be plotted, they must be included in the latest `genal.Geno.MR` call of this `genal.Geno` instance.
 
 If you wish to include the heterogeneity values (Cochran's Q) in the results, you can use the heterogeneity argument in the `genal.Geno.MR` call. Here, the heterogeneity for the inverse-variance weighted method:
