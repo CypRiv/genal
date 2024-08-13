@@ -833,7 +833,7 @@ class Geno:
         methods=[
             "IVW",
             "WM",
-            "Simple-median",
+            "Simple-mode",
             "Egger",
         ],
         exposure_name=None,

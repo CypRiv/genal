@@ -35,18 +35,27 @@ If you're using genal, please cite the following paper:
 **Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. medRxiv 2024.05.23.24307776; doi: https://doi.org/10.1101/2024.05.23.24307776
 
 ## Requirements for the genal module <a name="paragraph1"></a> 
-***Python 3.9 or later***. https://www.python.org/ <br> 
+***Python 3.11 or later***. https://www.python.org/ <br> 
 
 
 ## Installation and How to use the genal module <a name="paragraph2"></a>
 
 ### Installation <a name="paragraph2.1"></a>
 
+> **Note:**
+> 
+> **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal'.
+> ```
+> conda create --name genal python=3.11
+> conda activate genal
+> ```
+
+
 Download and install the package with pip:    
 ```
 pip install genal-python
 ```
-And it can be imported in a python environment with:
+And import it in a python environment with:
 ```python
 import genal
 ```
@@ -213,7 +222,7 @@ You can also use a custom reference panel by specifying to the reference_panel a
 
 ### Clumping <a name="paragraph3.3"></a>
 
-Clumping is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e., they are not in high linkage disequilibrium). For this step, we again need to use a reference panel.
+Clumping, or C+T: Clumping + Thresholding, is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e., they are not in high linkage disequilibrium). For this step, we again need to use a reference panel.
 
 The SNP-data loaded in a `genal.Geno` instance can be clumped using the `genal.Geno.clump` method. It will return another `genal.Geno` instance containing only the clumped data:
 
@@ -285,7 +294,7 @@ The output of the `genal.Geno.prs` method will include how many SNPs were used t
 Here, we see that about half of the SNPs were not extracted from the data. In such cases, we may want to try and salvage some of these SNPs by looking for proxies (SNPs in high linkage disequilibrium, i.e. highly correlated SNPs). This can be done by specifying the `proxy = True`. argument:
 
 ```python
-SBP_clumped.prs(name = "SBP_prs" ,path = "Pop_chr$", proxy = True, reference_panel = "eur", r2=0.8, kb=5000, window_snps=5000)
+SBP_clumped.prs(name = "SBP_prs_proxy" ,path = "Pop_chr$", proxy = True, reference_panel = "eur", r2=0.8, kb=5000, window_snps=5000)
 ```
 
 and the output is:
@@ -498,7 +507,7 @@ df_pheno = pd.read_csv("path/to/trait/data")
 
 > **Note:**
 > 
->    One important detail is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
+>    One important point is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
 
 Then, it is advised to make a copy of the `genal.Geno` instance containing our instruments as we are going to update their coefficients and to avoid any confusion:
 

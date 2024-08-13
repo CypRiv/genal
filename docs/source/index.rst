@@ -18,7 +18,7 @@ Genal draws on concepts from well-established R packages such as TwoSampleMR, MR
 
 To install the latest release, type::
 
-    pip install genal
+    pip install genal-python
 
 Contents
 --------

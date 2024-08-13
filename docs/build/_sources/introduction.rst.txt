@@ -2,13 +2,21 @@
 Installation
 ============
 
-The genal package can be easily installed with pip:
+.. note::
+    **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal'.
+
+    .. code-block:: bash
+
+        conda create --name genal python=3.11
+        conda activate genal
+
+The genal package requires Python 3.11. Download and install it with pip: 
 
 .. code-block:: bash
 
-    pip install genal
+    pip install genal-python
 
-And it can be imported in a python environment with:
+And import it in a python environment with:
 
 .. code-block:: python
 
@@ -145,7 +153,7 @@ By default, and depending on the global preprocessing level (``'None'``, ``'Fill
 
 If you do not wish to run certain steps, or wish to run only certain steps, you can use additional arguments. For more information, please refer to the :meth:`~genal.Geno.preprocess_data` method in the API documentation.
 
-In our case, the ``SNP`` column (for SNP identifier - rsid) was missing from our dataframe and has been added based on a 1000 genome reference panel:
+In our case, the ``SNP`` column (for SNP identifier - rsid) was missing from our dataframe and has been added based on a 1000 genome reference panel::
 
     Using the EUR reference panel.
     The SNP column (rsID) has been created. 197511 (2.787%) SNPs were not found in the reference data and their ID set to CHR:POS:EA.
@@ -176,7 +184,7 @@ You can also use a custom reference panel by specifying the path to bed/bim/fam 
 Clumping
 --------
 
-Clumping is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e., they are not in high linkage disequilibrium). For this step, we again need to use a reference panel.
+Clumping, or C+T: Clumping + Thresholding, is the step at which we select the SNPs that will be used as our genetic instruments in future Polygenic Risk Scores and Mendelian Randomization analyses. The process involves identifying the SNPs that are strongly associated with our trait of interest (systolic blood pressure in this tutorial) and are independent from each other. This second step ensures that selected SNPs are not highly correlated, (i.e., they are not in high linkage disequilibrium). For this step, we again need to use a reference panel.
 
 The SNP-data loaded in a :class:`~genal.Geno` instance can be clumped using the :meth:`~genal.Geno.clump` method. It will return another :class:`~genal.Geno` instance containing only the clumped data:
 
@@ -250,7 +258,7 @@ Here, we see that about half of the SNPs were not extracted from the data. In su
 
 .. code-block:: python
 
-    SBP_clumped.prs(name="SBP_prs", path="Pop_chr$", proxy=True, reference_panel="eur", r2=0.8, kb=5000, window_snps=5000)
+    SBP_clumped.prs(name="SBP_prs_proxy", path="Pop_chr$", proxy=True, reference_panel="eur", r2=0.8, kb=5000, window_snps=5000)
 
 and the output is::
 
@@ -489,7 +497,7 @@ Let's start by loading phenotypic data:
     df_pheno = pd.read_csv("path/to/trait/data")
 
 .. note::
-   One important detail is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
+   One important point is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
 
 Then, it is advised to make a copy of the :class:`~genal.Geno` instance containing our instruments as we are going to update their coefficients and to avoid any confusion:
 
@@ -589,7 +597,7 @@ Which will output::
         701 (45.37%) SNPs failed to query (not found in GWAS Catalog) and 7 (0.5%) SNPs timed out after 34.33 seconds. You can increase the timeout value with the timeout argument.
 
 And the :attr:`~genal.Geno.data` attribute now contains an `ASSOC` column::
-    
+
         EA NEA    EAF    BETA     SE  CHR        POS         SNP                                               ASSOC
         0  A   G  0.1784  0.2330  0.0402   10  102075479    rs603424  [eicosanoids measurement, decadienedioic acid (...]
         1  A   G  0.0706 -0.3873  0.0626   10  102403682   rs2996303                                       FAILED_QUERY
