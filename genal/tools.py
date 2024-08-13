@@ -183,10 +183,10 @@ def get_reference_panel_path(reference_panel="eur"):
         # If the reference panel files don't exist, attempt to download them
         if not check_bfiles(ref_panel_path):
             print(
-                f"The {reference_panel.capitalize()} reference panel was not found. Attempting to download it..."
+                f"The {reference_panel.capitalize()} (build 37) reference panel was not found. Attempting to download it..."
             )
             print(
-                "If you have already downloaded it, use genal.set_reference_folder(path) to avoid downloading again."
+                "If you have already downloaded it, or wish to use your own reference panel, use genal.set_reference_folder(path) to avoid downloading again."
             )
             
             try:
@@ -202,7 +202,7 @@ def get_reference_panel_path(reference_panel="eur"):
             with tarfile.open(os.path.join(ref_path, "reference_panels.tgz"), "r:gz") as tar_ref:
                 tar_ref.extractall(ref_path)
         else:
-            print(f"Using the {ref_panel_name} reference panel.")
+            print(f"Using the {ref_panel_name} (build 37) reference panel.")
 
     return ref_panel_path
 
@@ -228,6 +228,10 @@ def load_reference_panel(reference_panel="eur"):
     reference_panel_df = pd.read_csv(
         ref_panel_path + ".bim", sep="\t", names=["CHR","SNP","F","POS","A1","A2"]
     )
+    
+    # Convert CHR to string and remove 'chr' prefix if present, then convert to int
+    if str(reference_panel_df["CHR"][0]).startswith("chr"):
+        reference_panel_df["CHR"] = reference_panel_df["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
     return reference_panel_df
 
 def set_plink(path=""):
@@ -238,10 +242,16 @@ def set_plink(path=""):
     if not os.path.isfile(path):
         path = os.path.join(path, "plink")
 
+    # Check if the path is an executable
     try:
         process = subprocess.run(
             [path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5, text=True
         )
+
+        if not  os.access(path, os.X_OK):
+            raise TypeError("You do not have permission to execute the plink executable.")
+
+        # Check if the path is the correct plink version
         if not process.stdout.startswith("PLINK v1.9"):
             raise TypeError(
                 "The path provided is an executable, but not the plink 1.9 executable. Check the path and plink version."

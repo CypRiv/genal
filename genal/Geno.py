@@ -37,12 +37,13 @@ from .snp_query import async_query_gwas_catalog
 from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METHODS_NAMES
 
 # Do all the MR steps (query_outcome, harmonize etc) based on CHR/POS and not SNPs
+# Consider reference panels in build 38
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
 # Get proxies (simply return a list of proxies)
 # Multi-MR with python MR
-# When reading bim files (reference panels or update_snipds): handle the case where the chr column of the bim starts with chr
-# Handle genetic files in pgen
 # Switch to plink2.0 (but check that all functions exist)
+# Handle genetic files in pgen (requires plink2.0)
+# Helper function to read bim or pvar (or other variant files) from a genetic path and handle the cases where the chr column is not only a number
 
 
 class Geno:
@@ -68,34 +69,17 @@ class Geno:
         reference_panel_name (str): string to identify the reference_panel (path or population string)
 
     Methods:
-        preprocess_data():
-            Clean and preprocess dataframe of SNP data.
-
-        clump():
-            Clumps the main data and stores the result in data_clumped.
-
-        prs():
-            Computes Polygenic Risk Score on genomic data.
-
-        set_phenotype():
-            Assigns a DataFrame with individual-level data and a phenotype trait to
-            the phenotype attribute.
-
-        association_test():
-            Computes SNP-trait effect estimates, standard errors, and p-values.
-
-        query_outcome():
-            Extracts SNPs from outcome data with proxying and initializes MR_data.
-
-        MR():
-            Performs Mendelian Randomization between SNP-exposure and SNP-outcome data.
-
-        MRpresso():
-            Executes the MR-PRESSO algorithm for horizontal pleiotropy correction between
-            SNP-exposure and SNP-outcome data.
-
-        lift():
-            Lifts SNP data from one genomic build to another.
+        preprocess_data: Clean and preprocess the 'data' attribute (the main dataframe of SNP-level data).
+        clump: Clump the main data based on reference panels and return a new Geno object with the clumped data.
+        prs: Computes Polygenic Risk Score on genomic data.
+        set_phenotype: Assigns a DataFrame with individual-level data and a phenotype trait to the 'phenotype' attribute.
+        association_test: Computes SNP-trait effect estimates, standard errors, and p-values.
+        query_outcome: Extracts SNPs from SNP-outcome association data and stores it in the 'MR_data' attribute.
+        MR: Performs Mendelian Randomization between the SNP-exposure and SNP-outcome data stored in the 'MR_data' attribute. Stores the results in the 'MR_results' attribute.
+        MR_plot: Plot the results of the MR analysis stored in the 'MR_results' attribute.
+        MRpresso: Executes the MR-PRESSO algorithm for horizontal pleiotropy correction between the SNP-exposure and SNP-outcome data stored in the 'MR_data' attribute.
+        lift: Lifts SNP data from one genomic build to another.
+        query_gwas_catalog: Query the GWAS Catalog for SNP-trait associations.
     """
 
     def __init__(
@@ -416,8 +400,9 @@ class Geno:
         Returns:
             None: It updates the dataframe in the .data attribute.
             
-        Notes:
-            This can be used before extracting SNPs from the genetic data if there is possibility of a mismatch between the SNP name contained in the Geno dataframe (SNP-level data) and the SNP name used in the genetic data (individual-level data). Notably, this can avoid losing SNPs due to ID mismatch during polygenic risk scoring or single-SNP association testing.
+        Note:
+            This can be used before extracting SNPs from the genetic data if there is possibility of a mismatch between the SNP name contained in the Geno dataframe (SNP-level data) and the SNP name used in the genetic data (individual-level data). 
+            Notably, this can avoid losing SNPs due to ID mismatch during polygenic risk scoring or single-SNP association testing.
         """
         
         # Check mandatory columns
@@ -434,6 +419,11 @@ class Geno:
             bim = pd.read_csv(
                 path + ".bim", sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
             )
+
+            # Convert CHR to string and remove 'chr' prefix if present, then convert to int
+            if str(bim["CHR"][0]).startswith("chr"):
+                bim["CHR"] = bim["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
+
             data = data.merge(
                 bim[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
             )
@@ -571,14 +561,18 @@ class Geno:
                     path_i = path.replace("$", str(i))+ ".bim"
                     if os.path.exists(path_i):
                         bim_i = pd.read_csv(
-                            path_i, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
+                            path_i, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"], usecols=["SNP"]
                         )
                         genetic_snp_list.extend(bim_i.SNP.tolist())
             else: #If not split
-                bim = pd.read_csv(
-                            os.path.join(path, ".bim"), 
+                bim_path = os.path.join(path, ".bim")
+                if os.path.exists(bim_path):
+                    bim = pd.read_csv(
+                            bim_path, 
                             sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
-                )
+                        )
+                else:
+                    raise ValueError(f"The file {bim_path} does not exist.")
                 genetic_snp_list = bim.SNP.tolist()
             # Identify the SNPs already present in the genetic data
             genetic_snps = set(genetic_snp_list)
@@ -619,9 +613,6 @@ class Geno:
         """
         Assign a phenotype dataframe to the .phenotype attribute.
 
-        This method sets the .phenotype attribute which is essential to perform
-        single-SNP association tests using the association_test method.
-
         Args:
             data (pd.DataFrame): DataFrame containing individual-level row data with at least an individual IDs column
                                  and one phenotype column.
@@ -639,6 +630,10 @@ class Geno:
 
         Returns:
             None: Sets the .phenotype attribute for the instance.
+
+        Note:
+            This method sets the .phenotype attribute which is essential to perform single-SNP association tests using the association_test method.
+
         """
         
         processed_data, inferred_pheno_type = set_phenotype_func(
@@ -651,8 +646,6 @@ class Geno:
     def association_test(self, path=None, covar=[], standardize=True):
         """
         Conduct single-SNP association tests against a phenotype.
-
-        This method requires the phenotype to be set using the set_phenotype() function.
 
         Args:
             path (str, optional): Path to a bed/bim/fam set of genetic files.
@@ -667,6 +660,9 @@ class Geno:
         Returns:
             None: Updates the BETA, SE, and P columns of the data attribute based on the results
                   of the association tests.
+
+        Note:
+            This method requires the phenotype to be set using the set_phenotype() function.
         """
 
         # Ensure that the phenotype has been set using set_phenotype
@@ -1174,7 +1170,10 @@ class Geno:
         p_threshold=5e-8,
         return_p=False,
         return_study=False,
-        replace=True):
+        replace=True,
+        max_associations=None,
+        timeout=-1,
+    ):
         """
         Queries the GWAS Catalog Rest API and add an "ASSOC" column containing associated traits for each SNP.
         
@@ -1183,6 +1182,8 @@ class Geno:
             return_p (bool, optional): If True, include the p-value in the results. Default is False.
             return_study (bool, optional): If True, include the ID of the study from which the association is derived in the results. Default is False.
             replace (bool, optional): If True, updates the data attribute in place. Default is True.
+            max_associations (int, optional): If not None, only the first `max_associations` associations are reported for each SNP. Default is None.
+            timeout (int, optional): Timeout for each query in seconds. Default is -1 (custom timeout based on number of SNPs to query). Choose None for no timeout.
 
         Returns:
             pd.DataFrame: Data attribute with an additional column "ASSOC".
@@ -1199,26 +1200,42 @@ class Geno:
             data = self.data
             
         print(
-            f"Querying the GWAS Catalog and creating the ASSOC column. "
-            f"Only associations with a p-value <= {p_threshold} are reported. Use the p_threshold argument to change the threshold. "
-            f"To report the p-value of each association, use return_p=True. To report the study ID of the association, use return_study=True. "
+            f"Querying the GWAS Catalog and creating the ASSOC column. \n"
+            f"Only associations with a p-value <= {p_threshold} are reported. Use the p_threshold argument to change the threshold."
+        )
+        if max_associations:
+            print(f"Reporting the first {max_associations} associations for each SNP.")
+        if not return_p:
+            print(f"To report the p-value for each association, use return_p=True.")
+        if not return_study :
+            print(f"To report the study ID for each association, use return_study=True.")
+        print(
             f"The .data attribute will {'be' if replace else 'not be'} modified. "
             f"{'Use replace=False to leave it as is.' if replace else ''}"
-        )
+            )
         
+        # Estimate a reasonable timeout given the number of SNPs to query (45 SNPs per second)
+        timeout = max(len(data) / 45, 30) if timeout == -1 else timeout
+
         # Call the async function to query all SNPs
-        results_snps, errors = async_query_gwas_catalog(
+        results_snps, errors, timeouts = async_query_gwas_catalog(
             data.SNP.to_list(), 
             p_threshold=p_threshold, 
             return_p=return_p, 
-            return_study=return_study)
+            return_study=return_study,
+            max_associations=max_associations,
+            timeout=timeout,
+        )
         
         # Create the column
         data["ASSOC"] = data['SNP'].map(results_snps).fillna("FAILED_QUERY")
+        data.loc[data["SNP"].isin(timeouts), "ASSOC"] = "TIMEOUT"
         
         print("The ASSOC column has been successfully created.")
+        print(f"{len(errors)} ({len(errors)/len(data)*100:.2f}%) SNPs failed to query (not found in GWAS Catalog) and {len(timeouts)} ({len(timeouts)/len(data)*100:.1f}%) SNPs timed out after {timeout:.2f} seconds." 
+              f" You can increase the timeout value with the timeout argument.")
             
-        return data, errors
+        return data
         
 
     def standardize(self):
@@ -1291,6 +1308,11 @@ def merge_command_parallel(df_subset, path):
     bim = pd.read_csv(
         bim_path, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
     )
+
+    # Convert CHR to string and remove 'chr' prefix if present, then convert to int
+    if str(bim["CHR"][0]).startswith("chr"):
+        bim["CHR"] = bim["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
+    
     bim.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
 
     return df_subset.merge(

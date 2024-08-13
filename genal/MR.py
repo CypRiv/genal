@@ -684,8 +684,8 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
     model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
 
     # Extract coefficients
-    b = model.params[0]
-    se = model.bse[0]
+    b = model.params.iloc[0]
+    se = model.bse.iloc[0]
     pval = 2 * norm.sf(abs(b / se))
     Q_df = l - 1
     Q = model.scale * Q_df

@@ -19,6 +19,7 @@
     5. [Mendelian Randomization](#paragraph3.5)
     6. [SNP-association testing](#paragraph3.6)
     7. [Lifting](#paragraph3.7)
+    8. [GWAS Catalog](#paragraph3.8)
 
 
 ## Introduction <a name="introduction"></a>
@@ -79,7 +80,7 @@ For this tutorial, we will obtain genetic instruments for systolic blood pressur
 
 ### Data loading <a name="paragraph3.1"></a>
 
-We begin with publicly available summary statistics from a large GWAS study of systolic blood pressure. [Link to study](https://www.nature.com/articles/s41588-018-0205-x). After downloading and unzipping the summary statistics, we load them into a pandas DataFrame:
+We start this tutorial with publicly available summary statistics from a large GWAS study of systolic blood pressure. [Link to study](https://www.nature.com/articles/s41588-018-0205-x). After downloading and unzipping the summary statistics, we load them into a pandas DataFrame:
 
 ```python
 import pandas as pd
@@ -108,6 +109,10 @@ The `genal.Geno` takes as input a pandas dataframe where each row corresponds to
 - **P**: Column name for effect p-value. Defaults to `'P'`.
 - **EAF**: Column name for effect allele frequency. Defaults to `'EAF'`.
 
+> **Note:**
+> 
+> You do not need all columns to move forward, as not all columns are required by every function. Additionally, some columns can be imputed as we will see in the next paragraph.
+
 After inspecting the dataframe, we first need to extract the chromosome and position information from the `MarkerName` column into two new columns `CHR` and `POS`:
 
 ```python
@@ -133,7 +138,7 @@ The last argument (`keep_columns = False`) indicates that we do not wish to keep
 
 > **Note:**
 > 
-> Make sure to read the readme file usually provided with the summary statistics to identify the correct columns. It is particularly important to correctly identify the allele that represents the effect allele. Also, you do not need all columns to move forward, as some can be inputted as we will see next.
+> Make sure to read the readme file usually provided with the summary statistics to identify the correct columns. It is particularly important to correctly identify the allele that represents the effect allele.
 
 ### Data preprocessing <a name="paragraph3.2"></a>
 
@@ -312,7 +317,7 @@ and the output is:
     The PRS computation was successful and used 1330/1538 (86.476%) SNPs.
     PRS data saved to SBP_prs.csv
 
-In our case, we have been able to find proxies for 571 of the 786 SNPs that were missing in the population genetic data (7 potential proxies have been removed because they were identical to SNPs already present in our data).
+In our case, we have been able to find proxies for 578 of the 786 SNPs that were missing in the population genetic data (7 potential proxies have been removed because they were identical to SNPs already present in our data).
 
 You can customize how the proxies are chosen with the following arguments:
 - `reference_panel`: The reference population used to derive linkage disequilibrium values and find proxies. Defaults to `eur`.
@@ -322,7 +327,7 @@ You can customize how the proxies are chosen with the following arguments:
 
 > **Note:**
 > 
-> You can call the `genal.Geno.prs` method on any `Geno` instance (containing at least the EA, BETA, and either SNP or CHR/POS columns). The data does not need to be clumped, and there is no limit to the number of instruments used to compute the scores.
+> You can call the `genal.Geno.prs` method on any `Geno` instance (containing at least the EA, BETA, and either SNP or CHR/POS columns). The data does not need to be clumped, and there is no limit to the number of SNPs used to compute the scores.
 
 
 ### Mendelian Randomization <a name="paragraph3.5"></a>
@@ -482,7 +487,7 @@ df_pheno = pd.read_csv("path/to/trait/data")
 
 > **Note:**
 > 
-> One important detail is to make sure that the individual IDs are identical between the phenotypic data and the genetic data for the target population.
+>    One important detail is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
 
 Then, it is advised to make a copy of the `genal.Geno` instance containing our instruments as we are going to update their coefficients and to avoid any confusion:
 
@@ -560,5 +565,54 @@ You can specify the path of the LiftOver executable to the `liftover_path` argum
 SBP_Geno.lift(start = "hg19", end = "hg38", replace = False, liftover_path = "path/to/liftover/exec")
 ```
 
+### GWAS Catalog <a name="paragraph3.8"></a>
+
+It is sometimes interesting to determine the traits associated with our SNPs. In Mendelian Randomization, for instance, we may want to exclude instruments that are associated with traits likely causing horizontal pleiotropy. For this purpose, we can use the `genal.Geno.query_gwas_catalog` method. This method will query the GWAS Catalog API to determine the list of traits associated with each of our SNPs and store the results in a list in the `ASSOC` column of the `.data` attribute:
+
+```python
+SBP_clumped.query_gwas_catalog(p_threshold=5e-8)
+```
+Which will output:
+
+    Querying the GWAS Catalog and creating the ASSOC column. 
+    Only associations with a p-value <= 5e-08 are reported. Use the p_threshold argument to change the threshold.
+    To report the p-value for each association, use return_p=True.
+    To report the study ID for each association, use return_study=True.
+    The .data attribute will be modified. Use replace=False to leave it as is.
+    100%|██████████| 1545/1545 [00:34<00:00, 44.86it/s]
+    The ASSOC column has been successfully created.
+    701 (45.37%) SNPs failed to query (not found in GWAS Catalog) and 7 (0.5%) SNPs timed out after 34.33 seconds. You can increase the timeout value with the timeout argument.
+| EA  | NEA | EAF   | BETA   | SE     | CHR | POS        | SNP        | ASSOC                                                                 |
+|-----|-----|-------|--------|--------|-----|------------|------------|------------------------------------------------------------------------|
+| A   | G   | 0.1784| 0.2330 | 0.0402 | 10  | 102075479  | rs603424   | [eicosanoids measurement, decadienedioic acid (...]                     |
+| A   | G   | 0.0706| -0.3873| 0.0626 | 10  | 102403682  | rs2996303  | FAILED_QUERY                                                           |
+| T   | G   | 0.8872| 0.6846 | 0.0480 | 10  | 102553647  | rs1006545  | [diastolic blood pressure, systolic blood pressure...]                  |
+| T   | G   | 0.6652| -0.2098| 0.0340 | 10  | 102558506  | rs12570050 | FAILED_QUERY                                                           |
+| T   | C   | 0.3057| -0.2448| 0.0334 | 10  | 102603924  | rs4919502  | FAILED_QUERY                                                           |
+| ... | ... | ...   | ...    | ...    | ... | ...        | ...        | ...                                                                    |                                          |
+| T   | C   | 0.3514| 0.2203 | 0.0314 | 9   | 9350706    | rs1332813  | [diastolic blood pressure, systolic blood pressure...]                  |
+| T   | C   | 0.6880| -0.1897| 0.0332 | 9   | 94201341   | rs10820855 | FAILED_QUERY                                                           |
+| A   | T   | 0.3669| -0.1862| 0.0313 | 9   | 95201540   | rs7045409  | [protein measurement, pulse pressure measurement...]                   |
+
+If you are also interested in the p-values of each SNP-trait association, or the ID of the study from which the association was reported, you can use the `return_p = True` and `return_study = True` arguments. Then, the `ASSOC` column will contain a list of tuples, where each tuple contains the trait name, the p-value, and the study ID:
+
+```python
+SBP_clumped.query_gwas_catalog(p_threshold=5e-8, return_p=True, return_study=True)
+```
+
+| EA  | NEA | EAF   | BETA   | SE     | CHR | POS        | SNP        | ASSOC                                                                 |
+|-----|-----|-------|--------|--------|-----|------------|------------|------------------------------------------------------------------------|
+| A   | G   | 0.1784| 0.2330 | 0.0402 | 10  | 102075479  | rs603424   | TIMEOUT                                                                |
+| A   | G   | 0.0706| -0.3873| 0.0626 | 10  | 102403682  | rs2996303  | FAILED_QUERY                                                           |
+| T   | G   | 0.8872| 0.6846 | 0.0480 | 10  | 102553647  | rs1006545  | [(heart rate response to exercise, 6e-12, GCST...                      |
+| T   | G   | 0.6652| -0.2098| 0.0340 | 10  | 102558506  | rs12570050 | FAILED_QUERY                                                           |
+| T   | C   | 0.3057| -0.2448| 0.0334 | 10  | 102603924  | rs4919502  | FAILED_QUERY                                                           |
+| ... | ... | ...   | ...    | ...    | ... | ...        | ...        | ...                                                                    |                                                         |
+| T   | C   | 0.3514| 0.2203 | 0.0314 | 9   | 9350706    | rs1332813  | [(diastolic blood pressure, 1e-12, GCST9031029...                      |
+| T   | C   | 0.6880| -0.1897| 0.0332 | 9   | 94201341   | rs10820855 | FAILED_QUERY                                                           |
+| A   | T   | 0.3669| -0.1862| 0.0313 | 9   | 95201540   | rs7045409  | [(systolic blood pressure, 9e-13, GCST006624),...                      |
 
 
+> **Note:**
+> 
+> As you can see, many SNPs failed to be queried. This is normal as the GWAS Catalog is not exhaustive.

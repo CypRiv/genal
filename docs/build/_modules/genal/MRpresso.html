@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.MRpresso &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.MRpresso</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.MRpresso</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">statsmodels.api</span> <span class="k">as</span> <span class="nn">sm</span>
+<span class="kn">import</span> <span class="nn">statsmodels.formula.api</span> <span class="k">as</span> <span class="nn">smf</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span><span class="p">,</span> <span class="n">chi2</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ProcessPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span>
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">LinearRegression</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span> <span class="nn">numpy.random</span> <span class="kn">import</span> <span class="n">default_rng</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="c1">##todo: implement the multivariable option, for the moment we assume only 1 BETA_e column</span>
+<span class="c1"># Also: check if we can replace the LinearRegression of sklearn with one from statsmodels to avoid using sklearn just for that</span>
+
+
+<span class="c1"># MR-PRESSO main function</span>
+<div class="viewcode-block" id="mr_presso">
+<a class="viewcode-back" href="../../genal.html#genal.MRpresso.mr_presso">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_presso</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">,</span>
+    <span class="n">BETA_e_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+    <span class="n">n_iterations</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">outlier_test</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">distortion_test</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">significance_p</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+    <span class="n">cpus</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform the MR-PRESSO algorithm for detection of horizontal pleiotropy.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        data (pd.DataFrame): DataFrame with at least 4 columns: BETA_o (outcome), SE_o, BETA_e (exposure), SE_e.</span>
+<span class="sd">        BETA_e_columns (list): List of exposure beta columns.</span>
+<span class="sd">        n_iterations (int): Number of steps performed (random data generation).</span>
+<span class="sd">        outlier_test (bool): If True, identifies outlier SNPs responsible for horizontal pleiotropy.</span>
+<span class="sd">        distortion_test (bool): If True, tests significant distortion in the causal estimates.</span>
+<span class="sd">        significance_p (float): Statistical significance threshold for the detection of horizontal pleiotropy.</span>
+<span class="sd">        cpus (int): Number of CPUs to use for parallel processing.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        mod_table (pd.DataFrame): DataFrame with the original and outlier-corrected inverse variance-weighted MR results.</span>
+<span class="sd">        GlobalTest (dict): Dictionary with p-value of the global MR-PRESSO test.</span>
+<span class="sd">        OutlierTest (pd.DataFrame): DataFrame with p-value for each SNP for the outlier test.</span>
+<span class="sd">        BiasTest (dict): Dictionary with results of the distortion test.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Transforming the data</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">BETA_e_columns</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_e&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="n">data</span><span class="p">[[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">BETA_e_columns</span><span class="p">]]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">BETA_e_columns</span><span class="p">]]</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span>
+    <span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;SE_o&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Not enough instrumental variables&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">n_iterations</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+            <span class="s2">&quot;Not enough elements to compute empirical P-values, increase n_iterations&quot;</span>
+        <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running the MR-PRESSO algorithm with N = </span><span class="si">{</span><span class="n">n_iterations</span><span class="si">}</span><span class="s2"> iterations.&quot;</span><span class="p">)</span>
+    <span class="c1"># 1- Computing the observed residual sum of squares (RSS)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Computing the observed residual sum of squares...&quot;</span><span class="p">)</span>
+    <span class="n">RSSobs</span> <span class="o">=</span> <span class="n">getRSS_LOO</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="p">,</span> <span class="n">outlier_test</span><span class="p">)</span>
+
+    <span class="c1"># 2- Computing the distribution of expected residual sum of squares (RSS)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Computing the global MRPRESSO p-value...&quot;</span><span class="p">)</span>
+    <span class="n">partial_parallel_RSS_LOO</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
+        <span class="n">parallel_RSS_LOO</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="o">=</span><span class="n">BETA_e_columns</span>
+    <span class="p">)</span>  <span class="c1"># Wrapper function freezing the parallel_RSS_LOO call</span>
+    <span class="k">with</span> <span class="n">ProcessPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">cpus</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="n">tqdm</span><span class="p">(</span>
+                <span class="n">executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">partial_parallel_RSS_LOO</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_iterations</span><span class="p">)),</span>
+                <span class="n">total</span><span class="o">=</span><span class="n">n_iterations</span><span class="p">,</span>
+                <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Generating random data&quot;</span><span class="p">,</span>
+                <span class="n">ncols</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="n">RSSexp</span> <span class="o">=</span> <span class="p">[</span><span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">results</span><span class="p">]</span>
+    <span class="n">Random_data_e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">])</span>
+    <span class="n">Random_data_o</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">])</span>
+
+    <span class="n">global_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="n">r</span> <span class="o">&gt;</span> <span class="n">RSSobs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">RSSexp</span><span class="p">])</span> <span class="o">/</span> <span class="n">n_iterations</span>
+    <span class="n">global_p_str</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">global_p</span> <span class="k">if</span> <span class="n">global_p</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">n_iterations</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;&lt; </span><span class="si">{</span><span class="mi">1</span><span class="o">/</span><span class="n">n_iterations</span><span class="si">:</span><span class="s2">.1e</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">outlier_test</span><span class="p">:</span>
+        <span class="n">GlobalTest</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;RSSobs&quot;</span><span class="p">:</span> <span class="n">RSSobs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;Global_test_p&quot;</span><span class="p">:</span> <span class="n">global_p_str</span><span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">GlobalTest</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;RSSobs&quot;</span><span class="p">:</span> <span class="n">RSSobs</span><span class="p">,</span> <span class="s2">&quot;Global_test_p&quot;</span><span class="p">:</span> <span class="n">global_p_str</span><span class="p">}</span>
+
+    <span class="c1"># 3- Computing the single IV outlier test</span>
+    <span class="k">if</span> <span class="n">global_p</span> <span class="o">&lt;</span> <span class="n">significance_p</span> <span class="ow">and</span> <span class="n">outlier_test</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running the Outlier test.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">Dif</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">*</span> <span class="n">RSSobs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">Exp</span> <span class="o">=</span> <span class="n">Random_data_o</span> <span class="o">-</span> <span class="p">(</span><span class="n">Random_data_e</span> <span class="o">*</span> <span class="n">RSSobs</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Outlier test not done for multi MR.&quot;</span><span class="p">)</span>
+
+        <span class="n">abs_diffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">Exp</span><span class="o">.</span><span class="n">T</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">Dif</span><span class="p">)[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
+        <span class="n">pvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">abs_diffs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">Exp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">OutlierTest</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;RSSobs&quot;</span><span class="p">:</span> <span class="n">Dif</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Pvalue&quot;</span><span class="p">:</span> <span class="n">pvals</span><span class="p">})</span>
+
+        <span class="n">OutlierTest</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">index</span>
+        <span class="n">OutlierTest</span><span class="p">[</span><span class="s2">&quot;Pvalue&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span>
+            <span class="n">OutlierTest</span><span class="p">[</span><span class="s2">&quot;Pvalue&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="mi">1</span>
+        <span class="p">)</span>  <span class="c1"># Bonferroni correction</span>
+        <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">n_iterations</span> <span class="o">&gt;</span> <span class="n">significance_p</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Warning: the Outlier test in unstable. The </span><span class="si">{</span><span class="n">significance_p</span><span class="si">}</span><span class="s2"> significance threshold cannot be obtained with </span><span class="si">{</span><span class="n">n_iterations</span><span class="si">}</span><span class="s2"> Distributions. Increase n_iterations.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">outlier_test</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">OutlierTest</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+    <span class="c1"># 4- Computing the test of the distortion of the causal estimate</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running the Distortion test.&quot;</span><span class="p">)</span>
+    <span class="n">formula</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;BETA_o ~ -1 + </span><span class="si">{</span><span class="s1">&#39; + &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">mod_all</span> <span class="o">=</span> <span class="n">smf</span><span class="o">.</span><span class="n">wls</span><span class="p">(</span><span class="n">formula</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="n">BiasTest</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">distortion_test</span> <span class="ow">and</span> <span class="n">outlier_test</span><span class="p">:</span>
+        <span class="c1">## Is there an error in the MRPRESSO code? The outlier indices are supposed to be excluded from the expected bias computation (as per the paper).</span>
+        <span class="k">def</span> <span class="nf">get_random_bias</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">ref_outlier</span><span class="p">):</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">ref_outlier</span><span class="p">,</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+                        <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">)),</span>
+                        <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">),</span>
+                    <span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">subset_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">indices</span><span class="p">[:</span> <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">)]]</span>
+            <span class="n">mod_random</span> <span class="o">=</span> <span class="n">smf</span><span class="o">.</span><span class="n">wls</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;BETA_o ~ -1 + </span><span class="si">{</span><span class="s1">&#39; + &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">subset_data</span><span class="p">,</span>
+                <span class="n">weights</span><span class="o">=</span><span class="n">subset_data</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">],</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">mod_random</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">]</span>
+
+        <span class="n">ref_outlier</span> <span class="o">=</span> <span class="n">OutlierTest</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">OutlierTest</span><span class="p">[</span><span class="s2">&quot;Pvalue&quot;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">significance_p</span><span class="p">]</span><span class="o">.</span><span class="n">index</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+                <span class="n">BiasExp</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">get_random_bias</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">ref_outlier</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_iterations</span><span class="p">)</span>
+                <span class="p">]</span>
+                <span class="n">BiasExp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">BiasExp</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+
+                <span class="n">subset_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">)</span>
+                <span class="n">mod_no_outliers</span> <span class="o">=</span> <span class="n">smf</span><span class="o">.</span><span class="n">wls</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;BETA_o ~ -1 + </span><span class="si">{</span><span class="s1">&#39; + &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">data</span><span class="o">=</span><span class="n">subset_data</span><span class="p">,</span>
+                    <span class="n">weights</span><span class="o">=</span><span class="n">subset_data</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">],</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+                <span class="n">BiasObs</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">mod_all</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">]</span>
+                    <span class="o">-</span> <span class="n">mod_no_outliers</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">]</span>
+                <span class="p">)</span> <span class="o">/</span> <span class="nb">abs</span><span class="p">(</span><span class="n">mod_no_outliers</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">])</span>
+                <span class="n">BiasExp</span> <span class="o">=</span> <span class="p">(</span><span class="n">mod_all</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">]</span> <span class="o">-</span> <span class="n">BiasExp</span><span class="p">)</span> <span class="o">/</span> <span class="nb">abs</span><span class="p">(</span><span class="n">BiasExp</span><span class="p">)</span>
+
+                <span class="n">p_value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">BiasExp</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">BiasObs</span><span class="p">))</span> <span class="o">/</span> <span class="n">n_iterations</span>
+
+                <span class="n">BiasTest</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;Outliers Indices&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">),</span>
+                    <span class="s2">&quot;Distortion test coefficient&quot;</span><span class="p">:</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">BiasObs</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="s2">&quot;Distortion test p-value&quot;</span><span class="p">:</span> <span class="n">p_value</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="p">}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">BiasTest</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;Outliers Indices&quot;</span><span class="p">:</span> <span class="s2">&quot;All SNPs considered as outliers&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;Distortion test coefficient&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                    <span class="s2">&quot;Distortion test p-value&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">BiasTest</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;Outliers Indices&quot;</span><span class="p">:</span> <span class="s2">&quot;No significant outliers&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Distortion test coefficient&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;Distortion test p-value&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+
+    <span class="c1"># 5- Format</span>
+    <span class="n">row_original</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;exposure&quot;</span><span class="p">:</span> <span class="n">BETA_e_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;Raw&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
+        <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">mod_all</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">mod_all</span><span class="o">.</span><span class="n">bse</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">mod_all</span><span class="o">.</span><span class="n">pvalues</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="s2">&quot;mod_no_outliers&quot;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">():</span>
+        <span class="n">row_corrected</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;exposure&quot;</span><span class="p">:</span> <span class="n">BETA_e_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;Outlier-corrected&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_outlier</span><span class="p">),</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">mod_no_outliers</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">mod_no_outliers</span><span class="o">.</span><span class="n">bse</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">mod_no_outliers</span><span class="o">.</span><span class="n">pvalues</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+        <span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">row_corrected</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;exposure&quot;</span><span class="p">:</span> <span class="n">BETA_e_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;Outlier-corrected&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="n">mod_table</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">row_original</span><span class="p">,</span> <span class="n">row_corrected</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">mod_table</span><span class="p">,</span> <span class="n">GlobalTest</span><span class="p">,</span> <span class="n">OutlierTest</span><span class="p">,</span> <span class="n">BiasTest</span></div>
+
+
+
+<span class="c1">## MR-PRESSO helper functions</span>
+<span class="c1"># Define the matrix power operator</span>
+<div class="viewcode-block" id="power_eigen">
+<a class="viewcode-back" href="../../genal.html#genal.MRpresso.power_eigen">[docs]</a>
+<span class="k">def</span> <span class="nf">power_eigen</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="n">values</span><span class="p">,</span> <span class="n">vectors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eig</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">vectors</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">values</span><span class="o">**</span><span class="n">n</span><span class="p">))</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vectors</span><span class="o">.</span><span class="n">T</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Function to compute the residual sum of squares in a LOO framework</span>
+<div class="viewcode-block" id="getRSS_LOO">
+<a class="viewcode-back" href="../../genal.html#genal.MRpresso.getRSS_LOO">[docs]</a>
+<span class="k">def</span> <span class="nf">getRSS_LOO</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="p">,</span> <span class="n">returnIV</span><span class="p">):</span>
+    <span class="n">dataW</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">BETA_e_columns</span><span class="p">]</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">dataW</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">Y</span> <span class="o">=</span> <span class="n">dataW</span><span class="p">[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="c1"># Matrix operations after LOO</span>
+    <span class="k">def</span> <span class="nf">loo_calculation</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+        <span class="n">X_loo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">Y_loo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">power_eigen</span><span class="p">(</span><span class="n">X_loo</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">X_loo</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">X_loo</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Y_loo</span><span class="p">)</span>
+
+    <span class="n">CausalEstimate_LOO</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">loo_calculation</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dataW</span><span class="p">))])</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">CausalEstimate_LOO</span> <span class="o">=</span> <span class="n">CausalEstimate_LOO</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">RSS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nansum</span><span class="p">((</span><span class="n">Y</span> <span class="o">-</span> <span class="n">CausalEstimate_LOO</span> <span class="o">*</span> <span class="n">X</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Needs to do the getRSS_LOO for multi exposure.&quot;</span><span class="p">)</span>
+        <span class="c1"># RSS = np.nansum((Y - np.sum(CausalEstimate_LOO.T * X, axis=1)) ** 2)</span>
+
+    <span class="k">if</span> <span class="n">returnIV</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">RSS</span><span class="p">,</span> <span class="n">CausalEstimate_LOO</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">RSS</span></div>
+
+
+
+<span class="c1"># Generate random data based on normal distributions</span>
+<div class="viewcode-block" id="getRandomData">
+<a class="viewcode-back" href="../../genal.html#genal.MRpresso.getRandomData">[docs]</a>
+<span class="k">def</span> <span class="nf">getRandomData</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">]):</span>
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">default_rng</span><span class="p">()</span>
+
+    <span class="n">models</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)):</span>
+        <span class="n">lm</span> <span class="o">=</span> <span class="n">LinearRegression</span><span class="p">(</span><span class="n">fit_intercept</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">data_i</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">lm</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+            <span class="n">data_i</span><span class="p">[</span><span class="n">BETA_e_columns</span><span class="p">],</span> <span class="n">data_i</span><span class="p">[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">],</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">data_i</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lm</span><span class="p">)</span>
+
+    <span class="n">random_data_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">sd_col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">BETA_e_columns</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;SE_e&quot;</span><span class="p">]):</span>
+        <span class="n">random_data_dict</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="n">sd_col</span><span class="p">])</span>
+
+    <span class="n">random_data_dict</span><span class="p">[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[[</span><span class="n">i</span><span class="p">]][</span><span class="n">BETA_e_columns</span><span class="p">]),</span> <span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s2">&quot;SE_o&quot;</span><span class="p">]</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">model</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">models</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">random_data_dict</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Weights&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="n">random_data_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">random_data_dict</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">random_data_df</span></div>
+
+
+
+<span class="c1"># Function for the parallel executor in step 2: generate random data and compute the expected residual sum of squares</span>
+<div class="viewcode-block" id="parallel_RSS_LOO">
+<a class="viewcode-back" href="../../genal.html#genal.MRpresso.parallel_RSS_LOO">[docs]</a>
+<span class="k">def</span> <span class="nf">parallel_RSS_LOO</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="p">):</span>
+    <span class="n">random_data</span> <span class="o">=</span> <span class="n">getRandomData</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="p">)</span>
+
+    <span class="n">rss_exp</span> <span class="o">=</span> <span class="n">getRSS_LOO</span><span class="p">(</span><span class="n">random_data</span><span class="p">,</span> <span class="n">BETA_e_columns</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">rss_exp</span><span class="p">,</span> <span class="n">random_data</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">random_data</span><span class="p">[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

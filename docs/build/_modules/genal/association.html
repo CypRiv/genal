@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.association &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.association</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.association</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">pandas.api.types</span> <span class="kn">import</span> <span class="n">is_numeric_dtype</span>
+<span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="k">as</span> <span class="nn">st</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span>
+
+<span class="kn">from</span> <span class="nn">.extract_prs</span> <span class="kn">import</span> <span class="n">check_bfiles</span>
+<span class="kn">from</span> <span class="nn">.tools</span> <span class="kn">import</span> <span class="n">get_plink19_path</span>
+
+
+<div class="viewcode-block" id="association_test_func">
+<a class="viewcode-back" href="../../genal.html#genal.association.association_test_func">[docs]</a>
+<span class="k">def</span> <span class="nf">association_test_func</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">covar_list</span><span class="p">,</span> <span class="n">standardize</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">data_pheno</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Conduct single-SNP association tests against a phenotype.</span>
+
+<span class="sd">    This function performs a series of operations:</span>
+<span class="sd">        1. Checks for necessary preliminary steps.</span>
+<span class="sd">        2. Updates the FAM file with the phenotype data.</span>
+<span class="sd">        3. Creates a covariate file if required.</span>
+<span class="sd">        4. Runs a PLINK association test.</span>
+<span class="sd">        5. Processes the results and returns them.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        data (pd.DataFrame): Genetic data with the standard Geno columns.</span>
+<span class="sd">        covar_list (list): List of column names in the data_pheno DataFrame to use as covariates.</span>
+<span class="sd">        standardize (bool): Flag indicating if the phenotype needs standardization.</span>
+<span class="sd">        name (str): Prefix for the filenames used during the process.</span>
+<span class="sd">        data_pheno (pd.DataFrame): Phenotype data with at least an IID and PHENO columns.</span>
+<span class="sd">        pheno_type (str): Type of phenotype (&#39;binary&#39; or &#39;quant&#39;).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: Processed results of the association test.</span>
+
+<span class="sd">    This function corresponds to the following Geno method: :meth:`Geno.association_test`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Check necessary files are available</span>
+    <span class="n">genetic_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">check_bfiles</span><span class="p">(</span><span class="n">genetic_path</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="s2">&quot;Run the extract_snps() method before performing association tests.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;No SNPs for the association tests. Check the .data or .data_clumped dataframes.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Update phenotype in the FAM file</span>
+    <span class="n">fam</span> <span class="o">=</span> <span class="n">_prepare_fam_file</span><span class="p">(</span><span class="n">genetic_path</span><span class="p">,</span> <span class="n">data_pheno</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">,</span> <span class="n">standardize</span><span class="p">)</span>
+
+    <span class="c1"># Prepare covariate file if covariates are provided</span>
+    <span class="n">covar</span><span class="p">,</span> <span class="n">covar_filename</span> <span class="o">=</span> <span class="n">_handle_covariates</span><span class="p">(</span><span class="n">covar_list</span><span class="p">,</span> <span class="n">data_pheno</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="c1"># Execute PLINK association test</span>
+    <span class="n">output</span><span class="p">,</span> <span class="n">method</span> <span class="o">=</span> <span class="n">_run_plink_assoc_test</span><span class="p">(</span>
+        <span class="n">genetic_path</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">,</span> <span class="n">covar</span><span class="p">,</span> <span class="n">covar_filename</span><span class="p">,</span> <span class="n">covar_list</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Process and return results</span>
+    <span class="k">return</span> <span class="n">_process_results</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_prepare_fam_file</span><span class="p">(</span><span class="n">genetic_path</span><span class="p">,</span> <span class="n">data_pheno</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">,</span> <span class="n">standardize</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to prepare the FAM file with phenotype data.&quot;&quot;&quot;</span>
+    <span class="c1"># Read the FAM file</span>
+    <span class="n">fam</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">genetic_path</span> <span class="o">+</span> <span class="s2">&quot;.fam&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">)</span>
+    <span class="c1"># Extract relevant phenotype data</span>
+    <span class="n">data_pheno_trait</span> <span class="o">=</span> <span class="n">data_pheno</span><span class="p">[[</span><span class="s2">&quot;IID&quot;</span><span class="p">,</span> <span class="s2">&quot;PHENO&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;IID&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="c1"># Merge phenotype data with the FAM dataframe</span>
+    <span class="n">fam</span> <span class="o">=</span> <span class="n">fam</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">data_pheno_trait</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">indicator</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">fam</span><span class="o">.</span><span class="n">PHENO</span>
+    <span class="c1"># Verify that the merge was successful</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">fam</span><span class="p">[</span><span class="s2">&quot;_merge&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;both&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;The IDs in the phenotype dataframe are inconsistent with those in the genetic dataset. Call set_phenotype() method again, specifying the correct column name for the genetic IDs.&quot;</span>
+        <span class="p">)</span>
+    <span class="n">fam</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;PHENO&quot;</span><span class="p">,</span> <span class="s2">&quot;_merge&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Count the number of individuals with a valid phenotype trait</span>
+    <span class="n">n_non_na</span> <span class="o">=</span> <span class="n">fam</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_non_na</span><span class="si">}</span><span class="s2"> individuals are present in the genetic data and have a valid phenotype trait.&quot;</span>
+    <span class="p">)</span>
+    <span class="c1"># Update phenotype values based on its type</span>
+    <span class="k">if</span> <span class="n">pheno_type</span> <span class="o">==</span> <span class="s2">&quot;binary&quot;</span><span class="p">:</span>
+        <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int64&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pheno_type</span> <span class="o">==</span> <span class="s2">&quot;quant&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">standardize</span> <span class="o">==</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="c1"># Standardizing for quantitative phenotypes</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">&quot;Standardizing the phenotype to approximate a normal distribution. Use standardize = False if you do not want to standardize.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">-</span> <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">/</span> <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+    <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">fam</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="o">-</span><span class="mi">9</span><span class="p">)</span>
+    <span class="n">fam</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">genetic_path</span> <span class="o">+</span> <span class="s2">&quot;.fam&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">fam</span>
+
+
+<span class="k">def</span> <span class="nf">_handle_covariates</span><span class="p">(</span><span class="n">covar_list</span><span class="p">,</span> <span class="n">data_pheno</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to prepare the covariate file.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">covar_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># Ensure all covariates are present in phenotype data</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">covar_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data_pheno</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> column is not found in the .phenotype dataframe.&quot;</span>
+                <span class="p">)</span>
+        <span class="c1"># Select required columns and rename columns</span>
+        <span class="n">data_cov</span> <span class="o">=</span> <span class="n">data_pheno</span><span class="p">[[</span><span class="s2">&quot;IID&quot;</span><span class="p">,</span> <span class="s2">&quot;IID&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">covar_list</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">data_cov</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;FID&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">data_cov</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="c1"># Remove rows with NA values and print their number</span>
+        <span class="n">nrows</span> <span class="o">=</span> <span class="n">data_cov</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">data_cov</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">removed_rows</span> <span class="o">=</span> <span class="n">nrows</span> <span class="o">-</span> <span class="n">data_cov</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">removed_rows</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">removed_rows</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">removed_rows</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) individuals have NA values in the covariates columns and will be excluded from the association tests.&quot;</span>
+            <span class="p">)</span>
+        <span class="c1"># Ensure the covariates are numeric and not trivial (lead to association fail)</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">covar_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">data_pheno</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> covariate contains only one value and is removed from the tests.&quot;</span>
+                <span class="p">)</span>
+                <span class="n">data_cov</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">is_numeric_dtype</span><span class="p">(</span><span class="n">data_pheno</span><span class="p">[</span><span class="n">col</span><span class="p">]):</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> covariate is not numeric and is removed from the tests.&quot;</span>
+                <span class="p">)</span>
+                <span class="n">data_cov</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+        <span class="c1"># Define the covariate filename</span>
+        <span class="n">covar_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_covar.cov&quot;</span><span class="p">)</span>
+        <span class="c1"># Ensure FID and IID are in integer format and write the covariate file</span>
+        <span class="n">data_cov</span><span class="p">[</span><span class="s2">&quot;IID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_cov</span><span class="p">[</span><span class="s2">&quot;IID&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int64&quot;</span><span class="p">)</span>
+        <span class="n">data_cov</span><span class="p">[</span><span class="s2">&quot;FID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_cov</span><span class="p">[</span><span class="s2">&quot;FID&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int64&quot;</span><span class="p">)</span>
+        <span class="n">data_cov</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">covar_filename</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">covar</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">covar</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">covar_filename</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">covar</span><span class="p">,</span> <span class="n">covar_filename</span>
+
+
+<span class="k">def</span> <span class="nf">_run_plink_assoc_test</span><span class="p">(</span>
+    <span class="n">genetic_path</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">,</span> <span class="n">covar</span><span class="p">,</span> <span class="n">covar_filename</span><span class="p">,</span> <span class="n">covar_list</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to execute the PLINK association test.&quot;&quot;&quot;</span>
+    <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;logistic&quot;</span> <span class="k">if</span> <span class="n">pheno_type</span> <span class="o">==</span> <span class="s2">&quot;binary&quot;</span> <span class="k">else</span> <span class="s2">&quot;linear&quot;</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Running single-SNP </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> regression tests on </span><span class="si">{</span><span class="n">genetic_path</span><span class="si">}</span><span class="s2"> data </span><span class="si">{</span><span class="sa">f</span><span class="s1">&#39;with adjustment for: </span><span class="si">{</span><span class="n">covar_list</span><span class="si">}</span><span class="s1">&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">covar</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;without covariate adjustments&#39;</span><span class="si">}</span><span class="s2">.&quot;</span>
+    <span class="p">)</span>
+    <span class="c1"># Formulate the covariate argument for the PLINK command</span>
+    <span class="n">covar_argument</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;--covar </span><span class="si">{</span><span class="n">covar_filename</span><span class="si">}</span><span class="s2"> --hide-covar&quot;</span> <span class="k">if</span> <span class="n">covar</span> <span class="o">==</span> <span class="kc">True</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="c1"># Construct and run the PLINK command</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">genetic_path</span><span class="si">}</span><span class="s2"> --</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">covar_argument</span><span class="si">}</span><span class="s2"> --out </span><span class="si">{</span><span class="n">output</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">output</span><span class="p">,</span> <span class="n">method</span>
+
+
+<span class="k">def</span> <span class="nf">_process_results</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">pheno_type</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to process results after the PLINK association test.&quot;&quot;&quot;</span>
+    <span class="c1"># Path to PLINK results</span>
+    <span class="n">results_path</span> <span class="o">=</span> <span class="n">output</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;.assoc.&quot;</span> <span class="o">+</span> <span class="n">method</span>
+    <span class="n">assoc</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">results_path</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot;\s+&quot;</span><span class="p">)</span>
+
+    <span class="c1"># If logistic regression, log-transform the odds ratio</span>
+    <span class="n">assoc</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">assoc</span><span class="o">.</span><span class="n">OR</span><span class="p">)</span> <span class="k">if</span> <span class="n">pheno_type</span> <span class="o">==</span> <span class="s2">&quot;binary&quot;</span> <span class="k">else</span> <span class="n">assoc</span><span class="o">.</span><span class="n">BETA</span>
+    
+    <span class="n">n_na</span> <span class="o">=</span> <span class="n">assoc</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    
+    <span class="c1"># Merge results with the clumped data</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">,</span> <span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;P&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+        <span class="n">assoc</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;inner&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;SNP&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Adjust beta values based on allele match</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">EA</span> <span class="o">==</span> <span class="n">data</span><span class="o">.</span><span class="n">A1</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">BETA</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">NEA</span> <span class="o">==</span> <span class="n">data</span><span class="o">.</span><span class="n">A1</span><span class="p">,</span> <span class="o">-</span><span class="n">data</span><span class="o">.</span><span class="n">BETA</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Calculate and set standard error values</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;SE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">BETA</span> <span class="o">/</span> <span class="n">st</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">P</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="c1"># Drop unnecessary columns</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span>
+        <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">,</span> <span class="s2">&quot;TEST&quot;</span><span class="p">,</span> <span class="s2">&quot;NMISS&quot;</span><span class="p">,</span> <span class="s2">&quot;OR&quot;</span><span class="p">,</span> <span class="s2">&quot;STAT&quot;</span><span class="p">,</span> <span class="s2">&quot;BP&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Remove rows with mismatches in allele columns and notify the user</span>
+    <span class="n">nrow_previous</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="s2">&quot;BETA&quot;</span><span class="p">)</span>
+    <span class="n">delta_nrow</span> <span class="o">=</span> <span class="n">nrow_previous</span> <span class="o">-</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">n_na</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">delta_nrow</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">n_na</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">n_na</span><span class="si">}</span><span class="s1">(</span><span class="si">{</span><span class="n">n_na</span><span class="o">/</span><span class="n">nrow_previous</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s1">.3f</span><span class="si">}</span><span class="s1">%) SNP-trait tests returned NA value and &#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">n_na</span><span class="o">&gt;</span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">}{</span><span class="n">delta_nrow</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">delta_nrow</span><span class="o">/</span><span class="n">nrow_previous</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) SNPs removed due to allele discrepancies between the main data and the genetic data.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span>
+
+
+<div class="viewcode-block" id="set_phenotype_func">
+<a class="viewcode-back" href="../../genal.html#genal.association.set_phenotype_func">[docs]</a>
+<span class="k">def</span> <span class="nf">set_phenotype_func</span><span class="p">(</span><span class="n">data_original</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">PHENO_type</span><span class="p">,</span> <span class="n">IID</span><span class="p">,</span> <span class="n">alternate_control</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        data (pd.DataFrame): Contains at least an individual IDs column and one phenotype column.</span>
+<span class="sd">        IID (str): Name of the individual IDs column in data.</span>
+<span class="sd">        PHENO (str): Name of the phenotype column in data.</span>
+<span class="sd">        PHENO_type (str, optional): Type of the phenotype column. Either &quot;quant&quot; for quantitative (continuous) or &quot;binary&quot;.The function tries to infer the type if not provided.</span>
+<span class="sd">        alternate_control (bool): Assumes that for a binary trait, the controls are coded with the most frequent value. Use True to reverse the assumption.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: The modified data.</span>
+<span class="sd">        str: The inferred or provided PHENO_type.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: For inconsistencies in the provided data or arguments.</span>
+
+<span class="sd">    This function corresponds to the following GENO method: :meth:`GENO.set_phenotype`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data_original</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">_validate_columns_existence</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">IID</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">_standardize_column_names</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">IID</span><span class="p">)</span>
+    <span class="n">PHENO_type</span> <span class="o">=</span> <span class="n">_determine_phenotype_type</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO_type</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">_validate_and_process_phenotype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">PHENO_type</span><span class="p">,</span> <span class="n">alternate_control</span><span class="p">)</span>
+    <span class="n">_report_na_values</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The phenotype data is stored in the .phenotype attribute.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">PHENO_type</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_validate_columns_existence</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">IID</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks if columns exist and raises errors if not.&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">[</span><span class="n">PHENO</span><span class="p">,</span> <span class="n">IID</span><span class="p">]:</span>
+        <span class="c1"># Raise an error if the column name is not provided</span>
+        <span class="k">if</span> <span class="n">column</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Please provide a name for the </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2"> variable.&quot;</span><span class="p">)</span>
+        <span class="c1"># Raise an error if the column does not exist in the data</span>
+        <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The column &#39;</span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2">&#39; is not present in the dataset. This column is required!&quot;</span>
+            <span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The phenotype dataframe is empty.&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_standardize_column_names</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">IID</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Standardizes the column names to &#39;IID&#39; and &#39;PHENO&#39;.&quot;&quot;&quot;</span>
+    <span class="c1"># Drop redundant columns if they exist and rename the target columns to standard names</span>
+    <span class="k">if</span> <span class="n">PHENO</span> <span class="o">!=</span> <span class="s2">&quot;PHENO&quot;</span><span class="p">:</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;PHENO&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">IID</span> <span class="o">!=</span> <span class="s2">&quot;IID&quot;</span><span class="p">:</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;IID&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="n">IID</span><span class="p">:</span> <span class="s2">&quot;IID&quot;</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">:</span> <span class="s2">&quot;PHENO&quot;</span><span class="p">},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span>
+
+
+<span class="k">def</span> <span class="nf">_determine_phenotype_type</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO_type</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Guesses or validates the phenotype type.&quot;&quot;&quot;</span>
+    <span class="c1"># If phenotype type is not given, deduce it based on the unique values in the column</span>
+    <span class="k">if</span> <span class="n">PHENO_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">dropna</span><span class="p">()))</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Detected a binary phenotype in the &#39;PHENO&#39; column. Specify &#39;PHENO_type=</span><span class="se">\&quot;</span><span class="s2">quant</span><span class="se">\&quot;</span><span class="s2">&#39; if this is incorrect.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="s2">&quot;binary&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Detected a quantitative phenotype in the &#39;PHENO&#39; column. Specify &#39;PHENO_type=</span><span class="se">\&quot;</span><span class="s2">binary</span><span class="se">\&quot;</span><span class="s2">&#39; if this is incorrect.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="s2">&quot;quant&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">PHENO_type</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;binary&quot;</span><span class="p">,</span> <span class="s2">&quot;quant&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The only possible values for the PHENO_type argument are &#39;binary&#39; or &#39;quant&#39;&quot;</span>
+            <span class="p">)</span>
+    <span class="k">return</span> <span class="n">PHENO_type</span>
+
+
+<span class="k">def</span> <span class="nf">_validate_and_process_phenotype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">PHENO_type</span><span class="p">,</span> <span class="n">alternate_control</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validates the phenotype and processes it accordingly.&quot;&quot;&quot;</span>
+    <span class="c1"># Process the phenotype based on its type</span>
+    <span class="k">if</span> <span class="n">PHENO_type</span> <span class="o">==</span> <span class="s2">&quot;binary&quot;</span><span class="p">:</span>
+        <span class="n">_process_binary_phenotype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">alternate_control</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">PHENO_type</span> <span class="o">==</span> <span class="s2">&quot;quant&quot;</span><span class="p">:</span>
+        <span class="n">_validate_quantitative_phenotype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Accepted values for &#39;PHENO_type&#39; are &#39;binary&#39; or &#39;quant&#39;.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span>
+
+
+<span class="k">def</span> <span class="nf">_process_binary_phenotype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">,</span> <span class="n">alternate_control</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Processes a binary phenotype.&quot;&quot;&quot;</span>
+    <span class="c1"># Ensure that the phenotype is binary</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">dropna</span><span class="p">()))</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The &#39;</span><span class="si">{</span><span class="n">PHENO</span><span class="si">}</span><span class="s2">&#39; column is not binary as it contains more than two distinct values.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">alternate_control</span><span class="p">:</span>
+        <span class="n">code_control</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">code_case</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">code_control</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">code_case</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Identified </span><span class="si">{</span><span class="n">code_control</span><span class="si">}</span><span class="s2"> as the control code in &#39;PHENO&#39;. </span><span class="si">{</span><span class="s1">&#39;Set alternate_control=True to inverse this interpretation.&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">alternate_control</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Update the control and case codings</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">replace</span><span class="p">({</span><span class="s2">&quot;PHENO&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">code_control</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="n">code_case</span><span class="p">:</span> <span class="mi">1</span><span class="p">}},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_validate_quantitative_phenotype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">PHENO</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validates a quantitative phenotype.&quot;&quot;&quot;</span>
+    <span class="c1"># Ensure that the phenotype is numeric</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_numeric_dtype</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The &#39;</span><span class="si">{</span><span class="n">PHENO</span><span class="si">}</span><span class="s2">&#39; column must contain numeric values for a quantitative phenotype.&quot;</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_report_na_values</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reports the number of NA values in &#39;IID&#39; and &#39;PHENO&#39; columns.&quot;&quot;&quot;</span>
+    <span class="n">nrows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">n_nan_id</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">IID</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">n_nan_pheno</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">PHENO</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="c1"># Report NA values in ID and PHENO columns, if they exist</span>
+    <span class="k">if</span> <span class="n">n_nan_id</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">n_nan_id</span><span class="si">}</span><span class="s2"> NA values in the &#39;ID&#39; column, accounting for </span><span class="si">{</span><span class="n">n_nan_id</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">% of entries. These will be omitted during analyses.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_nan_pheno</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">n_nan_pheno</span><span class="si">}</span><span class="s2"> NA values in the &#39;PHENO&#39; column, accounting for </span><span class="si">{</span><span class="n">n_nan_pheno</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">% of entries. These will be omitted during analyses.&quot;</span>
+        <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

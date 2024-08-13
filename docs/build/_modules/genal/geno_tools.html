@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.geno_tools &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.geno_tools</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.geno_tools</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="k">as</span> <span class="nn">st</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">Counter</span>
+
+<span class="kn">from</span> <span class="nn">.constants</span> <span class="kn">import</span> <span class="n">STANDARD_COLUMNS</span>
+
+
+<div class="viewcode-block" id="remove_na">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.remove_na">[docs]</a>
+<span class="k">def</span> <span class="nf">remove_na</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Identify the standard columns containing NA values. Delete rows with NA values.&quot;&quot;&quot;</span>
+    <span class="n">nrows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">present_standard_columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">STANDARD_COLUMNS</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="n">columns_na</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">data</span><span class="p">[</span><span class="n">present_standard_columns</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="n">present_standard_columns</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">()]</span>
+        <span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="n">present_standard_columns</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">n_del</span> <span class="o">=</span> <span class="n">nrows</span> <span class="o">-</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">n_del</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Deleted </span><span class="si">{</span><span class="n">n_del</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">n_del</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) rows containing NA values in columns </span><span class="si">{</span><span class="n">columns_na</span><span class="si">}</span><span class="s2">. Use preprocessing = &#39;Fill&#39; to keep the rows containing NA values.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="check_snp_column">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.check_snp_column">[docs]</a>
+<span class="k">def</span> <span class="nf">check_snp_column</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove duplicates in the SNP column.&quot;&quot;&quot;</span>
+    <span class="n">duplicate_indices</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">],</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;first&quot;</span><span class="p">)]</span><span class="o">.</span><span class="n">index</span>
+    <span class="n">n_del</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">duplicate_indices</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_del</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">duplicate_indices</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_del</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">n_del</span><span class="o">/</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) duplicated SNPs have been removed. Use keep_dups=True to keep them.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="check_allele_column">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.check_allele_column">[docs]</a>
+<span class="k">def</span> <span class="nf">check_allele_column</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">allele_col</span><span class="p">,</span> <span class="n">keep_multi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Verify that the corresponding allele column is upper case strings. Set to nan if not formed with A, T, C, G letters.</span>
+<span class="sd">    Set to nan if values are multiallelic unless keep_multi=True.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">nrows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">data</span><span class="p">[</span><span class="n">allele_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">allele_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">atcg_condition</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">allele_col</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="s2">&quot;^[ATCG]+$&quot;</span><span class="p">,</span> <span class="n">na</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">atcg_count</span> <span class="o">=</span> <span class="n">nrows</span> <span class="o">-</span> <span class="n">atcg_condition</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">atcg_count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">atcg_condition</span><span class="p">,</span> <span class="n">allele_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">atcg_count</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">atcg_count</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) rows contain non A, T, C, G values in the </span><span class="si">{</span><span class="n">allele_col</span><span class="si">}</span><span class="s2"> column and are set to nan.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">keep_multi</span><span class="p">:</span>
+        <span class="n">nrows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">multi_condition</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">allele_col</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span>
+        <span class="n">multi_count</span> <span class="o">=</span> <span class="n">multi_condition</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">multi_count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">multi_condition</span><span class="p">,</span> <span class="n">allele_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">multi_count</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">multi_count</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) rows containing multiallelic values in the </span><span class="si">{</span><span class="n">allele_col</span><span class="si">}</span><span class="s2"> column are set to nan. Use keep_multi=True to keep them.&quot;</span>
+            <span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="fill_se_p">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.fill_se_p">[docs]</a>
+<span class="k">def</span> <span class="nf">fill_se_p</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;If either P or SE is missing but the other and BETA are present, fill it.&quot;&quot;&quot;</span>
+    <span class="c1"># If SE is missing</span>
+    <span class="k">if</span> <span class="p">(</span><span class="s2">&quot;P&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="s2">&quot;BETA&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="s2">&quot;SE&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">):</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;SE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">BETA</span> <span class="o">/</span> <span class="n">st</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">P</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)),</span> <span class="mi">0</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The SE (Standard Error) column has been created.&quot;</span><span class="p">)</span>
+    <span class="c1"># If P is missing</span>
+    <span class="k">if</span> <span class="p">(</span><span class="s2">&quot;SE&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="s2">&quot;BETA&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="s2">&quot;P&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">):</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;SE&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">st</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">BETA</span><span class="p">)</span> <span class="o">/</span> <span class="n">data</span><span class="o">.</span><span class="n">SE</span><span class="p">)),</span> <span class="mi">1</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The P (P-value) column has been created.&quot;</span><span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="check_p_column">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.check_p_column">[docs]</a>
+<span class="k">def</span> <span class="nf">check_p_column</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify that the P column contains numeric values in the range [0,1]. Set inappropriate values to NA.&quot;&quot;&quot;</span>
+    <span class="n">nrows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;coerce&quot;</span><span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;P&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="n">n_missing</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;P&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">n_missing</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_missing</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">n_missing</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) values in the P column have been set to nan for being missing, non numeric or out of range [0,1].&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="check_beta_column">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.check_beta_column">[docs]</a>
+<span class="k">def</span> <span class="nf">check_beta_column</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">effect_column</span><span class="p">,</span> <span class="n">preprocessing</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    If the BETA column is a column of odds ratios, log-transform it.</span>
+<span class="sd">    If no effect_column argument is specified, determine if the BETA column are beta estimates or odds ratios.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">effect_column</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">preprocessing</span> <span class="o">==</span> <span class="s1">&#39;None&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">data</span>
+        <span class="n">median</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">BETA</span><span class="p">)</span>
+        <span class="k">if</span> <span class="mf">0.5</span> <span class="o">&lt;</span> <span class="n">median</span> <span class="o">&lt;</span> <span class="mf">1.5</span><span class="p">:</span>
+            <span class="n">effect_column</span> <span class="o">=</span> <span class="s2">&quot;OR&quot;</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;The BETA column looks like Odds Ratios. Use effect_column=&#39;BETA&#39; if it is a column of Beta estimates.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">effect_column</span> <span class="o">=</span> <span class="s2">&quot;BETA&quot;</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;The BETA column looks like Beta estimates. Use effect_column=&#39;OR&#39; if it is a column of Odds Ratios.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1">## Log transform the effect column if appropriate</span>
+    <span class="k">if</span> <span class="n">effect_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">,</span> <span class="s2">&quot;OR&quot;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;The argument effect_column accepts only &#39;BETA&#39; or &#39;OR&#39; as values.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">effect_column</span> <span class="o">==</span> <span class="s2">&quot;OR&quot;</span><span class="p">:</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">])</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">&quot;SE&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The BETA column has been log-transformed to obtain Beta estimates.&quot;</span><span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="fill_ea_nea">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.fill_ea_nea">[docs]</a>
+<span class="k">def</span> <span class="nf">fill_ea_nea</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">reference_panel_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fill in the EA and NEA columns based on reference data.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;BETA&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;Warning: You have specified an effect (BETA) column but no effect allele (EA) column. An effect estimate is only meaningful if paired with the corresponding effect allele.&quot;</span>
+        <span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+        <span class="n">reference_panel_df</span><span class="p">[[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span> <span class="s2">&quot;A1&quot;</span><span class="p">,</span> <span class="s2">&quot;A2&quot;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">],</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span>
+    <span class="p">)</span>
+    <span class="n">n_missing</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A1&quot;</span><span class="p">:</span> <span class="s2">&quot;EA&quot;</span><span class="p">,</span> <span class="s2">&quot;A2&quot;</span><span class="p">:</span> <span class="s2">&quot;NEA&quot;</span><span class="p">},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">perc_missing</span> <span class="o">=</span> <span class="n">n_missing</span> <span class="o">/</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Alleles columns created: effect (EA) and non-effect allele (NEA). </span><span class="si">{</span><span class="n">n_missing</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">perc_missing</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) values are set to nan because SNPs were not found in the reference data.&quot;</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">perc_missing</span> <span class="o">&gt;</span> <span class="mi">50</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The EA (Effect Allele) and NEA (Non-Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start=&#39;hg38&#39;, end=&#39;hg19&#39;, replace=True) if they are in build GRCh38 (hg38).&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+
+<div class="viewcode-block" id="fill_nea">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.fill_nea">[docs]</a>
+<span class="k">def</span> <span class="nf">fill_nea</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">reference_panel_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fill in the NEA column based on reference data.&quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+        <span class="n">reference_panel_df</span><span class="p">[[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span> <span class="s2">&quot;A1&quot;</span><span class="p">,</span> <span class="s2">&quot;A2&quot;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">],</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span>
+    <span class="p">)</span>
+    <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;A2&quot;</span><span class="p">]]</span>
+    <span class="n">choices</span> <span class="o">=</span> <span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;A2&quot;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">]]</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;NEA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">conditions</span><span class="p">,</span> <span class="n">choices</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+    <span class="n">n_missing</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;NEA&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">,</span> <span class="s2">&quot;A2&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">perc_missing</span> <span class="o">=</span> <span class="n">n_missing</span> <span class="o">/</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;The NEA (Non Effect Allele) column has been created. </span><span class="si">{</span><span class="n">n_missing</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">perc_missing</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) values are set to nan because SNPs were not found in the reference data.&quot;</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">perc_missing</span> <span class="o">&gt;</span> <span class="mi">50</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The NEA (Non Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start=&#39;hg38&#39;, end=&#39;hg19&#39;, replace=True) if they are in build GRCh38 (hg38).&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+
+<div class="viewcode-block" id="fill_coordinates_func">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.fill_coordinates_func">[docs]</a>
+<span class="k">def</span> <span class="nf">fill_coordinates_func</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">reference_panel_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fill in the CHR/POS columns based on reference data.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="s2">&quot;SNP&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The SNP column is not found in the data and is mandatory to fill coordinates!&quot;</span>
+        <span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">reference_panel_df</span><span class="p">[[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span> <span class="s2">&quot;SNP&quot;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">)</span>
+    <span class="n">n_missing</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int32&quot;</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;POS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;POS&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int32&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;The coordinates columns (CHR for chromosome and POS for position) have been created following build GRCh37 (hg19). </span><span class="si">{</span><span class="n">n_missing</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">n_missing</span><span class="o">/</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) SNPs were not found in the reference data and their values set to nan.&quot;</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+
+<div class="viewcode-block" id="fill_snpids_func">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.fill_snpids_func">[docs]</a>
+<span class="k">def</span> <span class="nf">fill_snpids_func</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">reference_panel_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fill in the SNP column based on reference data.</span>
+<span class="sd">    If some SNPids are still missing, they will be replaced by a standard name: CHR:POS:EA</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">column</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The column </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2"> is not found in the data and is mandatory to fill snpID!&quot;</span>
+            <span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+        <span class="n">reference_panel_df</span><span class="p">[[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span> <span class="s2">&quot;SNP&quot;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">],</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span>
+    <span class="p">)</span>
+    <span class="n">n_missing</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">standard_name_condition</span> <span class="o">=</span> <span class="s2">&quot;EA&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">n_missing</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">standard_name_condition</span><span class="p">:</span>
+        <span class="n">missing_snp_condition</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">missing_snp_condition</span><span class="p">,</span> <span class="s2">&quot;SNP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">missing_snp_condition</span><span class="p">,</span> <span class="s2">&quot;CHR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="o">+</span> <span class="s2">&quot;:&quot;</span>
+            <span class="o">+</span> <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">missing_snp_condition</span><span class="p">,</span> <span class="s2">&quot;POS&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="o">+</span> <span class="s2">&quot;:&quot;</span>
+            <span class="o">+</span> <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">missing_snp_condition</span><span class="p">,</span> <span class="s2">&quot;NEA&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="o">+</span> <span class="s2">&quot;:&quot;</span>
+            <span class="o">+</span> <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">missing_snp_condition</span><span class="p">,</span> <span class="s2">&quot;EA&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">print_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; and their ID set to CHR:POS:NEA:EA&quot;</span>
+
+    <span class="n">perc_missing</span> <span class="o">=</span> <span class="n">n_missing</span> <span class="o">/</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>
+    
+    <span class="k">if</span> <span class="n">n_missing</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;The SNP column (rsID) has been created. All SNPs were found in the reference data.&quot;</span>
+    <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The SNP column (rsID) has been created. </span><span class="si">{</span><span class="n">n_missing</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">perc_missing</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) SNPs were not found in the reference data</span><span class="si">{</span><span class="n">print_statement</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">standard_name_condition</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+        
+    <span class="k">if</span> <span class="n">perc_missing</span> <span class="o">&gt;</span> <span class="mi">50</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The SNPid for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start=&#39;hg38&#39;, end=&#39;hg19&#39;, replace=True) if they are in build GRCh38 (hg38).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+
+<div class="viewcode-block" id="check_int_column">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.check_int_column">[docs]</a>
+<span class="k">def</span> <span class="nf">check_int_column</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">int_col</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the type of the int_col column to Int32 and non-numeric values to NA.&quot;&quot;&quot;</span>
+    <span class="n">nrows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">is_integer_dtype</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
+        <span class="n">data</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;coerce&quot;</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int32&quot;</span><span class="p">)</span>
+    <span class="n">n_nan</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">n_nan</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">int_col</span><span class="si">}</span><span class="s2"> column contains </span><span class="si">{</span><span class="n">n_nan</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">n_nan</span><span class="o">/</span><span class="n">nrows</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) values set to NaN (due to being missing or non-integer).&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="adjust_column_names">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.adjust_column_names">[docs]</a>
+<span class="k">def</span> <span class="nf">adjust_column_names</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">CHR</span><span class="p">,</span> <span class="n">POS</span><span class="p">,</span> <span class="n">SNP</span><span class="p">,</span> <span class="n">EA</span><span class="p">,</span> <span class="n">NEA</span><span class="p">,</span> <span class="n">BETA</span><span class="p">,</span> <span class="n">SE</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">EAF</span><span class="p">,</span> <span class="n">keep_columns</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Rename columns to the standard names making sure that there are no duplicated names.</span>
+<span class="sd">    Delete other columns if keep_columns=False, keep them if True.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Check keep_columns argument</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">keep_columns</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">keep_columns</span><span class="si">}</span><span class="s2"> only accepts values: True or False.&quot;</span><span class="p">)</span>
+
+    <span class="n">rename_dict</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">CHR</span><span class="p">:</span> <span class="s2">&quot;CHR&quot;</span><span class="p">,</span>
+        <span class="n">POS</span><span class="p">:</span> <span class="s2">&quot;POS&quot;</span><span class="p">,</span>
+        <span class="n">SNP</span><span class="p">:</span> <span class="s2">&quot;SNP&quot;</span><span class="p">,</span>
+        <span class="n">EA</span><span class="p">:</span> <span class="s2">&quot;EA&quot;</span><span class="p">,</span>
+        <span class="n">NEA</span><span class="p">:</span> <span class="s2">&quot;NEA&quot;</span><span class="p">,</span>
+        <span class="n">BETA</span><span class="p">:</span> <span class="s2">&quot;BETA&quot;</span><span class="p">,</span>
+        <span class="n">SE</span><span class="p">:</span> <span class="s2">&quot;SE&quot;</span><span class="p">,</span>
+        <span class="n">P</span><span class="p">:</span> <span class="s2">&quot;P&quot;</span><span class="p">,</span>
+        <span class="n">EAF</span><span class="p">:</span> <span class="s2">&quot;EAF&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rename_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">!=</span> <span class="n">value</span> <span class="ow">and</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> is not found in the dataframe.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">keep_columns</span><span class="p">:</span>
+        <span class="n">cols_to_keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">CHR</span><span class="p">,</span> <span class="n">POS</span><span class="p">,</span> <span class="n">SNP</span><span class="p">,</span> <span class="n">EA</span><span class="p">,</span> <span class="n">NEA</span><span class="p">,</span> <span class="n">BETA</span><span class="p">,</span> <span class="n">SE</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">EAF</span><span class="p">]</span>
+        <span class="n">cols_to_drop</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cols_to_keep</span><span class="p">]</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">cols_to_drop</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">rename_dict</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Check duplicated column names</span>
+    <span class="n">column_counts</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">duplicated_columns</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">col</span>
+        <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">column_counts</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">count</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">col</span> <span class="ow">in</span> <span class="n">rename_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="n">duplicated_columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;After adjusting the column names, the resulting dataframe has duplicated columns. Make sure your dataframe does not have a different column named </span><span class="si">{</span><span class="n">duplicated_columns</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+
+<div class="viewcode-block" id="check_arguments">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.check_arguments">[docs]</a>
+<span class="k">def</span> <span class="nf">check_arguments</span><span class="p">(</span>
+    <span class="n">preprocessing</span><span class="p">,</span>
+    <span class="n">reference_panel</span><span class="p">,</span>
+    <span class="n">effect_column</span><span class="p">,</span>
+    <span class="n">fill_snpids</span><span class="p">,</span>
+    <span class="n">fill_coordinates</span><span class="p">,</span>
+    <span class="n">keep_multi</span><span class="p">,</span>
+    <span class="n">keep_dups</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Verify the arguments passed for the Geno initialization and apply logic based on the preprocessing value. See :class:`Geno` for more details.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: Tuple containing updated values for (keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates)</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: For invalid data types or incompatible argument values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Validate preprocessing value</span>
+    <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;None&#39;</span><span class="p">,</span> <span class="s1">&#39;Fill&#39;</span><span class="p">,</span> <span class="s1">&#39;Fill_delete&#39;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;preprocessing must be one of [&#39;None&#39;, &#39;Fill&#39;, &#39;Fill_delete&#39;]. Refer to the Geno class docstring for details.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Validate effect_column value</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">((</span><span class="n">effect_column</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">effect_column</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;OR&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA&quot;</span><span class="p">])):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;effect_column must be one of [None, &#39;OR&#39;, &#39;BETA&#39;].&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Ensure all other arguments are either None or boolean type</span>
+    <span class="n">variables</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;fill_snpids&quot;</span><span class="p">:</span> <span class="n">fill_snpids</span><span class="p">,</span>
+        <span class="s2">&quot;fill_coordinates&quot;</span><span class="p">:</span> <span class="n">fill_coordinates</span><span class="p">,</span>
+        <span class="s2">&quot;keep_multi&quot;</span><span class="p">:</span> <span class="n">keep_multi</span><span class="p">,</span>
+        <span class="s2">&quot;keep_dups&quot;</span><span class="p">:</span> <span class="n">keep_dups</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">variables</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> only accepts values: None, True, or False.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Helper functions for preprocessing logic</span>
+    <span class="k">def</span> <span class="nf">keeptype_column</span><span class="p">(</span><span class="n">arg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper function to decide whether to keep multi-values/duplicates.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="kc">True</span> <span class="k">if</span> <span class="n">arg</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">preprocessing</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;None&#39;</span><span class="p">,</span> <span class="s1">&#39;Fill&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="n">arg</span>
+
+    <span class="k">def</span> <span class="nf">filltype_column</span><span class="p">(</span><span class="n">arg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper function to decide whether to fill snpids/coordinates.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">arg</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">preprocessing</span> <span class="o">==</span> <span class="s1">&#39;None&#39;</span> <span class="k">else</span> <span class="n">arg</span>
+
+    <span class="c1"># Apply preprocessing logic</span>
+    <span class="n">keep_multi</span> <span class="o">=</span> <span class="n">keeptype_column</span><span class="p">(</span><span class="n">keep_multi</span><span class="p">)</span>
+    <span class="n">keep_dups</span> <span class="o">=</span> <span class="n">keeptype_column</span><span class="p">(</span><span class="n">keep_dups</span><span class="p">)</span>
+    <span class="n">fill_snpids</span> <span class="o">=</span> <span class="n">filltype_column</span><span class="p">(</span><span class="n">fill_snpids</span><span class="p">)</span>
+    <span class="n">fill_coordinates</span> <span class="o">=</span> <span class="n">filltype_column</span><span class="p">(</span><span class="n">fill_coordinates</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">keep_multi</span><span class="p">,</span> <span class="n">keep_dups</span><span class="p">,</span> <span class="n">fill_snpids</span><span class="p">,</span> <span class="n">fill_coordinates</span></div>
+
+
+
+<div class="viewcode-block" id="save_data">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.save_data">[docs]</a>
+<span class="k">def</span> <span class="nf">save_data</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">&quot;h5&quot;</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Save a DataFrame to a file in a given format.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">    - data (pd.DataFrame): The data to be saved.</span>
+<span class="sd">    - name (str): The name of the file without extension.</span>
+<span class="sd">    - path (str, optional): Directory path for saving. Default is the current directory.</span>
+<span class="sd">    - fmt (str, optional): Format for the file, e.g., &quot;h5&quot;, &quot;csv&quot;, &quot;txt&quot;, &quot;vcf&quot;, &quot;vcf.gz&quot;. Default is &quot;h5&quot;.</span>
+<span class="sd">    - sep (str, optional): Delimiter for csv or txt files. Default is tab.</span>
+<span class="sd">    - header (bool, optional): Whether to include header in csv or txt files. Default is True.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    None. But saves the data to a file and prints the file path.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">    - ValueError: If the provided format is not recognized.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+        <span class="n">path_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">fmt</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">path_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">fmt</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">if</span> <span class="n">fmt</span> <span class="o">==</span> <span class="s2">&quot;h5&quot;</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="s2">&quot;integer&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">)</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">to_hdf</span><span class="p">(</span><span class="n">path_name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">fmt</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;csv&quot;</span><span class="p">,</span> <span class="s2">&quot;txt&quot;</span><span class="p">]:</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">path_name</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">sep</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="n">header</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">fmt</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;vcf&quot;</span><span class="p">,</span> <span class="s2">&quot;vcf.gz&quot;</span><span class="p">]:</span>
+        <span class="c1"># to do</span>
+        <span class="k">return</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;The fmt argument takes value in (h5 (default), csv, txt, vcf, vcf.gz).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Data saved to </span><span class="si">{</span><span class="n">path_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Combine_Geno">
+<a class="viewcode-back" href="../../genal.html#genal.geno_tools.Combine_Geno">[docs]</a>
+<span class="k">def</span> <span class="nf">Combine_Geno</span><span class="p">(</span><span class="n">Gs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Combine a list of GWAS objects into one.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">    - Gs (list): List of GWAS objects.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    Geno object: Combined Geno object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">.Geno</span> <span class="kn">import</span> <span class="n">Geno</span>
+    
+    <span class="n">C</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">G</span> <span class="ow">in</span> <span class="n">Gs</span><span class="p">:</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">C</span><span class="p">,</span> <span class="n">G</span><span class="o">.</span><span class="n">data</span><span class="p">])</span>
+
+    <span class="n">C</span> <span class="o">=</span> <span class="n">C</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Geno</span><span class="p">(</span><span class="n">C</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

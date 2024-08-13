@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.proxy &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.proxy</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.proxy</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">StringIO</span>
+
+<span class="kn">from</span> <span class="nn">.tools</span> <span class="kn">import</span> <span class="n">get_reference_panel_path</span><span class="p">,</span> <span class="n">get_plink19_path</span>
+
+<span class="c1">## TO DO: accept lists of CHR/POS instead of SNP names for these functions</span>
+
+
+<div class="viewcode-block" id="query_outcome_proxy">
+<a class="viewcode-back" href="../../genal.html#genal.proxy.query_outcome_proxy">[docs]</a>
+<span class="k">def</span> <span class="nf">query_outcome_proxy</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">ld</span><span class="p">,</span> <span class="n">snps_to_extract</span><span class="p">,</span> <span class="n">snps_df</span><span class="o">=</span><span class="p">[]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract the best proxies from a dataframe, as well as specific SNPs.</span>
+
+<span class="sd">    Given a dataframe `df` (originating from GENO.data) and a dataframe of potential proxies</span>
+<span class="sd">    (output from `find_proxies`), this function extracts the best proxies from `df` as well as</span>
+<span class="sd">    the SNPs specified in `snps_to_extract`.</span>
+<span class="sd">    This is suited for querying outcome data.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (pd.DataFrame): Dataframe of SNP information with the usual GENO columns</span>
+<span class="sd">                           (SNP, BETA, SE, EAF, EA, NEA). EAF is not necessary.</span>
+<span class="sd">        ld (pd.DataFrame): Dataframe of proxies (output from `find_proxies`).</span>
+<span class="sd">        snps_to_extract (list): List of SNPs to extract in addition to the proxies.</span>
+<span class="sd">        snps_df (list, optional): List of SNPs to choose the proxy from. Should be the list of</span>
+<span class="sd">                                  SNPs in df. Can be provided to avoid recomputing it. Defaults to an empty list.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: Dataframe with queried SNPs and their proxies.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># If snps_df is empty, populate it with SNPs from df</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">snps_df</span><span class="p">:</span>
+        <span class="n">snps_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="c1"># Filter proxies that are present in df</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="n">ld</span><span class="o">.</span><span class="n">SNP_B</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">snps_df</span><span class="p">)]</span>
+
+    <span class="c1"># Remove original SNPs</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="n">ld</span><span class="p">[</span><span class="s2">&quot;SNP_A&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ld</span><span class="p">[</span><span class="s2">&quot;SNP_B&quot;</span><span class="p">]]</span>
+
+    <span class="c1"># Sort by r2 and select the best proxy for each SNP</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">ld</span><span class="p">[</span><span class="s2">&quot;R&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;SNP_A&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># Determine SNPs to query</span>
+    <span class="n">snps_to_query</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">snps_to_extract</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">ld</span><span class="o">.</span><span class="n">SNP_B</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+    <span class="n">df_queried</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">snps_to_query</span><span class="p">)]</span>
+
+    <span class="c1"># Merge dataframes and identify proxies</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">df_queried</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">ld</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;SNP_B&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP_B&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">notnull</span><span class="p">()</span>
+
+    <span class="c1"># Flip BETA if the proxied SNP alleles are switched in the reference panel</span>
+    <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;B2&quot;</span><span class="p">]),</span>
+        <span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;B1&quot;</span><span class="p">]),</span>
+        <span class="p">(</span><span class="o">~</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">]),</span>
+        <span class="p">(</span>
+            <span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;B1&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;B2&quot;</span><span class="p">]])</span> <span class="o">==</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="o">&amp;</span> <span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">])</span>
+        <span class="p">),</span>
+    <span class="p">]</span>
+    <span class="n">choices</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="o">-</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">],</span>  <span class="c1"># if EA == B2, flip the sign of BETA</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">],</span>  <span class="c1"># if EA == B1, BETA does not change</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">],</span>  <span class="c1"># if the original SNP was not proxied, BETA does not change</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>  <span class="c1"># if the original SNP was proxied but EA is neither &quot;B1&quot; nor &quot;B2&quot;, BETA is NaN</span>
+    <span class="p">]</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">conditions</span><span class="p">,</span> <span class="n">choices</span><span class="p">)</span>
+
+    <span class="c1"># Drop rows with NaN BETA values</span>
+    <span class="n">nrow</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">nrow</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Deleted </span><span class="si">{</span><span class="n">nrow</span><span class="o">-</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2"> base SNPs that did not have matching alleles in reference data.&quot;</span>
+        <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found proxies for </span><span class="si">{</span><span class="n">output</span><span class="p">[</span><span class="s1">&#39;proxy&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2"> SNPs.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Replace original SNPs with their proxy (if proxied)</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP_A&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">])</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;POS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BP_A&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;POS&quot;</span><span class="p">])</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;CHR_A&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">])</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">])</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;NEA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;A2&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;NEA&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;EAF&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EAF&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;MAF_A&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EAF&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Drop columns related to ld</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">ld</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output</span></div>
+
+
+
+<div class="viewcode-block" id="apply_proxies">
+<a class="viewcode-back" href="../../genal.html#genal.proxy.apply_proxies">[docs]</a>
+<span class="k">def</span> <span class="nf">apply_proxies</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">ld</span><span class="p">,</span> <span class="n">searchspace</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a dataframe (coming from GENO.data attribute) and a dataframe of proxies</span>
+<span class="sd">    (output from find_proxies), replace the SNPs in df with their best proxies, if they exist.</span>
+<span class="sd">    This function is suited for exposure data (before running a PRS for instance).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df (DataFrame): Dataframe of SNP information with the usual GENO columns (SNP, BETA, SE, EAF, EA, NEA). EAF is not necessary.</span>
+<span class="sd">        ld (DataFrame): Dataframe of proxies (output from find_proxies).</span>
+<span class="sd">        searchspace (list, optional): List of SNPs to restrict the list of potential proxies. By default, includes all the proxies found. Using a searchspace can be done either at the find_proxies step or at this step, but it is much faster to use it at this step.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame: A DataFrame with SNPs replaced by their best proxies, if they exist.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Check mandatory columns</span>
+    <span class="n">mandatory_cols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">,</span> <span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA&quot;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">mandatory_cols</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> is not found in the data!&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Filter by searchspace if provided</span>
+    <span class="k">if</span> <span class="n">searchspace</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Filtering the potential proxies with the searchspace provided.&quot;</span><span class="p">)</span>
+        <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="n">ld</span><span class="o">.</span><span class="n">SNP_B</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">searchspace</span><span class="p">)]</span>
+
+    <span class="c1"># Remove original SNPs and sort by r2</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="n">ld</span><span class="p">[</span><span class="s2">&quot;SNP_A&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ld</span><span class="p">[</span><span class="s2">&quot;SNP_B&quot;</span><span class="p">]]</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">ld</span><span class="p">[</span><span class="s2">&quot;R&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+    <span class="c1"># Select the best proxy for each SNP</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;SNP_A&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># Merge the dataframes</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">ld</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;SNP_A&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">notnull</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP_B&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Flip BETA if the original SNP alleles are switched in the reference panel</span>
+    <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;A2&quot;</span><span class="p">],</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">],</span>
+        <span class="o">~</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span>
+        <span class="o">~</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;A2&quot;</span><span class="p">]])</span> <span class="o">&amp;</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span>
+    <span class="p">]</span>
+    <span class="n">choices</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="o">-</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">],</span>  <span class="c1"># if EA == A2, flip the sign of BETA</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">],</span>  <span class="c1"># if EA == A1, BETA does not change</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">],</span>  <span class="c1"># if SNP_A is NaN (The original SNP was not proxied), BETA does not change</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>  <span class="c1"># if the original SNP was proxied but EA is neither &quot;A1&quot; nor &quot;A2&quot;, BETA is NaN</span>
+    <span class="p">]</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">conditions</span><span class="p">,</span> <span class="n">choices</span><span class="p">)</span>
+
+    <span class="c1"># Delete SNPs with mismatched alleles</span>
+    <span class="n">nrow</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">nrow</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Deleted </span><span class="si">{</span><span class="n">nrow</span><span class="o">-</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2"> base SNPs that did not have matching alleles in reference data.&quot;</span>
+        <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found proxies for </span><span class="si">{</span><span class="n">output</span><span class="p">[</span><span class="s1">&#39;proxy&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2"> missing SNPs.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Replace the original SNPs with their proxy (if proxied)</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP_B&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">])</span>
+    <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;B1&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EA&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;POS&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;POS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;BP_B&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;POS&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;CHR&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;CHR_B&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;NEA&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;NEA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;B2&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;NEA&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;EAF&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EAF&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s2">&quot;proxy&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;MAF_B&quot;</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s2">&quot;EAF&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Drop ld columns</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">ld</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output</span></div>
+
+
+
+<div class="viewcode-block" id="find_proxies">
+<a class="viewcode-back" href="../../genal.html#genal.proxy.find_proxies">[docs]</a>
+<span class="k">def</span> <span class="nf">find_proxies</span><span class="p">(</span>
+    <span class="n">snp_list</span><span class="p">,</span>
+    <span class="n">searchspace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">reference_panel</span><span class="o">=</span><span class="s2">&quot;eur&quot;</span><span class="p">,</span>
+    <span class="n">kb</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>
+    <span class="n">r2</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+    <span class="n">window_snps</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a list of SNPs, return a table of proxies.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        snp_list (list): List of rsids.</span>
+<span class="sd">        searchspace (list, optional): List of SNPs to include in the search. By default, includes the whole reference panel.</span>
+<span class="sd">        reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies.</span>
+<span class="sd">                                         Accepts values: &quot;EUR&quot;, &quot;SAS&quot;, &quot;AFR&quot;, &quot;EAS&quot;, &quot;AMR&quot;.</span>
+<span class="sd">                                         Alternatively, provide a path leading to a specific bed/bim/fam reference panel.</span>
+<span class="sd">        kb (int, optional): Width of the genomic window to look for proxies. Defaults to 5000.</span>
+<span class="sd">        r2 (float, optional): Minimum linkage disequilibrium value with the main SNP for a proxy to be included. Defaults to 0.6.</span>
+<span class="sd">        window_snps (int, optional): Compute the LD value for SNPs that are not more than x SNPs apart from the main SNP. Defaults to 5000.</span>
+<span class="sd">        threads (int, optional): Number of threads to use. Defaults to 1.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame: A DataFrame containing the proxies. Only biallelic SNPs are returned.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Ensure tmp_GENAL directory exists</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;tmp_GENAL/&quot;</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Convert snp_list to numpy array</span>
+    <span class="n">snp_list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">snp_list</span><span class="p">))</span>
+
+    <span class="c1"># Check if searchspace is provided</span>
+    <span class="k">if</span> <span class="n">searchspace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">extract_arg</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Searching proxies in the provided searchspace.&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL/searchspace.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">searchspace</span> <span class="o">+</span> <span class="n">snp_list</span><span class="p">:</span>
+                <span class="n">file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">extract_arg</span> <span class="o">=</span> <span class="s2">&quot;--extract tmp_GENAL/searchspace.txt&quot;</span>
+
+    <span class="c1"># Save snp_list to a file</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL/snps_to_proxy.txt&quot;</span><span class="p">,</span> <span class="n">snp_list</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">)</span>
+
+    <span class="c1"># Construct and execute the plink command</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">get_reference_panel_path</span><span class="p">(</span><span class="n">reference_panel</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">extract_arg</span><span class="si">}</span><span class="s2"> --keep-allele-order --r in-phase with-freqs gz --ld-snp-list tmp_GENAL/snps_to_proxy.txt --ld-window-kb </span><span class="si">{</span><span class="n">kb</span><span class="si">}</span><span class="s2"> --ld-window-r2 </span><span class="si">{</span><span class="n">r2</span><span class="si">}</span><span class="s2"> --ld-window </span><span class="si">{</span><span class="n">window_snps</span><span class="si">}</span><span class="s2"> --out tmp_GENAL/proxy.targets --threads </span><span class="si">{</span><span class="n">threads</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Read and process the output</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;gunzip -c tmp_GENAL/proxy.targets.ld.gz&quot;</span>
+    <span class="n">unzipped_content</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">StringIO</span><span class="p">(</span><span class="n">unzipped_content</span><span class="p">),</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;\s+&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Filter out multiallelic SNPs</span>
+    <span class="n">ld</span><span class="p">[</span><span class="s2">&quot;PHASE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="s2">&quot;PHASE&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="n">ld</span><span class="p">[</span><span class="s2">&quot;PHASE&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="nb">len</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">]</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">ld</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Split the &quot;PHASE&quot; column into separate characters</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="n">ld</span><span class="p">[</span><span class="s2">&quot;PHASE&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A1&quot;</span><span class="p">,</span> <span class="s2">&quot;B1&quot;</span><span class="p">,</span> <span class="s2">&quot;A2&quot;</span><span class="p">,</span> <span class="s2">&quot;B2&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">ld</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">ld</span><span class="p">,</span> <span class="n">temp</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Convert integer columns to Int64 type</span>
+    <span class="k">for</span> <span class="n">int_col</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;CHR_A&quot;</span><span class="p">,</span> <span class="s2">&quot;CHR_B&quot;</span><span class="p">,</span> <span class="s2">&quot;BP_A&quot;</span><span class="p">,</span> <span class="s2">&quot;BP_B&quot;</span><span class="p">]:</span>
+        <span class="n">ld</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">ld</span><span class="p">[</span><span class="n">int_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int64&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ld</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

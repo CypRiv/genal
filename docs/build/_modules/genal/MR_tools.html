@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.MR_tools &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.MR_tools</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.MR_tools</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="k">as</span> <span class="nn">st</span>
+<span class="kn">from</span> <span class="nn">pandas.api.types</span> <span class="kn">import</span> <span class="n">is_numeric_dtype</span>
+
+<span class="kn">from</span> <span class="nn">.proxy</span> <span class="kn">import</span> <span class="n">find_proxies</span><span class="p">,</span> <span class="n">query_outcome_proxy</span>
+<span class="kn">from</span> <span class="nn">.MR</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.MRpresso</span> <span class="kn">import</span> <span class="n">mr_presso</span>
+<span class="kn">from</span> <span class="nn">.constants</span> <span class="kn">import</span> <span class="n">MR_METHODS_NAMES</span>
+
+<span class="n">REQUIRED_COLUMNS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA&quot;</span><span class="p">,</span> <span class="s2">&quot;SE&quot;</span><span class="p">,</span> <span class="s2">&quot;EA&quot;</span><span class="p">,</span> <span class="s2">&quot;NEA&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="mrpresso_func">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.mrpresso_func">[docs]</a>
+<span class="k">def</span> <span class="nf">mrpresso_func</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">,</span>
+    <span class="n">action</span><span class="p">,</span>
+    <span class="n">eaf_threshold</span><span class="p">,</span>
+    <span class="n">n_iterations</span><span class="p">,</span>
+    <span class="n">outlier_test</span><span class="p">,</span>
+    <span class="n">distortion_test</span><span class="p">,</span>
+    <span class="n">significance_p</span><span class="p">,</span>
+    <span class="n">cpus</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrapper function corresponding to the :meth:`Geno.MRpresso` method.</span>
+<span class="sd">    The MR-PRESSO algorithm is implemented here: :func:`MRpresso.mr_presso`</span>
+<span class="sd">    Refer to them for more details regarding arguments and return values.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        - EAF column check if action is set to 2.</span>
+<span class="sd">        - Data harmonization between exposure and outcome data based on action and eaf_threshold</span>
+<span class="sd">        - NA check</span>
+<span class="sd">        - MRpresso call and results return</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Check that action argument is a correct input</span>
+    <span class="k">if</span> <span class="n">action</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The action argument only takes 1,2 or 3 as value&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Unpack data (coming from MR_data attribute)</span>
+    <span class="n">df_exposure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">df_outcome</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">name_outcome</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+    <span class="c1"># Check EAF columns if action = 2</span>
+    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;EAF&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df_exposure</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3).&quot;</span>
+            <span class="p">)</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="k">elif</span> <span class="s2">&quot;EAF&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df_outcome</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3).&quot;</span>
+            <span class="p">)</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="mi">3</span>
+
+    <span class="c1"># Harmonize exposure and outcome data</span>
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">harmonize_MR</span><span class="p">(</span>
+        <span class="n">df_exposure</span><span class="p">,</span> <span class="n">df_outcome</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">action</span><span class="p">,</span> <span class="n">eaf_threshold</span><span class="o">=</span><span class="n">eaf_threshold</span>
+    <span class="p">)</span>
+    
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">df_mr_formatting</span><span class="p">(</span><span class="n">df_mr</span><span class="p">)</span>
+
+    <span class="c1"># Call and return the results of MR-PRESSO</span>
+    <span class="k">return</span> <span class="n">mr_presso</span><span class="p">(</span>
+        <span class="n">df_mr</span><span class="p">,</span>
+        <span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+        <span class="n">n_iterations</span><span class="p">,</span>
+        <span class="n">outlier_test</span><span class="p">,</span>
+        <span class="n">distortion_test</span><span class="p">,</span>
+        <span class="n">significance_p</span><span class="p">,</span>
+        <span class="n">cpus</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MR_func">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.MR_func">[docs]</a>
+<span class="k">def</span> <span class="nf">MR_func</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">,</span>
+    <span class="n">methods</span><span class="p">,</span>
+    <span class="n">action</span><span class="p">,</span>
+    <span class="n">heterogeneity</span><span class="p">,</span>
+    <span class="n">eaf_threshold</span><span class="p">,</span>
+    <span class="n">nboot</span><span class="p">,</span>
+    <span class="n">penk</span><span class="p">,</span>
+    <span class="n">phi</span><span class="p">,</span>
+    <span class="n">name_exposure</span><span class="p">,</span>
+    <span class="n">cpus</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrapper function corresponding to the :meth:`Geno.MR` method. Refer to them for more details regarding arguments and return values.</span>
+<span class="sd">    The MR algorithms are implemented here: :func:`MR.mr_ivw`, :func:`MR.mr_weighted_median`, :func:`MR.mr_egger_regression`, :func:`MR.mr_simple_median`...</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        - Validation of the action and methods arguments</span>
+<span class="sd">        - EAF column check if action is set to 2.</span>
+<span class="sd">        - Data harmonization between exposure and outcome data based on action and eaf_threshold</span>
+<span class="sd">        - NA check</span>
+<span class="sd">        - MR methods execution</span>
+<span class="sd">        - Compiles results and return a pd.DataFrame</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Check that action argument is a correct input</span>
+    <span class="k">if</span> <span class="n">action</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The action argument only takes 1,2 or 3 as value&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check the methods argument (contains either MR method names or &quot;all&quot;)</span>
+    <span class="n">valid_methods</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">MR_METHODS_NAMES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">valid_methods</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;all&quot;</span><span class="p">)</span>
+    <span class="n">methods</span> <span class="o">=</span> <span class="n">methods</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">methods</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">methods</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">m</span> <span class="ow">in</span> <span class="n">valid_methods</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The list of methods can only contain strings in </span><span class="si">{</span><span class="n">valid_methods</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Unpack data (coming from MR_data attribute)</span>
+    <span class="n">df_exposure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">df_outcome</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">name_outcome</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+    <span class="c1"># Check number of instruments</span>
+    <span class="k">if</span> <span class="n">df_exposure</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Not enough instruments to run MR. At least 2 are required.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+    <span class="c1"># Check EAF columns if action = 2</span>
+    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;EAF&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df_exposure</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3).&quot;</span>
+            <span class="p">)</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="k">elif</span> <span class="s2">&quot;EAF&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df_outcome</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3).&quot;</span>
+            <span class="p">)</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="mi">3</span>
+
+    <span class="c1"># Harmonize exposure and outcome data</span>
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">harmonize_MR</span><span class="p">(</span>
+        <span class="n">df_exposure</span><span class="p">,</span> <span class="n">df_outcome</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">action</span><span class="p">,</span> <span class="n">eaf_threshold</span><span class="o">=</span><span class="n">eaf_threshold</span>
+    <span class="p">)</span>
+
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">df_mr_formatting</span><span class="p">(</span><span class="n">df_mr</span><span class="p">)</span>
+
+    <span class="c1"># Check number of remaining instruments</span>
+    <span class="n">n_snps</span> <span class="o">=</span> <span class="n">df_mr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">n_snps</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_snps</span><span class="si">}</span><span class="s2"> SNPs remaining after harmonization step but at least 2 are required to run MR.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">df_mr</span>
+
+    <span class="c1"># Prepare values for MR methods</span>
+    <span class="n">BETA_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">SE_o</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df_mr</span><span class="p">[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">],</span>
+        <span class="n">df_mr</span><span class="p">[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">],</span>
+        <span class="n">df_mr</span><span class="p">[</span><span class="s2">&quot;SE_e&quot;</span><span class="p">],</span>
+        <span class="n">df_mr</span><span class="p">[</span><span class="s2">&quot;SE_o&quot;</span><span class="p">],</span>
+    <span class="p">)</span>  
+    
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Running Mendelian Randomization with </span><span class="si">{</span><span class="n">name_exposure</span><span class="si">}</span><span class="s2"> as exposure and </span><span class="si">{</span><span class="n">name_outcome</span><span class="si">}</span><span class="s2"> as outcome.&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Mapping the methods passed as argument to the corresponding functions and freeze arguments</span>
+    <span class="n">FUNCTION_MAP</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;Egger&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_egger_regression</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">),</span>
+        <span class="s2">&quot;Egger-boot&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span>
+            <span class="n">mr_egger_regression_bootstrap</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span>
+        <span class="p">),</span>
+        <span class="s2">&quot;WM&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_weighted_median</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">),</span>
+        <span class="s2">&quot;WM-pen&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_pen_wm</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">penk</span><span class="p">),</span>
+        <span class="s2">&quot;Simple-median&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_simple_median</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">),</span>
+        <span class="s2">&quot;IVW&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_ivw</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">),</span>
+        <span class="s2">&quot;IVW-RE&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_ivw_re</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">),</span>
+        <span class="s2">&quot;IVW-FE&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_ivw_fe</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">),</span>
+        <span class="s2">&quot;UWR&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_uwr</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">),</span>
+        <span class="s2">&quot;Sign&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_sign</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">),</span>
+        <span class="s2">&quot;Simple-mode&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_simple_mode</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">),</span>
+        <span class="s2">&quot;Weighted-mode&quot;</span><span class="p">:</span> <span class="n">partial</span><span class="p">(</span><span class="n">mr_weighted_mode</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">),</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Compute required MR methods and gather results</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="s2">&quot;all&quot;</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">:</span>
+        <span class="n">methods</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">MR_METHODS_NAMES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">:</span>
+        <span class="n">func</span> <span class="o">=</span> <span class="n">FUNCTION_MAP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">()</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="n">res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+    <span class="n">res</span><span class="p">[</span><span class="s2">&quot;exposure&quot;</span><span class="p">],</span> <span class="n">res</span><span class="p">[</span><span class="s2">&quot;outcome&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">name_exposure</span><span class="p">,</span> <span class="n">name_outcome</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">heterogeneity</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">res</span><span class="p">[[</span><span class="s2">&quot;exposure&quot;</span><span class="p">,</span> <span class="s2">&quot;outcome&quot;</span><span class="p">,</span> <span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;nSNP&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="s2">&quot;se&quot;</span><span class="p">,</span> <span class="s2">&quot;pval&quot;</span><span class="p">]]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span>
+            <span class="p">[</span>
+                <span class="s2">&quot;exposure&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;outcome&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Q&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Q_df&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Q_pval&quot;</span><span class="p">,</span>
+            <span class="p">]</span>
+        <span class="p">]</span>
+        <span class="n">res</span><span class="p">[</span><span class="s2">&quot;Q_df&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s2">&quot;Q_df&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;Int64&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">res</span><span class="p">,</span> <span class="n">df_mr</span></div>
+
+
+<div class="viewcode-block" id="df_mr_formatting">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.df_mr_formatting">[docs]</a>
+<span class="k">def</span> <span class="nf">df_mr_formatting</span><span class="p">(</span><span class="n">df_mr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Function to delete invalid values from the MR dataframe (after the harmonization step)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Delete NAs or infinite values (or null values in SE columns, null values in BETA are accepted) and print the SNP names and if the invalid value came from exposure or outcome data.</span>
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">df_mr</span><span class="p">[[</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA_e&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_e&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df_mr</span><span class="o">.</span><span class="n">replace</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">df_mr</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="p">[</span><span class="s2">&quot;SE_e&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">df_mr</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="p">[</span><span class="s2">&quot;SE_e&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+    <span class="n">mask_exposure</span> <span class="o">=</span> <span class="n">df_mr</span><span class="p">[[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_e&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">mask_outcome</span> <span class="o">=</span> <span class="n">df_mr</span><span class="p">[[</span><span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">rows_to_delete_exposure</span> <span class="o">=</span> <span class="n">df_mr</span><span class="p">[</span><span class="n">mask_exposure</span><span class="p">]</span>
+    <span class="n">rows_to_delete_outcome</span> <span class="o">=</span> <span class="n">df_mr</span><span class="p">[</span><span class="n">mask_outcome</span><span class="p">]</span>
+    <span class="n">n_deleted_exposure</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows_to_delete_exposure</span><span class="p">)</span>
+    <span class="n">n_deleted_outcome</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows_to_delete_outcome</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_deleted_exposure</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Deleting </span><span class="si">{</span><span class="n">n_deleted_exposure</span><span class="si">}</span><span class="s2"> SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (exposure data): </span><span class="si">{</span><span class="n">rows_to_delete_exposure</span><span class="p">[</span><span class="s1">&#39;SNP&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_deleted_outcome</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Deleting </span><span class="si">{</span><span class="n">n_deleted_outcome</span><span class="si">}</span><span class="s2"> SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (outcome data): </span><span class="si">{</span><span class="n">rows_to_delete_outcome</span><span class="p">[</span><span class="s1">&#39;SNP&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">df_mr</span><span class="p">[[</span><span class="s2">&quot;BETA_e&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_e&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">]]</span>
+    <span class="n">df_mr</span> <span class="o">=</span> <span class="n">df_mr</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">df_mr</span></div>
+
+
+
+<div class="viewcode-block" id="query_outcome_func">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.query_outcome_func">[docs]</a>
+<span class="k">def</span> <span class="nf">query_outcome_func</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">,</span> <span class="n">outcome</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span><span class="p">,</span> <span class="n">reference_panel</span><span class="p">,</span> <span class="n">kb</span><span class="p">,</span> <span class="n">r2</span><span class="p">,</span> <span class="n">window_snps</span><span class="p">,</span> <span class="n">cpus</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrapper function corresponding to the :meth:`Geno.query_outcome` method.</span>
+<span class="sd">    Refer to it for more details on the arguments and return values.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        - Validation of the required columns</span>
+<span class="sd">        - Load outcome data from Geno or path.</span>
+<span class="sd">        - Identify SNPs present in the outcome data</span>
+<span class="sd">        - Find proxies for the absent SNPs if needed</span>
+<span class="sd">        - Return exposure dataframe, outcome dataframe, outcome name</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Check required columns in the exposure data</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">REQUIRED_COLUMNS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The column </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2"> is not found in the data and is necessary.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Load the outcome dataframe (to be queried)</span>
+    <span class="kn">import</span> <span class="nn">genal</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">outcome</span><span class="p">,</span> <span class="n">genal</span><span class="o">.</span><span class="n">Geno</span><span class="p">):</span>
+        <span class="n">df_outcome</span><span class="p">,</span> <span class="n">name</span> <span class="o">=</span> <span class="n">load_outcome_from_geno_object</span><span class="p">(</span><span class="n">outcome</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">outcome</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">df_outcome</span><span class="p">,</span> <span class="n">name</span> <span class="o">=</span> <span class="n">load_outcome_from_filepath</span><span class="p">(</span><span class="n">outcome</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;You need to provide either a Geno object or filepath string to the outcome variable.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Check necessary columns from outcome</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">REQUIRED_COLUMNS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df_outcome</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The column </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2"> is not found in the outcome data and is necessary.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Identify the exposure SNPs present in the outcome data</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Identifying the exposure SNPs present in the outcome data...&quot;</span><span class="p">)</span>
+    <span class="n">outcome_snps</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">df_outcome</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+    <span class="n">exposure_snps</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+    <span class="n">snps_present</span> <span class="o">=</span> <span class="n">exposure_snps</span> <span class="o">&amp;</span> <span class="n">outcome_snps</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">snps_present</span><span class="p">)</span><span class="si">}</span><span class="s2"> SNPs out of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">exposure_snps</span><span class="p">)</span><span class="si">}</span><span class="s2"> are present in the outcome data.&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Find proxies for absent SNPs if needed</span>
+    <span class="k">if</span> <span class="n">proxy</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">exposure_snps</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">snps_present</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">snps_absent</span> <span class="o">=</span> <span class="n">exposure_snps</span> <span class="o">-</span> <span class="n">snps_present</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Searching proxies for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">snps_absent</span><span class="p">)</span><span class="si">}</span><span class="s2"> SNPs...&quot;</span><span class="p">)</span>
+        <span class="n">ld</span> <span class="o">=</span> <span class="n">find_proxies</span><span class="p">(</span>
+            <span class="n">snps_absent</span><span class="p">,</span>
+            <span class="n">reference_panel</span><span class="o">=</span><span class="n">reference_panel</span><span class="p">,</span>
+            <span class="n">kb</span><span class="o">=</span><span class="n">kb</span><span class="p">,</span>
+            <span class="n">r2</span><span class="o">=</span><span class="n">r2</span><span class="p">,</span>
+            <span class="n">window_snps</span><span class="o">=</span><span class="n">window_snps</span><span class="p">,</span>
+            <span class="n">threads</span><span class="o">=</span><span class="n">cpus</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">outcome</span> <span class="o">=</span> <span class="n">query_outcome_proxy</span><span class="p">(</span><span class="n">df_outcome</span><span class="p">,</span> <span class="n">ld</span><span class="p">,</span> <span class="n">snps_present</span><span class="p">,</span> <span class="n">outcome_snps</span><span class="p">)</span>
+        <span class="n">exposure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">outcome</span><span class="o">.</span><span class="n">SNP</span><span class="p">)]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">exposure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">snps_present</span><span class="p">)]</span>
+        <span class="n">outcome</span> <span class="o">=</span> <span class="n">df_outcome</span><span class="p">[</span><span class="n">df_outcome</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">snps_present</span><span class="p">)]</span>
+
+    <span class="n">exposure</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">outcome</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;(Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">exposure</span><span class="p">,</span> <span class="n">outcome</span><span class="p">,</span> <span class="n">name</span></div>
+
+
+
+<div class="viewcode-block" id="load_outcome_from_geno_object">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.load_outcome_from_geno_object">[docs]</a>
+<span class="k">def</span> <span class="nf">load_outcome_from_geno_object</span><span class="p">(</span><span class="n">outcome</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load outcome data from a Geno object.&quot;&quot;&quot;</span>
+    <span class="n">df_outcome</span> <span class="o">=</span> <span class="n">outcome</span><span class="o">.</span><span class="n">data</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">outcome</span><span class="o">.</span><span class="n">name</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Outcome data successfully loaded from &#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; Geno instance.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df_outcome</span><span class="p">,</span> <span class="n">name</span></div>
+
+
+
+<div class="viewcode-block" id="load_outcome_from_filepath">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.load_outcome_from_filepath">[docs]</a>
+<span class="k">def</span> <span class="nf">load_outcome_from_filepath</span><span class="p">(</span><span class="n">outcome</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load outcome data from a file path.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">outcome</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The path provided doesn&#39;t lead to a file.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">outcome</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.h5&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">outcome</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.hdf5&quot;</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The file provided needs to be in .h5 or .hdf5 format.&quot;</span><span class="p">)</span>
+    <span class="n">df_outcome</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_hdf</span><span class="p">(</span><span class="n">outcome</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">outcome</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Outcome data successfully loaded from path provided.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df_outcome</span><span class="p">,</span> <span class="n">name</span></div>
+
+
+
+<div class="viewcode-block" id="harmonize_MR">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.harmonize_MR">[docs]</a>
+<span class="k">def</span> <span class="nf">harmonize_MR</span><span class="p">(</span><span class="n">df_exposure</span><span class="p">,</span> <span class="n">df_outcome</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">eaf_threshold</span><span class="o">=</span><span class="mf">0.42</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Harmonize exposure and outcome for MR analyses.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        - df_exposure (pd.DataFrame): Exposure data with &quot;SNP&quot;,&quot;BETA&quot;,&quot;SE&quot;,&quot;EA&quot;,&quot;NEA&quot; and &quot;EAF&quot; if action=2</span>
+<span class="sd">        - df_outcome (pd.DataFrame): Outcome data with &quot;SNP&quot;,&quot;BETA&quot;,&quot;SE&quot;,&quot;EA&quot;,&quot;NEA&quot; and &quot;EAF&quot; if action=2</span>
+<span class="sd">        - action (int, optional): Determines how to treat palindromes. Defaults to 2.</span>
+<span class="sd">            1: Doesn&#39;t attempt to flip them (= Assume all alleles are coded on the forward strand)</span>
+<span class="sd">            2: Use allele frequencies (EAF) to attempt to flip them (conservative, default)</span>
+<span class="sd">            3: Remove all palindromic SNPs (very conservative).</span>
+<span class="sd">        - eaf_threshold (float, optional): Maximal effect allele frequency accepted when attempting to flip palindromic SNPs (only applied if action = 2). Defaults to 0.42.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        - pd.DataFrame: Harmonized data.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        - Verify the presence of required columns in both dataframes and rename them</span>
+<span class="sd">        - Merge exposure and outcome data</span>
+<span class="sd">        - Identify palindromes</span>
+<span class="sd">        - Classify SNPs into aligned / inverted / need to be flipped</span>
+<span class="sd">        - Flip the ones that require flipping</span>
+<span class="sd">        - Switch those that are inverted to align them</span>
+<span class="sd">        - Remove those that are still not aligned</span>
+<span class="sd">        - Treat palindromes based on action parameter</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Check required columns in both dataframes</span>
+    <span class="n">check_required_columns</span><span class="p">(</span><span class="n">df_exposure</span><span class="p">,</span> <span class="n">REQUIRED_COLUMNS</span><span class="p">)</span>
+    <span class="n">check_required_columns</span><span class="p">(</span><span class="n">df_outcome</span><span class="p">,</span> <span class="n">REQUIRED_COLUMNS</span><span class="p">)</span>
+
+    <span class="c1"># Rename columns</span>
+    <span class="n">df_exposure</span> <span class="o">=</span> <span class="n">df_exposure</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+        <span class="n">columns</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">&quot;EA&quot;</span><span class="p">:</span> <span class="s2">&quot;EA_e&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;NEA&quot;</span><span class="p">:</span> <span class="s2">&quot;NEA_e&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;EAF&quot;</span><span class="p">:</span> <span class="s2">&quot;EAF_e&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;BETA&quot;</span><span class="p">:</span> <span class="s2">&quot;BETA_e&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SE&quot;</span><span class="p">:</span> <span class="s2">&quot;SE_e&quot;</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">df_outcome</span> <span class="o">=</span> <span class="n">df_outcome</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+        <span class="n">columns</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">&quot;EA&quot;</span><span class="p">:</span> <span class="s2">&quot;EA_o&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;NEA&quot;</span><span class="p">:</span> <span class="s2">&quot;NEA_o&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;EAF&quot;</span><span class="p">:</span> <span class="s2">&quot;EAF_o&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;BETA&quot;</span><span class="p">:</span> <span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SE&quot;</span><span class="p">:</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">df_outcome</span> <span class="o">=</span> <span class="n">df_outcome</span><span class="p">[</span>
+        <span class="n">df_outcome</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;EA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;NEA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;EAF_o&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;SE_o&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Merge the dataframes on SNP</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df_exposure</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">df_outcome</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Default EAF columns if they do not exist</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_e&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;EAF_e&quot;</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;EAF_o&quot;</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+
+    <span class="c1"># Identify palindromes</span>
+    <span class="n">condition1</span> <span class="o">=</span> <span class="p">((</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;EA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;A&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;NEA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;T&quot;</span><span class="p">))</span> <span class="o">|</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;EA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;T&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;NEA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;A&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">condition2</span> <span class="o">=</span> <span class="p">((</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;EA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;C&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;NEA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;G&quot;</span><span class="p">))</span> <span class="o">|</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;EA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;G&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;NEA_e&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;C&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;palindrome&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">condition1</span> <span class="o">|</span> <span class="n">condition2</span>
+
+    <span class="c1"># Align effect alleles between exposure and outcome</span>
+    <span class="c1"># Classify SNPs into aligned / inverted / need to be flipped</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;aligned&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">EA_o</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NEA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">NEA_o</span><span class="p">)</span>  <span class="c1"># Already aligned</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;inverted&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">NEA_o</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NEA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">EA_o</span><span class="p">)</span>  <span class="c1"># Inverted</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;to_flip&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;aligned&quot;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;inverted&quot;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;palindrome&quot;</span><span class="p">]</span>
+    <span class="p">)</span>  <span class="c1"># Neither aligned nor inverted nor palindromic</span>
+
+    <span class="c1"># Flip the SNPs to be flipped</span>
+    <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">to_flip</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">to_flip_idx</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;to_flip&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">index</span>  <span class="c1"># Get indices of SNPs to be flipped</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;EA_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flip_alleles</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;EA_o&quot;</span><span class="p">])</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;NEA_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flip_alleles</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;NEA_o&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Recheck inverted SNPS to flag those that are inverted after being flipped</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;inverted&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">NEA_o</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NEA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">EA_o</span><span class="p">),</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Switch the inverted SNPs to align them</span>
+    <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">inverted</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">inverted_idx</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;inverted&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">index</span>  <span class="c1"># Get indices of inverted SNPs</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">inverted_idx</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;EA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;NEA_o&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="n">inverted_idx</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;NEA_o&quot;</span><span class="p">,</span> <span class="s2">&quot;EA_o&quot;</span><span class="p">]</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">values</span>  <span class="c1"># Swap outcome EA and NEA values</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">inverted_idx</span><span class="p">,</span> <span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Invert outcome BETA</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">inverted_idx</span><span class="p">,</span> <span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="mi">1</span> <span class="o">-</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">inverted_idx</span><span class="p">,</span> <span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># Invert outcome EAF</span>
+
+    <span class="c1"># All the SNPs should be aligned at this point. If not, they have an allele mismatch and need to be removed</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;aligned&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">EA_o</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NEA_e</span> <span class="o">==</span> <span class="n">df</span><span class="o">.</span><span class="n">NEA_o</span><span class="p">)</span>  <span class="c1"># Recheck aligned</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;allele_mismatch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="o">~</span><span class="n">df</span><span class="p">[</span>
+        <span class="s2">&quot;aligned&quot;</span>
+    <span class="p">]</span>  <span class="c1"># If still not aligned: requires exclusion due to allele mismatch</span>
+    <span class="n">mismatched_snps</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;allele_mismatch&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">mismatched_snps</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mismatched_snps</span><span class="si">}</span><span class="s2"> SNPs have been excluded due to a mismatch between the exposure and outcome alleles data.&quot;</span>
+        <span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;allele_mismatch&quot;</span><span class="p">]]</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Treat palindromes based on the action parameter</span>
+    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>  <span class="c1"># Simply delete them</span>
+        <span class="n">snps_deleted</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">palindrome</span><span class="p">]</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">values</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="o">.</span><span class="n">palindrome</span><span class="p">]</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Action = 3: excluding </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">snps_deleted</span><span class="p">)</span><span class="si">}</span><span class="s2"> palindromic SNPs: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">snps_deleted</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">apply_action_2</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">eaf_threshold</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">&quot;Action = 1: Keeping all palindromic SNPs without attempting to flip them.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+
+<div class="viewcode-block" id="flip_alleles">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.flip_alleles">[docs]</a>
+<span class="k">def</span> <span class="nf">flip_alleles</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flip the alleles.&quot;&quot;&quot;</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;g&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;G&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;t&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">x</span></div>
+
+
+
+<div class="viewcode-block" id="check_required_columns">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.check_required_columns">[docs]</a>
+<span class="k">def</span> <span class="nf">check_required_columns</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">columns</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the required columns are present in the dataframe.&quot;&quot;&quot;</span>
+    <span class="n">missing_columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">missing_columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The columns </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">missing_columns</span><span class="p">)</span><span class="si">}</span><span class="s2"> are not found in the data and are necessary.&quot;</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="apply_action_2">
+<a class="viewcode-back" href="../../genal.html#genal.MR_tools.apply_action_2">[docs]</a>
+<span class="k">def</span> <span class="nf">apply_action_2</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">eaf_threshold</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Use EAF_e and EAF_o to align palindromes if both EAFs are outside the intermediate allele frequency range.</span>
+<span class="sd">        - Replace NA values in EAF columns by 0.5 (will be flagged and removed in step 3)</span>
+<span class="sd">        - Set boundaries for intermediate allele frequencies</span>
+<span class="sd">        - Identify palindromes that have an intermediate allele frequency and delete them</span>
+<span class="sd">        - Among the remaining palindromes, identify the ones that need to be flipped and flip them</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># If EAF is nan for a SNP, it will be removed</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_e&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EAF_e</span><span class="o">.</span><span class="n">isna</span><span class="p">(),</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">EAF_e</span><span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EAF_o</span><span class="o">.</span><span class="n">isna</span><span class="p">(),</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">EAF_o</span><span class="p">)</span>
+
+    <span class="c1"># Set the boundaries for intermediate frequencies</span>
+    <span class="n">minf</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">eaf_threshold</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">eaf_threshold</span><span class="p">)</span>
+    <span class="n">maxf</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">minf</span>
+
+    <span class="c1"># Identify palindromes that have an intermediate allele frequency and delete them</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;ambiguous&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;palindrome&quot;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="p">(</span>
+        <span class="p">((</span><span class="n">minf</span> <span class="o">&lt;=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_e&quot;</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_e&quot;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">maxf</span><span class="p">))</span>
+        <span class="o">|</span> <span class="p">((</span><span class="n">minf</span> <span class="o">&lt;=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_o&quot;</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">maxf</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="n">snps_deleted</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">ambiguous</span><span class="p">]</span><span class="o">.</span><span class="n">SNP</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="o">.</span><span class="n">ambiguous</span><span class="p">]</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">snps_deleted</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">diff</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Action = 2: </span><span class="si">{</span><span class="n">diff</span><span class="si">}</span><span class="s2"> SNPs excluded for being palindromic with intermediate allele frequencies: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">snps_deleted</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Action = 2: None of the SNPs are palindromic with intermediate allele frequency, keeping all of them.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Identify palindromes that need to be flipped and flip them</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;to_flip&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;palindrome&quot;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="p">((</span><span class="n">df</span><span class="o">.</span><span class="n">EAF_e</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">EAF_o</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;to_flip&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">to_flip_idx</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;to_flip&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">index</span>  <span class="c1"># Get indices of SNPs to be flipped</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;BETA_o&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Invert outcome BETA</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="mi">1</span> <span class="o">-</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">to_flip_idx</span><span class="p">,</span> <span class="s2">&quot;EAF_o&quot;</span><span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># Invert outcome EAF</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Action = 2: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">to_flip</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2"> palindromic SNPs have been flipped.&quot;</span><span class="p">)</span>
+
+    <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

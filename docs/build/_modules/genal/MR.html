@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.MR &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.MR</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.MR</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">statsmodels.api</span> <span class="k">as</span> <span class="nn">sm</span>
+<span class="kn">import</span> <span class="nn">statsmodels.formula.api</span> <span class="k">as</span> <span class="nn">smf</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span><span class="p">,</span> <span class="n">chi2</span><span class="p">,</span> <span class="n">binomtest</span><span class="p">,</span> <span class="n">t</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ProcessPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span><span class="p">,</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">LinearRegression</span>
+<span class="kn">from</span> <span class="nn">sklearn.neighbors</span> <span class="kn">import</span> <span class="n">KernelDensity</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span> <span class="nn">numpy.random</span> <span class="kn">import</span> <span class="n">default_rng</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="kn">from</span> <span class="nn">.constants</span> <span class="kn">import</span> <span class="n">MR_METHODS_NAMES</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Mode methods</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="mr_simple_mode">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_simple_mode">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_simple_mode</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the simple mode method.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">    BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">    SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">    BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">    SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">    phi (int): Factor for the bandwidth parameter used in the kernel density estimation</span>
+<span class="sd">    nboot (int): Number of boostrap iterations to obtain the standard error and p-value</span>
+<span class="sd">    cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate or the intercept.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient or intercept.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate or intercept.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Simple-mode&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+    
+    <span class="n">BETA_IV</span>   <span class="o">=</span> <span class="n">BETA_o</span><span class="o">/</span><span class="n">BETA_e</span>
+    <span class="n">SE_IV</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">((</span><span class="n">BETA_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">SE_e</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">4</span><span class="p">))</span>
+    
+    <span class="n">BETA_mode</span> <span class="o">=</span> <span class="n">beta_mode</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">l</span><span class="p">),</span> <span class="n">phi</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;Simple&quot;</span><span class="p">)</span> <span class="c1">#Point estimate calculated using unweighted KDE</span>
+    <span class="n">BETA_boot</span> <span class="o">=</span> <span class="n">bootstrap_mode</span> <span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;Simple&quot;</span><span class="p">)</span> <span class="c1">#Generating bootstrapped point estimates with normal sampling and unweighted KDE</span>
+    <span class="n">SE_mode</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">median_abs_deviation</span><span class="p">(</span><span class="n">BETA_boot</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="mf">1.4826</span><span class="p">)</span>
+    <span class="n">P_mode</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">BETA_mode</span> <span class="o">/</span> <span class="n">SE_mode</span><span class="p">),</span> <span class="n">df</span><span class="o">=</span><span class="n">l</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="p">[</span>
+    <span class="p">{</span>
+        <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Simple-mode&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">BETA_mode</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">SE_mode</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">P_mode</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="mr_weighted_mode">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_weighted_mode">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_weighted_mode</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the weighted mode method.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">    BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">    SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">    BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">    SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">    phi (int): Factor for the bandwidth parameter used in the kernel density estimation</span>
+<span class="sd">    nboot (int): Number of boostrap iterations to obtain the standard error and p-value</span>
+<span class="sd">    cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate or the intercept.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient or intercept.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate or intercept.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Weighted-mode&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+    
+    <span class="n">BETA_IV</span>   <span class="o">=</span> <span class="n">BETA_o</span><span class="o">/</span><span class="n">BETA_e</span>
+    <span class="n">SE_IV</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">((</span><span class="n">BETA_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">SE_e</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">4</span><span class="p">))</span>
+    
+    <span class="n">BETA_mode</span> <span class="o">=</span> <span class="n">beta_mode</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;Weighted&quot;</span><span class="p">)</span> <span class="c1">#Point estimate calculated using KDE weighted with standard errors</span>
+    <span class="n">BETA_boot</span> <span class="o">=</span> <span class="n">bootstrap_mode</span> <span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;Weighted&quot;</span><span class="p">)</span> <span class="c1">#Generating bootstrapped point estimates with normal sampling and weighted KDE</span>
+    <span class="n">SE_mode</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">median_abs_deviation</span><span class="p">(</span><span class="n">BETA_boot</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="mf">1.4826</span><span class="p">)</span>
+    <span class="n">P_mode</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">BETA_mode</span> <span class="o">/</span> <span class="n">SE_mode</span><span class="p">),</span> <span class="n">df</span><span class="o">=</span><span class="n">l</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="p">[</span>
+    <span class="p">{</span>
+        <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Weighted-mode&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">BETA_mode</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">SE_mode</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">P_mode</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="beta_mode">
+<a class="viewcode-back" href="../../genal.html#genal.MR.beta_mode">[docs]</a>
+<span class="k">def</span> <span class="nf">beta_mode</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Function to compute the point estimate of mode methods.&quot;&quot;&quot;</span>
+    <span class="c1"># Bandwidth rule - modified Silverman&#39;s rule proposed by Bickel (2002)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="mf">0.9</span> <span class="o">*</span> <span class="nb">min</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">ddof</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">stats</span><span class="o">.</span><span class="n">median_abs_deviation</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="mf">1.4826</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">5</span><span class="p">)</span>
+        
+    <span class="c1"># Define the actual bandwidth</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.00000001</span><span class="p">,</span> <span class="n">s</span> <span class="o">*</span> <span class="n">phi</span><span class="p">)</span>
+
+    <span class="c1"># Kernel density estimation (gaussian kernel)</span>
+    <span class="n">kde</span> <span class="o">=</span> <span class="n">KernelDensity</span><span class="p">(</span><span class="n">bandwidth</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">kernel</span><span class="o">=</span><span class="s1">&#39;gaussian&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;Weighted&quot;</span><span class="p">:</span> <span class="c1">#Using weighted KDE </span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">SE_IV</span> <span class="o">**</span> <span class="o">-</span><span class="mi">2</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">SE_IV</span> <span class="o">**</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="c1"># Standardised weights</span>
+        <span class="n">kde</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;Simple&quot;</span><span class="p">:</span> <span class="c1">#Using unweighted KDE</span>
+        <span class="n">kde</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="c1"># Create points to evaluate the density on (Using 512 points and 3*h as padding to be equivalent to the stas::density function in R)</span>
+    <span class="n">x_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">BETA_IV</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">-</span><span class="mi">3</span><span class="o">*</span><span class="n">h</span><span class="p">,</span> <span class="n">BETA_IV</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">+</span><span class="mi">3</span><span class="o">*</span><span class="n">h</span><span class="p">,</span> <span class="mi">512</span><span class="p">)[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
+
+    <span class="c1"># Calculate log density and then convert to actual density</span>
+    <span class="n">log_density</span> <span class="o">=</span> <span class="n">kde</span><span class="o">.</span><span class="n">score_samples</span><span class="p">(</span><span class="n">x_range</span><span class="p">)</span>
+    <span class="n">density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_density</span><span class="p">)</span>
+
+    <span class="c1"># Find mode</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">x_range</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">density</span><span class="p">)]</span>
+
+    <span class="k">return</span> <span class="n">mode</span></div>
+
+
+<div class="viewcode-block" id="bootstrap_mode_iteration">
+<a class="viewcode-back" href="../../genal.html#genal.MR.bootstrap_mode_iteration">[docs]</a>
+<span class="k">def</span> <span class="nf">bootstrap_mode_iteration</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to run the simple and weighted mode boostrapping in parallel.&quot;&quot;&quot;</span>
+    <span class="n">BETA_IV_boot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">)</span> <span class="c1">#Normally sample BETA_IV</span>
+    
+    <span class="k">if</span> <span class="n">method</span><span class="o">==</span><span class="s2">&quot;Simple&quot;</span><span class="p">:</span> <span class="c1">#If Simple mode: the kernel density estimation is not weighted (SE vector of 1)</span>
+        <span class="k">return</span> <span class="n">beta_mode</span><span class="p">(</span><span class="n">BETA_IV_boot</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">BETA_IV</span><span class="p">)),</span> <span class="n">phi</span><span class="p">,</span> <span class="s2">&quot;Simple&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">method</span><span class="o">==</span><span class="s2">&quot;Weighted&quot;</span><span class="p">:</span> <span class="c1">#If Weighted mode: the kernel density estimation is weighted using the standard errors</span>
+        <span class="k">return</span> <span class="n">beta_mode</span><span class="p">(</span><span class="n">BETA_IV_boot</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="s2">&quot;Weighted&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Method should be either &#39;Simple&#39; or &#39;Weighted&#39;.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="bootstrap_mode">
+<a class="viewcode-back" href="../../genal.html#genal.MR.bootstrap_mode">[docs]</a>
+<span class="k">def</span> <span class="nf">bootstrap_mode</span> <span class="p">(</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Function to obtain arrays of bootstrapped beta estimates (weighted or unweighted) to estimate SEs of mode methods.&quot;&quot;&quot;</span>
+    
+    <span class="c1"># Declare the array to store results of the bootstrapping</span>
+    <span class="n">BETA_boot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">nboot</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    
+    <span class="c1">#Wrapper function freezing the bootstrap_iteration for parallel execution</span>
+    <span class="n">partial_bootstrap_iteration</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">bootstrap_mode_iteration</span><span class="p">,</span> <span class="n">BETA_IV</span><span class="o">=</span><span class="n">BETA_IV</span><span class="p">,</span> <span class="n">SE_IV</span><span class="o">=</span><span class="n">SE_IV</span><span class="p">,</span> <span class="n">phi</span><span class="o">=</span><span class="n">phi</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span> 
+    
+    <span class="c1">#Parallel execution with progress bar</span>
+    <span class="k">with</span> <span class="n">ProcessPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">cpus</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="n">tqdm</span><span class="p">(</span>
+                <span class="n">executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">partial_bootstrap_iteration</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">nboot</span><span class="p">)),</span>
+                <span class="n">total</span><span class="o">=</span><span class="n">nboot</span><span class="p">,</span>
+                <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> mode bootstrapping&quot;</span><span class="p">,</span>
+                <span class="n">ncols</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">BETA_boot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="n">BETA_boot</span></div>
+
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Egger regression methods</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="mr_egger_regression">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_egger_regression">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_egger_regression</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the egger regression method. See :func:`mr_egger_regression_bootstrap` for a version with bootstrapping.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">        nboot (int): Number of boostrap iterations to obtain the standard error and p-value</span>
+<span class="sd">        cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate or the intercept.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient or intercept.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate or intercept.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Initialize null result</span>
+    <span class="n">null_result</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">]</span>
+
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="c1"># Early return if insufficient data</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">null_result</span>
+
+    <span class="n">sign0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">BETA_e</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="n">BETA_o</span> <span class="o">=</span> <span class="n">BETA_o</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">BETA_e</span> <span class="o">=</span> <span class="n">BETA_e</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">BETA_o</span> <span class="o">*=</span> <span class="n">sign0</span>
+    <span class="n">BETA_e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="n">flipped</span> <span class="o">=</span> <span class="n">sign0</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span>
+
+    <span class="n">X</span> <span class="o">=</span> <span class="n">BETA_e</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">add_constant</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">BETA_o</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span>
+
+    <span class="n">mod</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">WLS</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">params</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">se</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">bse</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">mse_resid</span><span class="p">))</span>
+        <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">),</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">b_i</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">se_i</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">bse</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">mse_resid</span><span class="p">))</span>
+        <span class="n">pval_i</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b_i</span> <span class="o">/</span> <span class="n">se_i</span><span class="p">),</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">mse_resid</span> <span class="o">*</span> <span class="p">(</span><span class="n">l</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">Q_df</span> <span class="o">=</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">2</span>
+        <span class="n">Q_pval</span> <span class="o">=</span> <span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">Q_df</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+                <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="n">Q</span><span class="p">,</span>
+                <span class="s2">&quot;Q_df&quot;</span><span class="p">:</span> <span class="n">Q_df</span><span class="p">,</span>
+                <span class="s2">&quot;Q_pval&quot;</span><span class="p">:</span> <span class="n">Q_pval</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b_i</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se_i</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval_i</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+                <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="n">Q</span><span class="p">,</span>
+                <span class="s2">&quot;Q_df&quot;</span><span class="p">:</span> <span class="n">Q_df</span><span class="p">,</span>
+                <span class="s2">&quot;Q_pval&quot;</span><span class="p">:</span> <span class="n">Q_pval</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">&quot;Warning: Collinearities in MR Egger, try LD pruning the exposure (can be done with .clump()).&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">null_result</span></div>
+
+
+<div class="viewcode-block" id="mr_egger_regression_bootstrap">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_egger_regression_bootstrap">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_egger_regression_bootstrap</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">cpus</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the egger regression method with boostrapped standard errors. See :func:`mr_egger_regression` for a version without bootstrapping.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">        nboot (int): Number of boostrap iterations to obtain the standard error and p-value</span>
+<span class="sd">        cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate or the intercept.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient or intercept.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate or intercept.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger-boot&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger-boot&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">]</span>
+
+    <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">nboot</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+    <span class="k">with</span> <span class="n">ProcessPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">cpus</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="c1"># Start the load operations and mark each future with its URL</span>
+        <span class="n">futures</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">parallel_bootstrap_func</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span> <span class="n">i</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nboot</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span>
+            <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">),</span> <span class="n">total</span><span class="o">=</span><span class="n">nboot</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;MR Egger bootstrapping&quot;</span><span class="p">,</span> <span class="n">ncols</span><span class="o">=</span><span class="mi">100</span>
+        <span class="p">):</span>
+            <span class="n">ahat</span><span class="p">,</span> <span class="n">bhat</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">futures</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>  <span class="c1"># get the original index/counter</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">ahat</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">bhat</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger-boot&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">res</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]),</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nanstd</span><span class="p">(</span><span class="n">res</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]),</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">res</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]))</span> <span class="o">*</span> <span class="n">res</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">nboot</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Egger-boot&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">res</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]),</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nanstd</span><span class="p">(</span><span class="n">res</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]),</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">res</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]))</span> <span class="o">*</span> <span class="n">res</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">nboot</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="parallel_bootstrap_func">
+<a class="viewcode-back" href="../../genal.html#genal.MR.parallel_bootstrap_func">[docs]</a>
+<span class="k">def</span> <span class="nf">parallel_bootstrap_func</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to run the egger regression bootstrapping in parallel.&quot;&quot;&quot;</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">)</span>
+    <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">)</span>
+
+    <span class="c1"># Use absolute values for Egger reg</span>
+    <span class="n">ys</span> <span class="o">*=</span> <span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+
+    <span class="n">r</span> <span class="o">=</span> <span class="n">linreg</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;ahat&quot;</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;bhat&quot;</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="linreg">
+<a class="viewcode-back" href="../../genal.html#genal.MR.linreg">[docs]</a>
+<span class="k">def</span> <span class="nf">linreg</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to run linear regressions for the parallel egger bootstrapping.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">w</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+    <span class="n">xp</span> <span class="o">=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">x</span>
+    <span class="n">yp</span> <span class="o">=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">y</span>
+
+    <span class="n">bhat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cov</span><span class="p">(</span><span class="n">xp</span><span class="p">,</span> <span class="n">yp</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">xp</span><span class="p">)</span>
+    <span class="n">ahat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">bhat</span>
+    <span class="n">yhat</span> <span class="o">=</span> <span class="n">ahat</span> <span class="o">+</span> <span class="n">bhat</span> <span class="o">*</span> <span class="n">x</span>
+
+    <span class="n">residuals</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">yhat</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+        <span class="nb">sum</span><span class="p">(</span><span class="n">w</span> <span class="o">*</span> <span class="n">residuals</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">yhat</span><span class="p">))</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">w</span> <span class="o">*</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">bhat</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;ahat&quot;</span><span class="p">:</span> <span class="n">ahat</span><span class="p">,</span> <span class="s2">&quot;bhat&quot;</span><span class="p">:</span> <span class="n">bhat</span><span class="p">,</span> <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span> <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">}</span></div>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Median methods</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="weighted_median">
+<a class="viewcode-back" href="../../genal.html#genal.MR.weighted_median">[docs]</a>
+<span class="k">def</span> <span class="nf">weighted_median</span><span class="p">(</span><span class="n">b_iv</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to compute the weighted median estimate.&quot;&quot;&quot;</span>
+    <span class="n">order_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">b_iv</span><span class="p">)</span>
+    <span class="n">betaIV_order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">b_iv</span><span class="p">)[</span><span class="n">order_indices</span><span class="p">]</span>
+    <span class="n">weights_order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">weights</span><span class="p">)[</span><span class="n">order_indices</span><span class="p">]</span>
+    <span class="n">weights_sum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">weights_order</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">weights_order</span>
+    <span class="n">weights_sum</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">weights_order</span><span class="p">)</span>
+    <span class="n">below</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">weights_sum</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">))</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">betaIV_order</span><span class="p">[</span><span class="n">below</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">betaIV_order</span><span class="p">[</span><span class="n">below</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">betaIV_order</span><span class="p">[</span><span class="n">below</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span>
+        <span class="mf">0.5</span> <span class="o">-</span> <span class="n">weights_sum</span><span class="p">[</span><span class="n">below</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">weights_sum</span><span class="p">[</span><span class="n">below</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">weights_sum</span><span class="p">[</span><span class="n">below</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">b</span></div>
+
+
+
+<div class="viewcode-block" id="weighted_median_bootstrap">
+<a class="viewcode-back" href="../../genal.html#genal.MR.weighted_median_bootstrap">[docs]</a>
+<span class="k">def</span> <span class="nf">weighted_median_bootstrap</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">nboot</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to generate boostrapped replications.&quot;&quot;&quot;</span>
+    <span class="n">med</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">nboot</span><span class="p">)</span>
+    <span class="c1">#for i in tqdm(</span>
+    <span class="c1">#    range(nboot), total=nboot, desc=&quot;Weighted median bootstrapping&quot;, ncols=100</span>
+    <span class="c1">#):</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nboot</span><span class="p">):</span>
+        <span class="n">BETA_e_boot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">SE_e</span><span class="p">)</span>
+        <span class="n">BETA_o_boot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">BETA_o</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">SE_o</span><span class="p">)</span>
+        <span class="n">betaIV_boot</span> <span class="o">=</span> <span class="n">BETA_o_boot</span> <span class="o">/</span> <span class="n">BETA_e_boot</span>
+        <span class="n">med</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">weighted_median</span><span class="p">(</span><span class="n">betaIV_boot</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">med</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="mr_weighted_median">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_weighted_median">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_weighted_median</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the weighted median method.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">        nboot (int): Number of boostrap iterations to obtain the standard error and p-value</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The standard error is obtained with bootstrapping.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;WM&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+
+    <span class="n">b_iv</span> <span class="o">=</span> <span class="n">BETA_o</span> <span class="o">/</span> <span class="n">BETA_e</span>
+    <span class="n">VBj</span> <span class="o">=</span> <span class="p">(</span><span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">((</span><span class="n">BETA_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">SE_e</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">4</span><span class="p">)</span>
+
+    <span class="n">b</span> <span class="o">=</span> <span class="n">weighted_median</span><span class="p">(</span><span class="n">b_iv</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">VBj</span><span class="p">)</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">weighted_median_bootstrap</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">VBj</span><span class="p">,</span> <span class="n">nboot</span><span class="p">)</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[{</span><span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;WM&quot;</span><span class="p">],</span> <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span> <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span> <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">}]</span></div>
+
+
+
+<div class="viewcode-block" id="mr_pen_wm">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_pen_wm">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_pen_wm</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">,</span> <span class="n">penk</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the penalised weighted median method. See https://arxiv.org/abs/1606.03729.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">        nboot (int): Number of boostrap iterations to obtain the standard error and p-value.</span>
+<span class="sd">        penk (float): Constant factor used to penalise the weights.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;WM-pen&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+
+    <span class="n">betaIV</span> <span class="o">=</span> <span class="n">BETA_o</span> <span class="o">/</span> <span class="n">BETA_e</span>
+    <span class="c1">#betaIVW = np.sum(BETA_o * BETA_e / SE_o**2) / np.sum(BETA_e**2 / SE_o**2)</span>
+    <span class="n">VBj</span> <span class="o">=</span> <span class="p">(</span><span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">BETA_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">SE_e</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">BETA_e</span><span class="o">**</span><span class="mi">4</span><span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">VBj</span>
+
+    <span class="n">bwm</span> <span class="o">=</span> <span class="n">mr_weighted_median</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">)</span>
+    <span class="n">penalty</span> <span class="o">=</span> <span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">weights</span> <span class="o">*</span> <span class="p">(</span><span class="n">betaIV</span> <span class="o">-</span> <span class="n">bwm</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;b&quot;</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">pen_weights</span> <span class="o">=</span> <span class="n">weights</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">penalty</span> <span class="o">*</span> <span class="n">penk</span><span class="p">)</span>
+
+    <span class="n">b</span> <span class="o">=</span> <span class="n">weighted_median</span><span class="p">(</span><span class="n">betaIV</span><span class="p">,</span> <span class="n">pen_weights</span><span class="p">)</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">weighted_median_bootstrap</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">pen_weights</span><span class="p">,</span> <span class="n">nboot</span><span class="p">)</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;WM-pen&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="mr_simple_median">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_simple_median">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_simple_median</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">nboot</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the simple median method.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+<span class="sd">        nboot (int): Number of boostrap iterations to obtain the standard error and p-value</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The standard error is obtained with bootstrapping.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Simple-median&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+
+    <span class="n">b_iv</span> <span class="o">=</span> <span class="n">BETA_o</span> <span class="o">/</span> <span class="n">BETA_e</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">))</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">weighted_median</span><span class="p">(</span><span class="n">b_iv</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">weighted_median_bootstrap</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">nboot</span><span class="p">)</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[{</span><span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Simple-median&quot;</span><span class="p">],</span> <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span> <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span> <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span> <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">}]</span></div>
+
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Regression methods</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="mr_ivw">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_ivw">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_ivw</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the Inverse Variance Weighted (IVW) method with random effects. Standard Error is corrected for under dispersion (as opposed to :func:`mr_ivw_re`).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">            - &quot;Q&quot;: Cochran&quot;s Q statistic for heterogeneity.</span>
+<span class="sd">            - &quot;Q_df&quot;: Degrees of freedom for the Q statistic.</span>
+<span class="sd">            - &quot;Q_pval&quot;: P-value for the Q statistic.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The function uses weighted least squares regression (WLS) to estimate the causal effect size,</span>
+<span class="sd">        weighting by the inverse of the variance of the outcome&quot;s effect sizes.</span>
+<span class="sd">        Cochran&quot;s Q statistics also computed to assess the heterogeneity across the instrumental variables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># If less than 2 valid rows, return NA values</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="c1"># Create weights and perform weighted regression</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">WLS</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="c1"># Extract coefficients</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">bse</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">mse_resid</span><span class="p">))</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+
+    <span class="n">Q_df</span> <span class="o">=</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="n">Q_df</span>
+    <span class="n">Q_pval</span> <span class="o">=</span> <span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">Q_df</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+            <span class="s2">&quot;Q_df&quot;</span><span class="p">:</span> <span class="n">Q_df</span><span class="p">,</span>
+            <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="n">Q</span><span class="p">,</span>
+            <span class="s2">&quot;Q_pval&quot;</span><span class="p">:</span> <span class="n">Q_pval</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="mr_ivw_re">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_ivw_re">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_ivw_re</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the Inverse Variance Weighted (IVW) method with random effects. Standard Error is not corrected for under dispersion (as opposed to :func:`mr_ivw`).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">            - &quot;Q&quot;: Cochran&quot;s Q statistic for heterogeneity.</span>
+<span class="sd">            - &quot;Q_df&quot;: Degrees of freedom for the Q statistic.</span>
+<span class="sd">            - &quot;Q_pval&quot;: P-value for the Q statistic.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The function uses weighted least squares regression (WLS) to estimate the causal effect size,</span>
+<span class="sd">        weighting by the inverse of the variance of the outcome&quot;s effect sizes.</span>
+<span class="sd">        Cochran&quot;s Q statistics also computed to assess the heterogeneity across the instrumental variables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># If less than 2 valid rows, return NA values</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW-RE&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="c1"># Create weights and perform weighted regression</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">WLS</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="c1"># Extract coefficients</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">bse</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+    <span class="n">Q_df</span> <span class="o">=</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="n">Q_df</span>
+    <span class="n">Q_pval</span> <span class="o">=</span> <span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">Q_df</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW-RE&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+            <span class="s2">&quot;Q_df&quot;</span><span class="p">:</span> <span class="n">Q_df</span><span class="p">,</span>
+            <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="n">Q</span><span class="p">,</span>
+            <span class="s2">&quot;Q_pval&quot;</span><span class="p">:</span> <span class="n">Q_pval</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="mr_ivw_fe">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_ivw_fe">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_ivw_fe</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform a Mendelian Randomization analysis using the Inverse Variance Weighted (IVW) method with fixed effects.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">            - &quot;Q&quot;: Cochran&quot;s Q statistic for heterogeneity.</span>
+<span class="sd">            - &quot;Q_df&quot;: Degrees of freedom for the Q statistic.</span>
+<span class="sd">            - &quot;Q_pval&quot;: P-value for the Q statistic.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The function uses weighted least squares regression (WLS) to estimate the causal effect size,</span>
+<span class="sd">        weighting by the inverse of the variance of the outcome&quot;s effect sizes.</span>
+<span class="sd">        Cochran&quot;s Q statistics also computed to assess the heterogeneity across the instrumental variables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW-FE&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+
+    <span class="c1"># Create weights and perform weighted regression</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">SE_o</span><span class="o">**</span><span class="mi">2</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">WLS</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW-FE&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="c1"># Extract coefficients</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">bse</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">model</span><span class="o">.</span><span class="n">mse_resid</span><span class="o">**</span><span class="mf">0.5</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+    <span class="n">Q_df</span> <span class="o">=</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="n">Q_df</span>
+    <span class="n">Q_pval</span> <span class="o">=</span> <span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">Q_df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;IVW-FE&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+            <span class="s2">&quot;Q_df&quot;</span><span class="p">:</span> <span class="n">Q_df</span><span class="p">,</span>
+            <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="n">Q</span><span class="p">,</span>
+            <span class="s2">&quot;Q_pval&quot;</span><span class="p">:</span> <span class="n">Q_pval</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="mr_uwr">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_uwr">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_uwr</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">SE_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">,</span> <span class="n">SE_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs an unweighted regression Mendelian Randomization analysis.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        SE_e (numpy array): Standard errors corresponding to `BETA_e`.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+<span class="sd">        SE_o (numpy array): Standard errors corresponding to `BETA_o`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing a dictionary with the results:</span>
+<span class="sd">            - &quot;method&quot;: Name of the analysis method.</span>
+<span class="sd">            - &quot;b&quot;: Coefficient of the regression, representing the causal estimate.</span>
+<span class="sd">            - &quot;se&quot;: Adjusted standard error of the coefficient.</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the causal estimate.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">            - &quot;Q&quot;: Cochran&quot;s Q statistic for heterogeneity.</span>
+<span class="sd">            - &quot;Q_df&quot;: Degrees of freedom for the Q statistic.</span>
+<span class="sd">            - &quot;Q_pval&quot;: P-value for the Q statistic.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The returned causal estimate is not weighted by the inverse variance.</span>
+<span class="sd">        The standard error is corrected for under dispersion.</span>
+<span class="sd">        Cochran&quot;s Q statistics also computed to assess the heterogeneity across the instrumental variables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">l</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;UWR&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="c1"># Perform regression without weights</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">OLS</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="c1"># Extract coefficients and compute statistics</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">bse</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">mse_resid</span><span class="o">**</span><span class="mf">0.5</span><span class="p">)</span>  <span class="c1"># Adjusted standard error</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">norm</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="n">se</span><span class="p">))</span>
+    <span class="n">Q_df</span> <span class="o">=</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="n">Q_df</span>
+    <span class="n">Q_pval</span> <span class="o">=</span> <span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">Q_df</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;UWR&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">se</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">l</span><span class="p">,</span>
+            <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;Q_df&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;Q_pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">]</span></div>
+
+
+
+<span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">Sign method</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="mr_sign">
+<a class="viewcode-back" href="../../genal.html#genal.MR.mr_sign">[docs]</a>
+<span class="k">def</span> <span class="nf">mr_sign</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs the sign concordance test.</span>
+
+<span class="sd">    The sign concordance test is used to determine whether there is a consistent direction</span>
+<span class="sd">    of effect (i.e., sign) between the exposure and outcome across the variants.</span>
+<span class="sd">    The consistent directonality is an assumption of Mendelian Randomization.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        BETA_e (numpy array): Effect sizes of genetic variants on the exposure.</span>
+<span class="sd">        BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of dict: A list containing dictionaries with the following keys:</span>
+<span class="sd">            - &quot;method&quot;: Name of the method.</span>
+<span class="sd">            - &quot;nSNP&quot;: Number of genetic variants used in the analysis.</span>
+<span class="sd">            - &quot;b&quot;: Proportion of concordant signs between exposure and outcome effect</span>
+<span class="sd">                   sizes minus 0.5, multiplied by 2.</span>
+<span class="sd">            - &quot;se&quot;: Not applicable for this method (returns NaN).</span>
+<span class="sd">            - &quot;pval&quot;: P-value for the sign concordance test based on a binomial distribution.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        Effect sizes that are exactly zero are replaced with NaN and are not included in the analysis. A binomial test is then performed to evaluate the probability of observing the given number of concordant signs by chance alone, assuming a null expectation of 50% concordance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Replace zeros with NaNs</span>
+    <span class="n">BETA_e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">BETA_e</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">BETA_e</span><span class="p">)</span>
+    <span class="n">BETA_o</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">BETA_o</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">BETA_o</span><span class="p">)</span>
+
+    <span class="c1"># Check for enough non-missing values</span>
+    <span class="n">valid_data</span> <span class="o">=</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">))</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">valid_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Sign&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+
+    <span class="c1"># Count the number of consistent signs</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">BETA_e</span><span class="p">[</span><span class="n">valid_data</span><span class="p">])</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">BETA_o</span><span class="p">[</span><span class="n">valid_data</span><span class="p">]))</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">valid_data</span><span class="p">)</span>
+
+    <span class="c1"># Binomial test</span>
+    <span class="n">pval</span> <span class="o">=</span> <span class="n">binomtest</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">/</span> <span class="n">n</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">MR_METHODS_NAMES</span><span class="p">[</span><span class="s2">&quot;Sign&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;nSNP&quot;</span><span class="p">:</span> <span class="n">n</span><span class="p">,</span>
+            <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s2">&quot;se&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">:</span> <span class="n">pval</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">]</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

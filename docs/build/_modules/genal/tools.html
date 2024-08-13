@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.tools &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.tools</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.tools</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">wget</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+
+<span class="kn">from</span> <span class="nn">.constants</span> <span class="kn">import</span> <span class="n">REF_PANELS</span><span class="p">,</span> <span class="n">REF_PANELS_URL</span>
+
+<span class="n">config_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s2">&quot;~/.genal/&quot;</span><span class="p">),</span> <span class="s2">&quot;config.json&quot;</span><span class="p">)</span>
+<span class="c1"># default_ref_path = os.path.join(os.getcwd(), &quot;tmp_GENAL&quot;, &quot;Reference_files&quot;)</span>
+<span class="n">default_ref_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s2">&quot;~/.genal/&quot;</span><span class="p">),</span> <span class="s2">&quot;Reference_files&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="default_config">
+<a class="viewcode-back" href="../../genal.html#genal.tools.default_config">[docs]</a>
+<span class="k">def</span> <span class="nf">default_config</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns default config values&quot;&quot;&quot;</span>
+    <span class="n">current_file_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+    <span class="n">default_config</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;paths&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;plink19_path&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;liftover_path&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;geno_path&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ref_path&quot;</span><span class="p">:</span> <span class="n">default_ref_path</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">default_config</span></div>
+
+
+
+<div class="viewcode-block" id="read_config">
+<a class="viewcode-back" href="../../genal.html#genal.tools.read_config">[docs]</a>
+<span class="k">def</span> <span class="nf">read_config</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get config file data&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">config</span></div>
+
+
+
+<div class="viewcode-block" id="write_config">
+<a class="viewcode-back" href="../../genal.html#genal.tools.write_config">[docs]</a>
+<span class="k">def</span> <span class="nf">write_config</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write data to config file&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+<div class="viewcode-block" id="setup_genetic_path">
+<a class="viewcode-back" href="../../genal.html#genal.tools.setup_genetic_path">[docs]</a>
+<span class="k">def</span> <span class="nf">setup_genetic_path</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure the genetic data path based on user input and saved configuration.&quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">read_config</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="s2">&quot;geno_path&quot;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;No path has been saved in the config file. Please provide one.&quot;</span><span class="p">)</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;geno_path&quot;</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using path saved in config file: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">path</span>
+
+    <span class="c1"># Ensure correct path format</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;$&quot;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;The path should contain at most 1 &#39;$&#39; sign. Use it to indicate the chromosome number if the data is split by chromosomes.&quot;</span>
+        <span class="p">)</span>
+    <span class="c1"># Check if the path is valid</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Remove file extension</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;$&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">check_bfiles</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;The path does not lead to valid bed/bim/fam files.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">check_split</span> <span class="o">=</span> <span class="p">[</span><span class="n">check_bfiles</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">23</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">check_split</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;The path does not lead to valid bed/bim/fam files.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Save path to config.json file</span>
+    <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;geno_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span>
+    <span class="n">write_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="create_tmp">
+<a class="viewcode-back" href="../../genal.html#genal.tools.create_tmp">[docs]</a>
+<span class="k">def</span> <span class="nf">create_tmp</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create the temporary folder if not present&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to create the &#39;tmp_GENAL&#39; directory. Check permissions.&quot;</span>
+            <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="set_reference_folder">
+<a class="viewcode-back" href="../../genal.html#genal.tools.set_reference_folder">[docs]</a>
+<span class="k">def</span> <span class="nf">set_reference_folder</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set a folder path to store reference data.</span>
+
+<span class="sd">    This function allows users to specify a directory where reference data will be stored.</span>
+<span class="sd">    If the directory doesn&#39;t exist, it will be created. If no path is provided, a default</span>
+<span class="sd">    directory named &#39;tmp_GENAL&#39; in the current working directory will be used.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        path (str, optional): The desired directory path for storing reference data. Defaults to a temporary folder in the current working directory.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        OSError: If the directory cannot be created.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: The function prints messages to inform the user of the status and any errors.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># If no path is provided, set default path to root/.genal/Reference_files</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">default_ref_path</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No path provided, defaulting to </span><span class="si">{</span><span class="n">default_ref_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># If the directory doesn&#39;t exist, attempt to create it</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating the &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39; directory.&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unable to create the &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39; directory. Check permissions.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Check if the directory is readable</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">R_OK</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: The directory &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39; is not readable.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c1"># Check if the directory is writable</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">W_OK</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: The directory &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39; is not writable.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c1"># Update the configuration with the new path</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">read_config</span><span class="p">()</span>
+    <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;ref_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span>
+    <span class="n">write_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reference files will be downloaded and stored in: &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_reference_panel_path">
+<a class="viewcode-back" href="../../genal.html#genal.tools.get_reference_panel_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_reference_panel_path</span><span class="p">(</span><span class="n">reference_panel</span><span class="o">=</span><span class="s2">&quot;eur&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieve the path of the specified reference panel.</span>
+
+<span class="sd">    This function checks if the provided reference panel is a valid path to bed/bim/fam files.</span>
+<span class="sd">    If not, it checks if the reference panel exists in the reference folder. If it doesn&#39;t exist,</span>
+<span class="sd">    the function attempts to download it.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        reference_panel (str, optional): The name of the reference panel or a path to bed/bim/fam files. Defaults to &quot;eur&quot;.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the provided reference panel is not recognized.</span>
+<span class="sd">        OSError: If there&#39;s an issue creating the directory.</span>
+<span class="sd">        FileNotFoundError: If the reference panel is not found.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The path to the reference panel.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Remove file extension and check if it&#39;s a path to a bed/bim/fam triple</span>
+    <span class="n">reference_panel</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">reference_panel</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">check_bfiles</span><span class="p">(</span><span class="n">reference_panel</span><span class="p">):</span>
+        <span class="n">ref_panel_path</span> <span class="o">=</span> <span class="n">reference_panel</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using the provided path as the reference panel.&quot;</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># If it&#39;s not a valid path, check if the reference panel is recognized</span>
+        <span class="n">reference_panel</span> <span class="o">=</span> <span class="n">reference_panel</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">read_config</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">reference_panel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">REF_PANELS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The reference_panel argument can only take values in </span><span class="si">{</span><span class="n">REF_PANELS</span><span class="si">}</span><span class="s2"> or be a valid path to bed/bim/fam files.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">ref_path</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;ref_path&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Create the reference path if it doesn&#39;t exist</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">ref_path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">ref_path</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span>
+                    <span class="s2">&quot;Unable to create the &#39;tmp_GENAL&#39; directory. Check permissions.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">ref_panel_name</span> <span class="o">=</span> <span class="n">reference_panel</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="n">ref_panel_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ref_path</span><span class="p">,</span> <span class="n">ref_panel_name</span><span class="p">)</span>
+
+        <span class="c1"># If the reference panel files don&#39;t exist, attempt to download them</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">check_bfiles</span><span class="p">(</span><span class="n">ref_panel_path</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">reference_panel</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span><span class="si">}</span><span class="s2"> (build 37) reference panel was not found. Attempting to download it...&quot;</span>
+            <span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;If you have already downloaded it, or wish to use your own reference panel, use genal.set_reference_folder(path) to avoid downloading again.&quot;</span>
+            <span class="p">)</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">wget</span><span class="o">.</span><span class="n">download</span><span class="p">(</span><span class="n">REF_PANELS_URL</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ref_path</span><span class="p">,</span> <span class="s2">&quot;reference_panels.tgz&quot;</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Download unsuccessful: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="s2">&quot;Manually download the reference file and use genal.set_reference_folder(path).&quot;</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reference panel </span><span class="si">{</span><span class="n">reference_panel</span><span class="si">}</span><span class="s2"> not found.&quot;</span><span class="p">)</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Download successful. Decompressing...&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ref_path</span><span class="p">,</span> <span class="s2">&quot;reference_panels.tgz&quot;</span><span class="p">),</span> <span class="s2">&quot;r:gz&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tar_ref</span><span class="p">:</span>
+                <span class="n">tar_ref</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">ref_path</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using the </span><span class="si">{</span><span class="n">ref_panel_name</span><span class="si">}</span><span class="s2"> (build 37) reference panel.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ref_panel_path</span></div>
+
+
+
+<div class="viewcode-block" id="load_reference_panel">
+<a class="viewcode-back" href="../../genal.html#genal.tools.load_reference_panel">[docs]</a>
+<span class="k">def</span> <span class="nf">load_reference_panel</span><span class="p">(</span><span class="n">reference_panel</span><span class="o">=</span><span class="s2">&quot;eur&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the bim file from the reference panel specified.&quot;&quot;&quot;</span>
+    
+    <span class="c1"># Check if it&#39;s a path to a .bim file</span>
+    <span class="n">reference_panel</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">reference_panel</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">reference_panel</span> <span class="o">+</span> <span class="s2">&quot;.bim&quot;</span><span class="p">):</span>
+        <span class="n">ref_panel_path</span> <span class="o">=</span> <span class="n">reference_panel</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using the provided bim file as the reference dataset.&quot;</span><span class="p">)</span>
+        
+    <span class="c1"># Else, check if it&#39;s one of the reference datasets names and get the path</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">reference_panel</span> <span class="o">=</span> <span class="n">reference_panel</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">reference_panel</span> <span class="o">==</span> <span class="s2">&quot;multi&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Multi reference dataset not implemented yet.&quot;</span><span class="p">)</span> 
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ref_panel_path</span> <span class="o">=</span> <span class="n">get_reference_panel_path</span><span class="p">(</span><span class="n">reference_panel</span><span class="p">)</span>
+            
+    <span class="c1">#Load it and return it</span>
+    <span class="n">reference_panel_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">ref_panel_path</span> <span class="o">+</span> <span class="s2">&quot;.bim&quot;</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">,</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span><span class="s2">&quot;F&quot;</span><span class="p">,</span><span class="s2">&quot;POS&quot;</span><span class="p">,</span><span class="s2">&quot;A1&quot;</span><span class="p">,</span><span class="s2">&quot;A2&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+    
+    <span class="c1"># Convert CHR to string and remove &#39;chr&#39; prefix if present, then convert to int</span>
+    <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">reference_panel_df</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;chr&quot;</span><span class="p">):</span>
+        <span class="n">reference_panel_df</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">reference_panel_df</span><span class="p">[</span><span class="s2">&quot;CHR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;^chr&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">reference_panel_df</span></div>
+
+
+<div class="viewcode-block" id="set_plink">
+<a class="viewcode-back" href="../../genal.html#genal.tools.set_plink">[docs]</a>
+<span class="k">def</span> <span class="nf">set_plink</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the plink 1.9 path and verify that it is the correct version.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;You need to provide a path.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;plink&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check if the path is an executable</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">path</span><span class="p">],</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span>  <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">X_OK</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;You do not have permission to execute the plink executable.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Check if the path is the correct plink version</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;PLINK v1.9&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">&quot;The path provided is an executable, but not the plink 1.9 executable. Check the path and plink version.&quot;</span>
+            <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+    <span class="c1"># Change config file</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">read_config</span><span class="p">()</span>
+    <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;plink19_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span>
+    <span class="n">write_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Path to plink 1.9 successfully set: &#39;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="get_plink19_path">
+<a class="viewcode-back" href="../../genal.html#genal.tools.get_plink19_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_plink19_path</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the plink19 path if it exists in the config file.&quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">read_config</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;plink19_path&quot;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;The path to plink 1.9 has not been set yet. Use set_plink(path_to_plink) first.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="s2">&quot;plink19_path&quot;</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="check_bfiles">
+<a class="viewcode-back" href="../../genal.html#genal.tools.check_bfiles">[docs]</a>
+<span class="k">def</span> <span class="nf">check_bfiles</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the path specified leads to a bed/bim/fam triple.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.bed&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">filepath</span><span class="p">))</span>
+        <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.bim&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">filepath</span><span class="p">))</span>
+        <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.fam&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">filepath</span><span class="p">))</span>
+    <span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="delete_tmp">
+<a class="viewcode-back" href="../../genal.html#genal.tools.delete_tmp">[docs]</a>
+<span class="k">def</span> <span class="nf">delete_tmp</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Delete the tmp folder.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The tmp_GENAL folder has been successfully deleted.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;There is no tmp_GENAL folder to delete in the current directory.&quot;</span><span class="p">)</span>
+    <span class="k">return</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.extract_prs &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.extract_prs</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.extract_prs</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ProcessPoolExecutor</span>
+
+<span class="kn">from</span> <span class="nn">.tools</span> <span class="kn">import</span> <span class="n">check_bfiles</span><span class="p">,</span> <span class="n">read_config</span><span class="p">,</span> <span class="n">write_config</span><span class="p">,</span> <span class="n">setup_genetic_path</span><span class="p">,</span> <span class="n">get_plink19_path</span>
+
+
+<div class="viewcode-block" id="prs_func">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.prs_func">[docs]</a>
+<span class="k">def</span> <span class="nf">prs_func</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">weighted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ram</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute a PRS (Polygenic Risk Score) using provided SNP-level data. Corresponds to the :meth:`Geno.prs` method</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        data (pd.DataFrame): Dataframe containing SNP-level data.</span>
+<span class="sd">        weighted (bool, optional): Perform a weighted PRS using BETA column estimates.</span>
+<span class="sd">            If False, perform an unweighted PRS (equivalent to BETAs set to 1). Defaults to True.</span>
+<span class="sd">        path (str, optional): Path to bed/bim/fam set of genetic files to use for PRS calculation.</span>
+<span class="sd">            If not provided, it uses the genetic data extracted with the `.extract_snps` method or attempts to use the path in the config file. Defaults to None.</span>
+<span class="sd">        ram (int, optional): RAM memory in MB to be used by plink. Defaults to 10000.</span>
+<span class="sd">        name (str, optional): Name used for naming output and intermediate files. Defaults to &quot;&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame containing PRS results.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If mandatory columns are missing in the data.</span>
+<span class="sd">        TypeError: If valid bed/bim/fam files are not found.</span>
+<span class="sd">        ValueError: If PRS computation was not successful.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="c1"># Call extract_snps</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">extract_snps_func</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">SNP</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+
+    <span class="c1"># Set BETA values to 1 if unweighted PRS is required</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">weighted</span><span class="p">:</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;BETA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Computing an unweighted PRS using </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> data.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Computing a weighted PRS using </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> data.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check for empty dataframe</span>
+    <span class="n">n_snps</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">n_snps</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;No SNPs remain for the polygenic risk score (PRS) calculation.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Write processed data to file and run plink on it</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;EA&quot;</span><span class="p">,</span> <span class="s2">&quot;BETA&quot;</span><span class="p">]]</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_to_prs.txt&quot;</span><span class="p">)</span>
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_prs&quot;</span><span class="p">)</span>
+
+    <span class="n">data</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">data_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">plink_command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --memory </span><span class="si">{</span><span class="n">ram</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> </span><span class="se">\</span>
+<span class="s2">                     --score </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2"> 1 2 3 header --out </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">plink_command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Read and process PRS results</span>
+    <span class="n">prs_file</span> <span class="o">=</span> <span class="n">output_path</span> <span class="o">+</span> <span class="s2">&quot;.profile&quot;</span>
+    <span class="n">log_file</span> <span class="o">=</span> <span class="n">output_path</span> <span class="o">+</span> <span class="s2">&quot;.log&quot;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">prs_file</span><span class="p">):</span> <span class="c1">#If the profile file exists: PRS was successful</span>
+        <span class="c1">#Extracts the number of SNPs used for the PRS computation</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;--score: (\d+) valid predictor&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">log_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                    <span class="n">n_predictors</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="c1">#Return scores</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The PRS computation was successful and used </span><span class="si">{</span><span class="n">n_predictors</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_snps</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">n_predictors</span><span class="o">/</span><span class="n">n_snps</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) SNPs.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">df_score</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">prs_file</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;\s+&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df_score</span><span class="p">[[</span><span class="s2">&quot;FID&quot;</span><span class="p">,</span> <span class="s2">&quot;IID&quot;</span><span class="p">,</span> <span class="s2">&quot;SCORE&quot;</span><span class="p">]]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">output</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The PRS computation was not successful. Check the </span><span class="si">{</span><span class="n">output_path</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s1">&#39;.log&#39;</span><span class="si">}</span><span class="s2"> file.&quot;</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="extract_snps_func">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.extract_snps_func">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_snps_func</span><span class="p">(</span><span class="n">snp_list</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extracts a list of SNPs from the given path. This function corresponds to the following Geno method: :meth:`Geno.extract_snps`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        snp_list (List[str]): List of SNPs to extract.</span>
+<span class="sd">        name (str): Name prefix for the output files.</span>
+<span class="sd">        path (str, optional): Path to the dataset. Defaults to the path from the configuration.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: Raises an error when no valid path is saved or when there&#39;s an incorrect format in the provided path.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">setup_genetic_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+    <span class="n">snp_list</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="p">,</span> <span class="n">nrow</span> <span class="o">=</span> <span class="n">prepare_snp_list</span><span class="p">(</span><span class="n">snp_list</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="n">filetype</span> <span class="o">=</span> <span class="s2">&quot;split&quot;</span> <span class="k">if</span> <span class="s2">&quot;$&quot;</span> <span class="ow">in</span> <span class="n">path</span> <span class="k">else</span> <span class="s2">&quot;combined&quot;</span>
+
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">filetype</span> <span class="o">==</span> <span class="s2">&quot;split&quot;</span><span class="p">:</span>
+        <span class="n">merge_command</span><span class="p">,</span> <span class="n">bedlist_path</span> <span class="o">=</span> <span class="n">extract_snps_from_split_data</span><span class="p">(</span>
+            <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">snp_list_path</span>
+        <span class="p">)</span>
+        <span class="n">handle_multiallelic_variants</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">merge_command</span><span class="p">,</span> <span class="n">bedlist_path</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">extract_snps_from_combined_data</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="p">)</span>
+        
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created bed/bim/fam fileset with extracted SNPs: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Report SNPs not found</span>
+    <span class="n">report_snps_not_found</span><span class="p">(</span><span class="n">nrow</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output_path</span></div>
+
+
+
+<div class="viewcode-block" id="prepare_snp_list">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.prepare_snp_list">[docs]</a>
+<span class="k">def</span> <span class="nf">prepare_snp_list</span><span class="p">(</span><span class="n">snp_list</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepare the SNP list for extraction.&quot;&quot;&quot;</span>
+    <span class="n">snp_list</span> <span class="o">=</span> <span class="n">snp_list</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="n">snp_list_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_list.txt&quot;</span>
+    <span class="n">snp_list_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="n">snp_list_name</span><span class="p">)</span>
+    <span class="n">snp_list</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">snp_list_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">nrow</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">snp_list</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">snp_list</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="p">,</span> <span class="n">nrow</span></div>
+
+
+
+<div class="viewcode-block" id="extract_command_parallel">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.extract_command_parallel">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_command_parallel</span><span class="p">(</span><span class="n">task_id</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Helper function to run SNP extraction in parallel for different chromosomes.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        task_id (int): Identifier for the task/chromosome.</span>
+<span class="sd">        name (str): Name prefix for the output files.</span>
+<span class="sd">        path (str): Path to the data set.</span>
+<span class="sd">        snp_list_path (str): Path to the list of SNPs to extract.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        int: Returns the task_id if no valid bed/bim/fam files are found.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">bfile_path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">task_id</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">check_bfiles</span><span class="p">(</span><span class="n">bfile_path</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">task_id</span>
+
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_extract_chr</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">bfile_path</span><span class="si">}</span><span class="s2"> --extract </span><span class="si">{</span><span class="n">snp_list_path</span><span class="si">}</span><span class="s2"> --make-bed --out </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_bedlist">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.create_bedlist">[docs]</a>
+<span class="k">def</span> <span class="nf">create_bedlist</span><span class="p">(</span><span class="n">bedlist</span><span class="p">,</span> <span class="n">output_name</span><span class="p">,</span> <span class="n">not_found</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a bedlist file for SNP extraction.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        bedlist (str): Path to save the bedlist file.</span>
+<span class="sd">        output_name (str): Base name for the output files.</span>
+<span class="sd">        not_found (List[int]): List of chromosome numbers for which no bed/bim/fam files were found.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bedlist</span><span class="p">,</span> <span class="s2">&quot;w+&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">bedlist_file</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">23</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">not_found</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;bed/bim/fam files not found for chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">check_bfiles</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">_chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+                <span class="n">bedlist_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">_chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SNPs extracted for chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No SNPs extracted for chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="extract_snps_from_split_data">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.extract_snps_from_split_data">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_snps_from_split_data</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract SNPs from data split by chromosome.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Extracting SNPs for each chromosome...&quot;</span><span class="p">)</span>
+    <span class="n">num_tasks</span> <span class="o">=</span> <span class="mi">22</span>
+    <span class="n">partial_extract_command_parallel</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
+        <span class="n">extract_command_parallel</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="o">=</span><span class="n">snp_list_path</span>
+    <span class="p">)</span>  <span class="c1"># Wrapper function</span>
+    <span class="k">with</span> <span class="n">ProcessPoolExecutor</span><span class="p">()</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="n">not_found</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="n">executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">partial_extract_command_parallel</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_tasks</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Merge extracted SNPs from each chromosome</span>
+    <span class="n">bedlist_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_bedlist.txt&quot;</span>
+    <span class="n">bedlist_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="n">bedlist_name</span><span class="p">)</span>
+    <span class="n">create_bedlist</span><span class="p">(</span>
+        <span class="n">bedlist_path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_extract&quot;</span><span class="p">),</span> <span class="n">not_found</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Merging SNPs extracted from each chromosome...&quot;</span><span class="p">)</span>
+    <span class="n">merge_command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --merge-list </span><span class="si">{</span><span class="n">bedlist_path</span><span class="si">}</span><span class="s2"> --make-bed --out </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">merge_command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">merge_command</span><span class="p">,</span> <span class="n">bedlist_path</span></div>
+
+
+
+<div class="viewcode-block" id="handle_multiallelic_variants">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.handle_multiallelic_variants">[docs]</a>
+<span class="k">def</span> <span class="nf">handle_multiallelic_variants</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">merge_command</span><span class="p">,</span> <span class="n">bedlist_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle multiallelic variants detected during merging.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">remove_multiallelic</span><span class="p">():</span>
+        <span class="n">snps_to_exclude</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr-merge.missnp&quot;</span><span class="p">),</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">23</span><span class="p">):</span>
+            <span class="n">bim_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_extract_chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.bim&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">bim_path</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">bim</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">bim_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+            <span class="c1"># If no SNPs would be left for this chr: remove corresponding bedlist line</span>
+            <span class="n">n_to_exclude</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">bim</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">snps_to_exclude</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+            <span class="k">if</span> <span class="n">n_to_exclude</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">bim</span><span class="p">[</span><span class="mi">1</span><span class="p">])):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No SNPs remaining for chromosome </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                <span class="n">tmp_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="s2">&quot;tmp_multiallelic&quot;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bedlist_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span>
+                    <span class="n">tmp_filename</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">temp_file</span><span class="p">:</span>
+                    <span class="n">output_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_extract&quot;</span><span class="p">)</span>
+                    <span class="n">line_to_exclude</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">_chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="k">for</span> <span class="n">current_line_number</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">line</span> <span class="o">!=</span> <span class="n">line_to_exclude</span><span class="p">:</span>
+                            <span class="n">temp_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                <span class="c1"># Replace the original file with the temporary file</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp_filename</span><span class="p">,</span> <span class="n">bedlist_path</span><span class="p">)</span>
+
+            <span class="c1"># If there is at least one multiallelic SNP for this chr</span>
+            <span class="k">elif</span> <span class="n">n_to_exclude</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">bfile_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_extract_chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">missnp_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                    <span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr-merge.missnp&quot;</span>
+                <span class="p">)</span>
+                <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_extract_chr</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">bfile_path</span><span class="si">}</span><span class="s2"> --exclude </span><span class="si">{</span><span class="n">missnp_path</span><span class="si">}</span><span class="s2"> --make-bed --out </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                    <span class="n">command</span><span class="p">,</span>
+                    <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+                    <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">snps_to_exclude</span><span class="p">)</span>
+
+    <span class="n">log_content</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr.log&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s2">&quot;with 3+ alleles present&quot;</span> <span class="ow">in</span> <span class="n">log_content</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Multiallelic variants detected in the genetic files: removing them before merging.&quot;</span><span class="p">)</span>
+        <span class="n">n_multiallelic</span> <span class="o">=</span> <span class="n">remove_multiallelic</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reattempting the merge after exclusion of </span><span class="si">{</span><span class="n">n_multiallelic</span><span class="si">}</span><span class="s2"> multiallelic variants.&quot;</span><span class="p">)</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">merge_command</span><span class="p">,</span>
+            <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1">## In rare cases, plink fails to identify all the multiallelic SNPs with the first pass.</span>
+        <span class="n">log_content</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr.log&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s2">&quot;with 3+ alleles present&quot;</span> <span class="ow">in</span> <span class="n">log_content</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Multiallelic variants still detected: removing them before merging.&quot;</span><span class="p">)</span>
+            <span class="n">remove_multiallelic</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Reattempting the merge after deletion of multiallelic variants.&quot;</span><span class="p">)</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">merge_command</span><span class="p">,</span>
+                <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+                <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="extract_snps_from_combined_data">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.extract_snps_from_combined_data">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_snps_from_combined_data</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">snp_list_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract SNPs from combined data.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Extracting SNPs...&quot;</span><span class="p">)</span>
+    <span class="n">extract_command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">get_plink19_path</span><span class="p">()</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> --extract </span><span class="si">{</span><span class="n">snp_list_path</span><span class="si">}</span><span class="s2"> --make-bed --out </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">extract_command</span><span class="p">,</span>
+        <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+        <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+    
+
+
+<div class="viewcode-block" id="report_snps_not_found">
+<a class="viewcode-back" href="../../genal.html#genal.extract_prs.report_snps_not_found">[docs]</a>
+<span class="k">def</span> <span class="nf">report_snps_not_found</span><span class="p">(</span><span class="n">nrow</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Report the number of SNPs not found in the data.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">count_lines</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">)</span>
+
+    <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_allchr.bim&quot;</span><span class="p">)</span>
+    <span class="n">extracted_snps_count</span> <span class="o">=</span> <span class="n">count_lines</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    <span class="n">delta_nrow</span> <span class="o">=</span> <span class="n">nrow</span> <span class="o">-</span> <span class="n">extracted_snps_count</span>
+    <span class="k">if</span> <span class="n">delta_nrow</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Extraction completed. </span><span class="si">{</span><span class="n">delta_nrow</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">delta_nrow</span><span class="o">/</span><span class="n">nrow</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">%) SNPs were not extracted from the genetic data.&quot;</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

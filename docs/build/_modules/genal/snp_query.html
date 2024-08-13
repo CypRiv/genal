@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.snp_query &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#main-functions">Main functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.snp_query</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.snp_query</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">aiohttp</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">nest_asyncio</span>
+<span class="kn">from</span> <span class="nn">tqdm.asyncio</span> <span class="kn">import</span> <span class="n">tqdm_asyncio</span>
+
+<span class="c1"># Using nest_asyncio to allow execution in notebooks</span>
+<span class="n">nest_asyncio</span><span class="o">.</span><span class="n">apply</span><span class="p">()</span>
+
+<span class="c1"># Main function to start the event loop and run the asynchronous query</span>
+<div class="viewcode-block" id="async_query_gwas_catalog">
+<a class="viewcode-back" href="../../api.html#genal.snp_query.async_query_gwas_catalog">[docs]</a>
+<span class="k">def</span> <span class="nf">async_query_gwas_catalog</span><span class="p">(</span><span class="n">snps</span><span class="p">,</span> <span class="n">p_threshold</span><span class="o">=</span><span class="mf">5e-8</span><span class="p">,</span> <span class="n">return_p</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">return_study</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+                             <span class="n">max_associations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+    <span class="n">results_global</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">timeouts</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">query_gwas_catalog_coroutine</span><span class="p">(</span><span class="n">snps</span><span class="p">,</span> <span class="n">p_threshold</span><span class="p">,</span> <span class="n">return_p</span><span class="p">,</span> <span class="n">return_study</span><span class="p">,</span> <span class="n">max_associations</span><span class="p">,</span> <span class="n">timeout</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">results_global</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">timeouts</span></div>
+
+
+
+<span class="c1"># Function to query GWAS Catalog API for SNP associations</span>
+<div class="viewcode-block" id="query_gwas_catalog_coroutine">
+<a class="viewcode-back" href="../../api.html#genal.snp_query.query_gwas_catalog_coroutine">[docs]</a>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">query_gwas_catalog_coroutine</span><span class="p">(</span><span class="n">snps</span><span class="p">,</span> <span class="n">p_threshold</span><span class="o">=</span><span class="mf">5e-8</span><span class="p">,</span> <span class="n">return_p</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">return_study</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+                                       <span class="n">max_associations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Query the GWAS Catalog API for SNP associations.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        snps (list): List of SNPs to query.</span>
+<span class="sd">        p_threshold (float): P-value threshold for filtering associations.</span>
+<span class="sd">        return_p (bool): Whether to return the P-value of the association.</span>
+<span class="sd">        return_study (bool): Whether to return the study ID of the association.</span>
+<span class="sd">        max_associations (int): Maximum number of associations to return for each SNP.</span>
+<span class="sd">        timeout (int): Timeout for each query in seconds.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        results_global (dict): Dictionary storing the SNP (keys) and results for each SNP: a list of single strings or tuples</span>
+<span class="sd">        errors (list): List storing SNP for which the GWAS Catalog could not be queried</span>
+<span class="sd">        timeouts (list): List storing SNP for which the timeout was reached</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">results_global</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># Dictionary storing the SNP (keys) and results for each SNP: a list of single strings or tuples</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># List storing SNP for which the GWAS Catalog could not be queried</span>
+    <span class="n">timeouts</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># List storing SNP for which the timeout was reached</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">fetch</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">):</span> 
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">with</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">):</span>
+                <span class="k">async</span> <span class="k">with</span> <span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">response</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="k">await</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">TimeoutError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;TIMEOUT&quot;</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">process_snp</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">snp</span><span class="p">):</span>
+        <span class="c1">#print(f&quot;Processing SNP {snp}&quot;)</span>
+        
+        <span class="n">results_snp</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># List storing the results for each association found for this SNP</span>
+        
+        <span class="n">base_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;https://www.ebi.ac.uk/gwas/rest/api/singleNucleotidePolymorphisms/</span><span class="si">{</span><span class="n">snp</span><span class="si">}</span><span class="s2">/associations?projection=associationBySnp&quot;</span>
+        <span class="n">base_data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">fetch</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">base_url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">base_data</span> <span class="o">==</span> <span class="s2">&quot;TIMEOUT&quot;</span><span class="p">:</span>
+            <span class="n">timeouts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">snp</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">base_data</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="c1"># Process each association found for this SNP</span>
+            <span class="k">for</span> <span class="n">assoc</span> <span class="ow">in</span> <span class="n">base_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;_embedded&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;associations&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+
+                <span class="c1"># If there are already max_associations, stop the loop</span>
+                <span class="k">if</span> <span class="n">max_associations</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">max_associations</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="n">pvalue</span> <span class="o">=</span> <span class="n">assoc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pvalue&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                <span class="c1"># If the pvalue of the association does not pass the threshold, the association is not processed further nor reported </span>
+                <span class="k">if</span> <span class="n">pvalue</span> <span class="o">&lt;</span> <span class="n">p_threshold</span><span class="p">:</span>
+                    <span class="n">trait</span> <span class="o">=</span> <span class="n">assoc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;efoTraits&quot;</span><span class="p">,</span> <span class="p">[])[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trait&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                    
+                    <span class="c1"># If the return_study flag is active: query the page containing the GWAS Catalog study ID</span>
+                    <span class="k">if</span> <span class="n">return_study</span><span class="p">:</span>
+                        <span class="n">study_url</span> <span class="o">=</span> <span class="n">assoc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_links&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;study&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;href&quot;</span><span class="p">,</span> <span class="p">{})</span>
+                        <span class="n">study_data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">fetch</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">study_url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+                        <span class="n">study_id</span> <span class="o">=</span> <span class="s2">&quot;TIMEOUT&quot;</span> <span class="k">if</span> <span class="n">study_data</span> <span class="o">==</span> <span class="s2">&quot;TIMEOUT&quot;</span> <span class="k">else</span> <span class="n">study_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;accessionId&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">study_data</span> <span class="k">else</span> <span class="s2">&quot;Not found&quot;</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">study_id</span> <span class="o">=</span> <span class="kc">None</span>
+                        
+                    <span class="c1"># Return a tuple or a string depending on the return flags</span>
+                    <span class="k">if</span> <span class="n">return_p</span> <span class="ow">and</span> <span class="n">return_study</span><span class="p">:</span>
+                        <span class="n">result_assoc</span> <span class="o">=</span> <span class="p">(</span><span class="n">trait</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{:.4g}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pvalue</span><span class="p">),</span> <span class="n">study_id</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">return_p</span><span class="p">:</span>
+                        <span class="n">result_assoc</span> <span class="o">=</span> <span class="p">(</span><span class="n">trait</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{:.4g}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pvalue</span><span class="p">))</span>
+                    <span class="k">elif</span> <span class="n">return_study</span><span class="p">:</span>
+                        <span class="n">result_assoc</span> <span class="o">=</span> <span class="p">(</span><span class="n">trait</span><span class="p">,</span> <span class="n">study_id</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">result_assoc</span> <span class="o">=</span> <span class="n">trait</span>
+                    <span class="n">results_snp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result_assoc</span><span class="p">)</span>
+                    
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                
+            <span class="c1"># Clean the associations depending on the flag</span>
+            <span class="c1"># If the P-value and Study ID are not returned, display each trait only once</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">return_p</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">return_study</span><span class="p">:</span>
+                <span class="n">results_snp</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">results_snp</span><span class="p">))</span>
+            <span class="c1"># If the P-value must be returned, return each trait once with the lowest p-value</span>
+            <span class="k">elif</span> <span class="n">return_p</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">return_study</span><span class="p">:</span>
+                <span class="n">min_trait</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">for</span> <span class="n">trait</span><span class="p">,</span> <span class="n">pvalue</span> <span class="ow">in</span> <span class="n">results_snp</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">trait</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">min_trait</span> <span class="ow">or</span> <span class="n">pvalue</span> <span class="o">&lt;</span> <span class="n">min_trait</span><span class="p">[</span><span class="n">trait</span><span class="p">]:</span>
+                        <span class="n">min_trait</span><span class="p">[</span><span class="n">trait</span><span class="p">]</span> <span class="o">=</span> <span class="n">pvalue</span>
+                <span class="n">results_snp</span> <span class="o">=</span> <span class="p">[(</span><span class="n">trait</span><span class="p">,</span> <span class="n">min_trait</span><span class="p">[</span><span class="n">trait</span><span class="p">])</span> <span class="k">for</span> <span class="n">trait</span> <span class="ow">in</span> <span class="n">min_trait</span><span class="p">]</span>
+                
+            <span class="n">results_global</span><span class="p">[</span><span class="n">snp</span><span class="p">]</span> <span class="o">=</span> <span class="n">results_snp</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">snp</span><span class="p">)</span>
+    
+    <span class="k">async</span> <span class="k">with</span> <span class="n">aiohttp</span><span class="o">.</span><span class="n">ClientSession</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+        <span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span><span class="n">process_snp</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">snp</span><span class="p">)</span> <span class="k">for</span> <span class="n">snp</span> <span class="ow">in</span> <span class="n">snps</span><span class="p">]</span>
+        <span class="k">await</span> <span class="n">tqdm_asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="n">tasks</span><span class="p">)</span>
+    
+    <span class="c1"># Exclude timeouts from errors</span>
+    <span class="c1">#errors = [error for error in errors if error not in timeouts]</span>
+
+    <span class="k">return</span> <span class="n">results_global</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">timeouts</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

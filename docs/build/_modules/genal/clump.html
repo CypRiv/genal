@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>genal.clump &mdash; genal v0.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=90b5f367"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            genal
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Home</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html#tutorial">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">The Geno class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#clumping-function">Clumping function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html#extract-and-prs-functions">Extract and PRS functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">genal</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">genal.clump</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for genal.clump</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">uuid</span>
+
+<span class="kn">from</span> <span class="nn">.tools</span> <span class="kn">import</span> <span class="n">read_config</span><span class="p">,</span> <span class="n">get_plink19_path</span><span class="p">,</span> <span class="n">get_reference_panel_path</span><span class="p">,</span> <span class="n">create_tmp</span>
+
+
+<div class="viewcode-block" id="clump_data">
+<a class="viewcode-back" href="../../genal.html#genal.clump.clump_data">[docs]</a>
+<span class="k">def</span> <span class="nf">clump_data</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">,</span>
+    <span class="n">reference_panel</span><span class="o">=</span><span class="s2">&quot;eur&quot;</span><span class="p">,</span>
+    <span class="n">kb</span><span class="o">=</span><span class="mi">250</span><span class="p">,</span>
+    <span class="n">r2</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">p1</span><span class="o">=</span><span class="mf">5e-8</span><span class="p">,</span>
+    <span class="n">p2</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">ram</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform clumping on the given data using plink. Corresponds to the :meth:`Geno.clump` method.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        data (pd.DataFrame): Input data with at least &#39;SNP&#39; and &#39;P&#39; columns.</span>
+<span class="sd">        reference_panel (str): The reference population for linkage disequilibrium values. Accepts values &quot;eur&quot;, &quot;sas&quot;, &quot;afr&quot;, &quot;eas&quot;, &quot;amr&quot;. Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is &quot;eur&quot;.</span>
+<span class="sd">        kb (int, optional): Clumping window in terms of thousands of SNPs. Default is 250.</span>
+<span class="sd">        r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.</span>
+<span class="sd">        p1 (float, optional): P-value threshold during clumping. SNPs above this value are not considered. Default is 5e-8.</span>
+<span class="sd">        p2 (float, optional): P-value threshold post-clumping to further filter the clumped SNPs. If p2 &lt; p1, it won&#39;t be considered. Default is 0.01.</span>
+<span class="sd">        name (str, optional): Name used for the files created in the tmp_GENAL folder.</span>
+<span class="sd">        ram (int, optional): Amount of RAM in MB to be used by plink.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: Data after clumping, if any.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">plink19_path</span> <span class="o">=</span> <span class="n">get_plink19_path</span><span class="p">()</span>
+
+    <span class="c1"># Create unique ID for the name if none is passed</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">())[:</span><span class="mi">8</span><span class="p">]</span>
+
+    <span class="c1"># Save the relevant data columns to a temporary file</span>
+    <span class="n">to_clump_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_to_clump.txt&quot;</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[[</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;P&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">to_clump_filename</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Construct and execute the plink clumping command</span>
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="n">plink_command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">plink19_path</span><span class="si">}</span><span class="s2"> --memory </span><span class="si">{</span><span class="n">ram</span><span class="si">}</span><span class="s2"> --bfile </span><span class="si">{</span><span class="n">get_reference_panel_path</span><span class="p">(</span><span class="n">reference_panel</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="se">\</span>
+<span class="s2">                     --clump </span><span class="si">{</span><span class="n">to_clump_filename</span><span class="si">}</span><span class="s2"> --clump-kb </span><span class="si">{</span><span class="n">kb</span><span class="si">}</span><span class="s2"> --clump-r2 </span><span class="si">{</span><span class="n">r2</span><span class="si">}</span><span class="s2"> --clump-p1 </span><span class="si">{</span><span class="n">p1</span><span class="si">}</span><span class="s2"> </span><span class="se">\</span>
+<span class="s2">                     --clump-p2 </span><span class="si">{</span><span class="n">p2</span><span class="si">}</span><span class="s2"> --out </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">plink_command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Check and print the outputs for relevant information</span>
+    <span class="k">if</span> <span class="n">output</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;PLINK execution failed with the following error: </span><span class="si">{</span><span class="n">output</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;more top variant IDs missing&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
+        <span class="n">missing_variants</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;more top variant IDs missing&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span>
+            <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: </span><span class="si">{</span><span class="n">missing_variants</span><span class="si">}</span><span class="s2"> top variant IDs missing&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;No significant --clump results.&quot;</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No SNPs remaining after clumping.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">output</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;--clump: &quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="c1"># Extract the list of clumped SNPs and get the relevant data subset</span>
+    <span class="n">clumped_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;tmp_GENAL&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.clumped&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">clumped_filename</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">clumped_filename</span><span class="si">}</span><span class="s2">&#39; is missing.&quot;</span><span class="p">)</span>
+    <span class="n">plink_clumped</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">clumped_filename</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;\s+&quot;</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">])</span>
+    <span class="n">clumped_data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">plink_clumped</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">])]</span>
+    <span class="n">clumped_data</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">clumped_data</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Cyprien A. Rivier.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
