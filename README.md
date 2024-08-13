@@ -11,6 +11,7 @@
 3. [Requirements for the genal module](#paragraph1)
 4. [Installation and how to use genal](#paragraph2)
     1. [Installation](#paragraph2.1)
+    2. [Documentation](#paragraph2.2)
 5. [Tutorial and presentation of the main tools](#paragraph3)
     1. [Data loading](#paragraph3.1)
     2. [Data preprocessing](#paragraph3.2)
@@ -56,6 +57,16 @@ Once downloaded, the path to the plink executable can be set with:
 ```
 genal.set_plink(path="/path/to/plink/executable/file")
 ```
+### Documentation <a name="paragraph2.2"></a>
+
+For detailed information on how to use the functionalities of Genal, please refer to the documentation: https://genal.rtfd.io
+
+The documentation covers:
+- Installation 
+- This tutorial
+- The list of the main functions with complete description of their arguments
+- An exhaustive API reference
+
 
 ## Tutorial <a name="paragraph3"></a>
 For this tutorial, we will obtain genetic instruments for systolic blood pressure (SBP), compute a Polygenic Risk Score (PRS), and run a Mendelian Randomization analysis to investigate the genetically-determined effect of SBP on the risk of stroke. We will utilize summary statistics from Genome-Wide Association Studies (GWAS) and individual-level data from the UK Biobank. The steps include:
