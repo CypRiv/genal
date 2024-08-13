@@ -15,14 +15,6 @@ copyright = '2023, Cyprien A. Rivier'
 author = 'Cyprien A. Rivier'
 release = 'v0.8'
 
-########### TRICK FOUND ON SOME TUTORIAL : ADD IN THE MOCK_MODULES ANY EXTERNAL MODULE YOU'RE USING IN YOUR PACKAGE.
-
-import mock
-
-MOCK_MODULES = ['numpy', 'pandas', 'aiohttp', 'nest_asyncio', 'plotnine', 'psutil', 'pyliftover', 'scikit_learn', 'scipy', 'statsmodels', 'tqdm', 'wget']
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
-
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
