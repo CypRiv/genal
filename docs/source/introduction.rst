@@ -51,7 +51,7 @@ h. `GWAS Catalog`_
 Data loading
 ============
 
-We start this tutorial with publicly available summary statistics data from a large GWAS of systolic blood pressure (https://www.nature.com/articles/s41588-018-0205-x). After downloading and unzipping the summary statistics, we load the data into a pandas dataframe:
+We start this tutorial with publicly available summary statistics data from a large GWAS of systolic blood pressure `Link to study <https://www.nature.com/articles/s41588-018-0205-x>`_. `Download link <http://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST006001-GCST007000/GCST006624/Evangelou_30224653_SBP.txt.gz>`_. After downloading and unzipping the summary statistics, we load the data into a pandas dataframe:
 
 .. code-block:: python
 
@@ -318,7 +318,8 @@ Mendelian Randomization
 
 To run MR, we need to load both our exposure and outcome SNP-level data in :class:`~genal.Geno` instances. In our case, the genetic instruments of the MR are the SNPs associated with blood pressure at genome-wide significant levels resulting from the clumping of the blood pressure GWAS. They are stored in our ``SBP_clumped`` :class:`~genal.Geno` instance which also include their association with the exposure trait (instrument-SBP estimates in the ``BETA`` column).
 
-To get their association with the outcome trait (instrument-stroke estimates), we are going to use SNP-level data from a large GWAS of stroke performed by the GIGASTROKE consortium (`Nature article <https://www.nature.com/articles/s41586-022-05165-3>`_):
+To get their association with the outcome trait (instrument-stroke estimates), we are going to use SNP-level data from a large GWAS of stroke performed by the GIGASTROKE consortium:
+`Link to study <https://www.nature.com/articles/s41586-022-05165-3>`_. `Download link <http://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90104001-GCST90105000/GCST90104539/GCST90104539_buildGRCh37.tsv.gz>`_.
 
 .. code-block:: python
 

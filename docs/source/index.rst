@@ -8,7 +8,7 @@ genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization
 
 :Author: Cyprien Rivier
 :Date: |today|
-:Version: "0.8"
+:Version: "0.9"
 
 Genal is a python module designed to make it easy to run genetic risk scores and mendelian randomization analyses. It integrates a collection of tools that facilitate the cleaning of single nucleotide polymorphism data (usually derived from Genome-Wide Association Studies) and enable the execution of key clinical population genetic workflows. The functionalities provided by genal include clumping, lifting, association testing, polygenic risk scoring, and Mendelian randomization analyses, all within a single Python module.
 

@@ -100,7 +100,7 @@ For this tutorial, we will obtain genetic instruments for systolic blood pressur
 
 ### Data loading <a name="paragraph3.1"></a>
 
-We start this tutorial with publicly available summary statistics from a large GWAS study of systolic blood pressure. [Link to study](https://www.nature.com/articles/s41588-018-0205-x). After downloading and unzipping the summary statistics, we load them into a pandas DataFrame:
+We start this tutorial with publicly available summary statistics from a large GWAS study of systolic blood pressure. [Link to study](https://www.nature.com/articles/s41588-018-0205-x). [Download link](http://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST006001-GCST007000/GCST006624/Evangelou_30224653_SBP.txt.gz). After downloading and unzipping the summary statistics, we load them into a pandas DataFrame:
 
 ```python
 import pandas as pd
@@ -354,7 +354,7 @@ You can customize how the proxies are chosen with the following arguments:
 
 To run MR, we need to load both our exposure and outcome SNP-level data in `genal.Geno` instances. In our case, the genetic instruments of the MR are the SNPs associated with blood pressure at genome-wide significant levels resulting from the clumping of the blood pressure GWAS. They are stored in our `SBP_clumped` `genal.Geno` instance which also include their association with the exposure trait (instrument-SBP estimates in the `BETA` column).
 
-To get their association with the outcome trait (instrument-stroke estimates), we are going to use SNP-level data from a large GWAS of stroke performed by the GIGASTROKE consortium ([https://www.nature.com/articles/s41586-022-05165-3](https://www.nature.com/articles/s41586-022-05165-3)):
+To get their association with the outcome trait (instrument-stroke estimates), we are going to use SNP-level data from a large GWAS of stroke performed by the GIGASTROKE consortium: [Link to study](https://www.nature.com/articles/s41586-022-05165-3). [Link to download](http://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90104001-GCST90105000/GCST90104539/GCST90104539_buildGRCh37.tsv.gz):
 
 ```python
 stroke_gwas = pd.read_csv("GCST90104539_buildGRCh37.tsv",sep="\t")
