@@ -3,12 +3,12 @@ Installation
 ============
 
 .. note::
-    **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal'.
+    **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal_env'.
 
     .. code-block:: bash
 
-        conda create --name genal python=3.11
-        conda activate genal
+        conda create --name genal_env python=3.11
+        conda activate genal_env
 
 The genal package requires Python 3.11. Download and install it with pip: 
 
@@ -159,7 +159,7 @@ In our case, the ``SNP`` column (for SNP identifier - rsid) was missing from our
     The SNP column (rsID) has been created. 197511 (2.787%) SNPs were not found in the reference data and their ID set to CHR:POS:EA.
     The BETA column looks like Beta estimates. Use effect_column='OR' if it is a column of Odds Ratios.
 
-You can always check the data of a ``genal.Geno`` instance by accessing the ``data`` attribute:
+You can always check the data of a :class:`~genal.Geno` instance by accessing the :attr:`~genal.Geno.data` attribute:
 
 .. code-block:: python
 
@@ -172,7 +172,8 @@ You can always check the data of a ``genal.Geno`` instance by accessing the ``da
     4    T   C  0.6406 -0.0680  0.0313  0.029870   10  100003785  rs1359508
 
 
-And we see that the ``SNP`` column with the rsids has been added based on the reference data. You do not need to obtain the 1000 genome reference panel yourself, genal will download it the first time you use it. By default, the reference panel used is the European (EUR) one. You can specify another valid reference panel (AFR, EAS, SAS, AMR) with the ``reference_panel`` argument:
+And we see that the ``SNP`` column with the rsids has been added based on the reference data. You do not need to obtain the 1000 genome reference panel yourself, genal will download it the first time you use it. 
+By default, the reference panel used is the European (EUR) one. You can specify another valid reference panel (AFR, EAS, SAS, AMR) with the ``reference_panel`` argument:
 
 .. code-block:: python
 
@@ -362,22 +363,23 @@ Genal will print how many SNPs were successfully found and extracted from the ou
     1541 SNPs out of 1545 are present in the outcome data.
     (Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.
     
-Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
+.. note::
+    Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
 
-.. code-block:: python
+    .. code-block:: python
 
-    SBP_clumped.query_outcome(Stroke_geno, proxy=True, reference_panel="eur", 
-                              kb=5000, r2=0.6, window_snps=5000)
+        SBP_clumped.query_outcome(Stroke_geno, proxy=True, reference_panel="eur", 
+                                kb=5000, r2=0.6, window_snps=5000)
 
-And genal will print the number of missing instruments which have been proxied::
+    And genal will print the number of missing instruments that have been proxied::
 
-    Outcome data successfully loaded from 'b352e412' geno instance.
-    Identifying the exposure SNPs present in the outcome data...
-    1541 SNPs out of 1545 are present in the outcome data.
-    Searching proxies for 4 SNPs...
-    Using the EUR reference panel.
-    Found proxies for 4 SNPs.
-    (Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.
+        Outcome data successfully loaded from 'b352e412' geno instance.
+        Identifying the exposure SNPs present in the outcome data...
+        1541 SNPs out of 1545 are present in the outcome data.
+        Searching proxies for 4 SNPs...
+        Using the EUR reference panel.
+        Found proxies for 4 SNPs.
+        (Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.
 
 After extracting the instruments from the outcome data, the ``SBP_clumped`` :class:`~genal.Geno` instance contains an :attr:`~genal.Geno.MR` attribute containing the instruments-exposure and instruments-outcome associations necessary to run MR. Running MR is now as simple as calling the :meth:`~genal.Geno.MR` method of the SBP_clumped :class:`~genal.Geno` instance:
 
@@ -431,7 +433,7 @@ By default, only some MR methods (inverse-variance weighted, weighted median, Si
 - ``Weighted-mode`` for the Weighted mode method
 - ``all`` to run all the above methods
 
-For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API.
+For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to :meth:`~genal.Geno.MR`.
 
 If you want to visualize the obtained MR results, you can use the :meth:`~genal.Geno.MR_plot` method that will plot each SNP in an ``effect_on_exposure x effect_on_outcome`` plane as well as lines corresponding to different MR methods:
 
@@ -579,7 +581,8 @@ You can specify the path of the LiftOver executable to the ``liftover_path`` arg
 GWAS Catalog
 ------------
 
-It is sometimes interesting to determine the traits associated with our SNPs. In Mendelian Randomization, for instance, we may want to exclude instruments that are associated with traits likely causing horizontal pleiotropy. For this purpose, we can use the :meth:`~genal.Geno.query_gwas_catalog` method. This method will query the GWAS Catalog API to determine the list of traits associated with each of our SNPs and store the results in a list in the ``ASSOC`` column of the ``.data`` attribute:
+It is sometimes interesting to determine the traits associated with our SNPs. In Mendelian Randomization, for instance, we may want to exclude instruments that are associated with traits likely causing horizontal pleiotropy. 
+For this purpose, we can use the :meth:`~genal.Geno.query_gwas_catalog` method. This method will query the GWAS Catalog API to determine the list of traits associated with each of our SNPs and store the results in a list in the ``ASSOC`` column of the ``.data`` attribute:
 
 .. code-block:: python
 
@@ -596,7 +599,7 @@ Which will output::
         The ASSOC column has been successfully created.
         701 (45.37%) SNPs failed to query (not found in GWAS Catalog) and 7 (0.5%) SNPs timed out after 34.33 seconds. You can increase the timeout value with the timeout argument.
 
-And the :attr:`~genal.Geno.data` attribute now contains an `ASSOC` column::
+And the :attr:`~genal.Geno.data` attribute now contains an ``ASSOC`` column::
 
         EA NEA    EAF    BETA     SE  CHR        POS         SNP                                               ASSOC
         0  A   G  0.1784  0.2330  0.0402   10  102075479    rs603424  [eicosanoids measurement, decadienedioic acid (...]

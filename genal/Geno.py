@@ -565,7 +565,7 @@ class Geno:
                         )
                         genetic_snp_list.extend(bim_i.SNP.tolist())
             else: #If not split
-                bim_path = os.path.join(path, ".bim")
+                bim_path = path + ".bim"
                 if os.path.exists(bim_path):
                     bim = pd.read_csv(
                             bim_path, 

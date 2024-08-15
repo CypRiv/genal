@@ -32,6 +32,9 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=""):
     # Call extract_snps
     path = extract_snps_func(data.SNP, name, path)
 
+    if path == "FAILED":
+        raise ValueError("No SNPs were extracted from the genetic data and the PRS can't be computed.")
+
     # Set BETA values to 1 if unweighted PRS is required
     if not weighted:
         data["BETA"] = 1
@@ -53,10 +56,16 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=""):
 
     data.to_csv(data_path, sep="\t", index=False, header=True)
     plink_command = f"{get_plink19_path()} --memory {ram} --bfile {path} \
-                     --score {data_path} 1 2 3 header --out {output_path}"
-    output = subprocess.run(
-        plink_command, shell=True, capture_output=True, text=True, check=True
-    )
+                     --score {data_path} 1 2 3 header --out {output_path} --allow-no-sex"
+    try:
+        output = subprocess.run(
+            plink_command, shell=True, capture_output=True, text=True, check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Error running PLINK command: {e}")
+        print(f"PLINK stdout: {e.stdout}")
+        print(f"PLINK stderr: {e.stderr}")
+        raise ValueError("PLINK command failed. Check the error messages above for details.")
 
     # Read and process PRS results
     prs_file = output_path + ".profile"
@@ -91,6 +100,9 @@ def extract_snps_func(snp_list, name, path=None):
         name (str): Name prefix for the output files.
         path (str, optional): Path to the dataset. Defaults to the path from the configuration.
 
+    Returns:
+        str: path to the genetic files containing the extracted SNPs
+
     Raises:
         TypeError: Raises an error when no valid path is saved or when there's an incorrect format in the provided path.
     """
@@ -108,11 +120,15 @@ def extract_snps_func(snp_list, name, path=None):
         handle_multiallelic_variants(name, merge_command, bedlist_path)
     else:
         extract_snps_from_combined_data(name, path, output_path, snp_list_path)
-        
-    print(f"Created bed/bim/fam fileset with extracted SNPs: {output_path}")
 
-    # Report SNPs not found
-    report_snps_not_found(nrow, name)
+    bim_path = output_path + ".bim"
+    if not os.path.exists(bim_path):
+        print(f"None of the provided SNPs were found in the genetic data.")
+        return "FAILED"
+    else:
+        print(f"Created bed/bim/fam fileset with extracted SNPs: {output_path}")
+        # Report SNPs not found
+        report_snps_not_found(nrow, name)
 
     return output_path
 
@@ -159,14 +175,17 @@ def create_bedlist(bedlist, output_name, not_found):
         not_found (List[int]): List of chromosome numbers for which no bed/bim/fam files were found.
     """
     with open(bedlist, "w+") as bedlist_file:
+        n_lines = 0
         for i in range(1, 23):
             if i in not_found:
                 print(f"bed/bim/fam files not found for chr{i}.")
             elif check_bfiles(f"{output_name}_chr{i}"):
                 bedlist_file.write(f"{output_name}_chr{i}\n")
+                n_lines += 1
                 print(f"SNPs extracted for chr{i}.")
             else:
                 print(f"No SNPs extracted for chr{i}.")
+    return n_lines
 
 
 def extract_snps_from_split_data(name, path, output_path, snp_list_path):
@@ -184,9 +203,12 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path):
     # Merge extracted SNPs from each chromosome
     bedlist_name = f"{name}_bedlist.txt"
     bedlist_path = os.path.join("tmp_GENAL", bedlist_name)
-    create_bedlist(
+    n_lines = create_bedlist(
         bedlist_path, os.path.join("tmp_GENAL", f"{name}_extract"), not_found
     )
+    if n_lines == 0:
+        raise Warning("No SNPs were extracted from any chromosome.")
+
     print("Merging SNPs extracted from each chromosome...")
     merge_command = f"{get_plink19_path()} --merge-list {bedlist_path} --make-bed --out {output_path}"
     subprocess.run(
@@ -291,5 +313,5 @@ def report_snps_not_found(nrow, name):
     delta_nrow = nrow - extracted_snps_count
     if delta_nrow > 0:
         print(
-            f"Extraction completed. {delta_nrow}({delta_nrow/nrow*100:.3f}%) SNPs were not extracted from the genetic data."
+            f"{delta_nrow}({delta_nrow/nrow*100:.3f}%) SNPs were not extracted from the genetic data."
         )

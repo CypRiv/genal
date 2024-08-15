@@ -34,7 +34,7 @@ def check_snp_column(data):
     if n_del > 0:
         data.drop(index=duplicate_indices, inplace=True)
         print(
-            f"{n_del}({n_del/data.shape[0]*100:.3f}%) duplicated SNPs have been removed. Use keep_dups=True to keep them."
+            f"{n_del}({n_del/data.shape[0]*100:.3f}%) SNPs with duplicated IDs (SNP column) have been removed. Use keep_dups=True to keep them."
         )
     return
 
@@ -205,7 +205,7 @@ def fill_snpids_func(data, reference_panel_df):
     )
     n_missing = data["SNP"].isna().sum()
 
-    standard_name_condition = "EA" in data.columns and n_missing > 0
+    standard_name_condition = "EA" in data.columns and "NEA" in data.columns and n_missing > 0
     if standard_name_condition:
         missing_snp_condition = data["SNP"].isna()
         data.loc[missing_snp_condition, "SNP"] = (

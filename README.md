@@ -44,10 +44,10 @@ If you're using genal, please cite the following paper:
 
 > **Note:**
 > 
-> **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal'.
+> **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal_env'.
 > ```
-> conda create --name genal python=3.11
-> conda activate genal
+> conda create --name genal_env python=3.11
+> conda activate genal_env
 > ```
 
 
@@ -395,21 +395,25 @@ Genal will print how many SNPs were successfully found and extracted from the ou
     1541 SNPs out of 1545 are present in the outcome data.
     (Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.
     
-Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
 
-```python
-SBP_clumped.query_outcome(Stroke_geno, proxy = True, reference_panel = "eur", kb = 5000, r2 = 0.6, window_snps = 5000)
-```
-
-And genal will print the number of missing instruments which have been proxied:
-
-    Outcome data successfully loaded from 'b352e412' geno instance.
-    Identifying the exposure SNPs present in the outcome data...
-    1541 SNPs out of 1545 are present in the outcome data.
-    Searching proxies for 4 SNPs...
-    Using the EUR reference panel.
-    Found proxies for 4 SNPs.
-    (Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.
+> **Note:**
+>Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
+>
+> Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
+>
+> ```python
+> SBP_clumped.query_outcome(Stroke_geno, proxy = True, reference_panel = "eur", kb = 5000, r2 = 0.6, window_snps = 5000)
+> ```
+> 
+> And genal will print the number of missing instruments that have been proxied:
+> 
+>     Outcome data successfully loaded from 'b352e412' geno instance.
+>     Identifying the exposure SNPs present in the outcome data...
+>     1541 SNPs out of 1545 are present in the outcome data.
+>     Searching proxies for 4 SNPs...
+>     Using the EUR reference panel.
+>     Found proxies for 4 SNPs.
+>     (Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute.
 
 After extracting the instruments from the outcome data, the `SBP_clumped` `genal.Geno` instance contains an `MR_data` attribute containing the instruments-exposure and instruments-outcome associations necessary to run MR. Running MR is now as simple as calling the `genal.Geno.MR` method of the SBP_clumped `genal.Geno` instance:
 
@@ -454,7 +458,7 @@ By default, only some MR methods (inverse-variance weighted, weighted median, Si
 - `Weighted-mode` for the Weighted mode method
 - `all` to run all the above methods
 
-For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API.
+For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API: [https://genal.readthedocs.io/en/latest/modules.html#id4](MR method).
 
 If you want to visualize the obtained MR results, you can use the `genal.Geno.MR_plot` method that will plot each SNP in an `effect_on_exposure x effect_on_outcome` plane as well as lines corresponding to different MR methods:
 
