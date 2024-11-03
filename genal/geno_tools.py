@@ -121,7 +121,7 @@ def check_beta_column(data, effect_column, preprocessing):
             "The argument effect_column accepts only 'BETA' or 'OR' as values."
         )
     if effect_column == "OR":
-        data["BETA"] = np.log(data["BETA"])
+        data["BETA"] = np.log(data["BETA"].clip(lower=0.01))
         data.drop(columns="SE", errors="ignore", inplace=True)
         print("The BETA column has been log-transformed to obtain Beta estimates.")
     return

@@ -6,7 +6,7 @@
 genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization
 ============================================================================
 
-:Author: Cyprien Rivier
+:Author: Cyprien A. Rivier
 :Date: |today|
 :Version: "0.9"
 
@@ -46,7 +46,7 @@ Citation
 If you use genal in your work, please cite the following paper:
 
 .. [Rivier.2024] *Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization*
-   Cyprien Rivier, Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. 
+   Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. 
    medRxiv. 2024 May `10.1101/2024.05.23.24307776 <https://doi.org/10.1101/2024.05.23.24307776>`_.
 
 References

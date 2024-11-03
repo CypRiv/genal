@@ -121,14 +121,17 @@ def extract_snps_func(snp_list, name, path=None):
     else:
         extract_snps_from_combined_data(name, path, output_path, snp_list_path)
 
-    bim_path = output_path + ".bim"
-    if not os.path.exists(bim_path):
-        print(f"None of the provided SNPs were found in the genetic data.")
-        return "FAILED"
-    else:
-        print(f"Created bed/bim/fam fileset with extracted SNPs: {output_path}")
-        # Report SNPs not found
-        report_snps_not_found(nrow, name)
+    #Check that at least 1 variant has been extracted. If not, return "FAILED" to warn downstream functions (prs, association_test)
+    log_path = output_path + ".log"
+    with open(log_path, 'r') as log_file:
+        if "No variants remaining" in log_file.read():
+            print("None of the provided SNPs were found in the genetic data.")
+            return "FAILED"
+
+        else:
+            print(f"Created bed/bim/fam fileset with extracted SNPs: {output_path}")
+            # Report SNPs not found
+            report_snps_not_found(nrow, name)
 
     return output_path
 

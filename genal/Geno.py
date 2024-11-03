@@ -687,7 +687,9 @@ class Geno:
         snp_list = data["SNP"]
 
         # Extract SNPs using the provided path and SNP list
-        _ = extract_snps_func(snp_list, self.name, path)
+        path = extract_snps_func(snp_list, self.name, path)
+        if path == "FAILED":
+            raise ValueError("No SNPs were extracted from the genetic data and the association test can't be run.")
         
         # Perform the association test
         updated_data = association_test_func(
