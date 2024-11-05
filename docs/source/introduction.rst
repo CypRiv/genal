@@ -7,10 +7,10 @@ Installation
 
     .. code-block:: bash
 
-        conda create --name genal_env python=3.11
+        conda create --name genal_env python=3.8
         conda activate genal_env
 
-The genal package requires Python 3.11. Download and install it with pip: 
+The genal package requires Python 3.8 or later. Download and install it with pip: 
 
 .. code-block:: bash
 
@@ -22,12 +22,18 @@ And import it in a python environment with:
 
     import genal
 
-The main genal functionalities require a working installation of PLINK v1.9 (and not 2.0 as certain functionalities have not been updated yet) that can be downloaded here: https://www.cog-genomics.org/plink/ 
-Once downloaded, the path to the plink 1.9 executable should be set with:
+The main genal functionalities require a working installation of PLINK v1.9 (and not 2.0 as certain functionalities have not been updated yet). 
+If you have already installed plink v1.9, you can set the path to its executable with:
 
 .. code-block:: python
 
     genal.set_plink(path="/path/to/plink/executable/file")
+
+If plink is not installed, genal can install the correct version for your system with the following line.
+
+.. code-block:: python
+
+    genal.install_plink()
 
 ========
 Tutorial

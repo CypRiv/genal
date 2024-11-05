@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from scipy import stats
-from scipy.stats import norm, chi2
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
@@ -11,7 +9,6 @@ from numpy.random import default_rng
 from functools import partial
 
 ##todo: implement the multivariable option, for the moment we assume only 1 BETA_e column
-# Also: check if we can replace the LinearRegression of sklearn with one from statsmodels to avoid using sklearn just for that
 
 
 # MR-PRESSO main function

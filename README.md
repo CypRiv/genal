@@ -35,7 +35,7 @@ If you're using genal, please cite the following paper:
 **Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. medRxiv 2024.05.23.24307776; doi: https://doi.org/10.1101/2024.05.23.24307776
 
 ## Requirements for the genal module <a name="paragraph1"></a> 
-***Python 3.11 or later***. https://www.python.org/ <br> 
+***Python 3.8 or later***. https://www.python.org/ <br> 
 
 
 ## Installation and How to use the genal module <a name="paragraph2"></a>
@@ -46,7 +46,7 @@ If you're using genal, please cite the following paper:
 > 
 > **Optional**: It is recommended to create a new environment to avoid dependencies conflicts. Here, we create a new conda environment called 'genal_env'.
 > ```
-> conda create --name genal_env python=3.11
+> conda create --name genal_env python=3.8
 > conda activate genal_env
 > ```
 
@@ -60,12 +60,19 @@ And import it in a python environment with:
 import genal
 ```
 
-The main genal functionalities require a working installation of PLINK v1.9 that can be downloaded here: https://www.cog-genomics.org/plink/ 
-Once downloaded, the path to the plink executable can be set with:
+The main genal functionalities require a working installation of PLINK v1.9 (and not 2.0 as certain functionalities have not been updated yet). 
+If you have already installed plink v1.9, you can set the path to its executable with:
 
 ```
 genal.set_plink(path="/path/to/plink/executable/file")
 ```
+
+If plink is not installed, genal can install the correct version for your system with the following line.
+
+```
+genal.install_plink()
+```
+
 ### Documentation <a name="paragraph2.2"></a>
 
 For detailed information on how to use the functionalities of Genal, please refer to the documentation: https://genal.rtfd.io

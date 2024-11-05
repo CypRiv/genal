@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import datetime
 import os, subprocess
-import scipy.stats as st
 from pandas.api.types import is_numeric_dtype
 
 from .proxy import find_proxies, query_outcome_proxy

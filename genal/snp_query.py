@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 import numpy as np
 import nest_asyncio
-from tqdm.asyncio import tqdm_asyncio
+from tqdm.auto import tqdm  
 
 # Using nest_asyncio to allow execution in notebooks
 nest_asyncio.apply()
@@ -10,8 +10,16 @@ nest_asyncio.apply()
 # Main function to start the event loop and run the asynchronous query
 def async_query_gwas_catalog(snps, p_threshold=5e-8, return_p=False, return_study=False, 
                              max_associations=None, timeout=100):
-    loop = asyncio.get_event_loop()
-    results_global, errors, timeouts = loop.run_until_complete(query_gwas_catalog_coroutine(snps, p_threshold, return_p, return_study, max_associations, timeout))
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    results_global, errors, timeouts = loop.run_until_complete(
+        query_gwas_catalog_coroutine(
+            snps, p_threshold, return_p, return_study, max_associations, timeout
+        )
+    )
     return results_global, errors, timeouts
 
 
@@ -36,18 +44,21 @@ async def query_gwas_catalog_coroutine(snps, p_threshold=5e-8, return_p=False, r
     """
     
     results_global = {}  # Dictionary storing the SNP (keys) and results for each SNP: a list of single strings or tuples
-    errors = []  # List storing SNP for which the GWAS Catalog could not be queried
-    timeouts = [] # List storing SNP for which the timeout was reached
+    errors = []          # List storing SNP for which the GWAS Catalog could not be queried
+    timeouts = []        # List storing SNP for which the timeout was reached
 
-    async def fetch(session, url, timeout=timeout): 
+    async def fetch(session, url, timeout_duration=timeout): 
         try:
-            async with asyncio.timeout(timeout):
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        return await response.json()
-                    return None
+            # Wrap the entire fetch operation with asyncio.wait_for for timeout
+            response = await asyncio.wait_for(session.get(url), timeout=timeout_duration)
+            async with response:
+                if response.status == 200:
+                    return await response.json()
+                return None
         except asyncio.TimeoutError:
             return "TIMEOUT"
+        except aiohttp.ClientError:
+            return "ERROR"
 
     async def process_snp(session, snp):
         #print(f"Processing SNP {snp}")
@@ -55,11 +66,13 @@ async def query_gwas_catalog_coroutine(snps, p_threshold=5e-8, return_p=False, r
         results_snp = []  # List storing the results for each association found for this SNP
         
         base_url = f"https://www.ebi.ac.uk/gwas/rest/api/singleNucleotidePolymorphisms/{snp}/associations?projection=associationBySnp"
-        base_data = await fetch(session, base_url, timeout=timeout)
+        base_data = await fetch(session, base_url, timeout_duration=timeout)
         
         if base_data == "TIMEOUT":
             timeouts.append(snp)
-        elif base_data:
+        elif base_data == "ERROR" or base_data is None:
+            errors.append(snp)
+        else:
             i = 0
             # Process each association found for this SNP
             for assoc in base_data.get('_embedded', {}).get('associations', []):
@@ -72,13 +85,25 @@ async def query_gwas_catalog_coroutine(snps, p_threshold=5e-8, return_p=False, r
                 pvalue = assoc.get("pvalue", np.nan)
                 # If the pvalue of the association does not pass the threshold, the association is not processed further nor reported 
                 if pvalue < p_threshold:
-                    trait = assoc.get("efoTraits", [])[0].get("trait", "")
+                    efo_traits = assoc.get("efoTraits", [])
+                    if efo_traits:
+                        trait = efo_traits[0].get("trait", "")
+                    else:
+                        trait = ""
                     
                     # If the return_study flag is active: query the page containing the GWAS Catalog study ID
                     if return_study:
-                        study_url = assoc.get("_links", {}).get("study", {}).get("href", {})
-                        study_data = await fetch(session, study_url, timeout=timeout)
-                        study_id = "TIMEOUT" if study_data == "TIMEOUT" else study_data.get("accessionId", "") if study_data else "Not found"
+                        study_url = assoc.get("_links", {}).get("study", {}).get("href", "")
+                        if study_url:
+                            study_data = await fetch(session, study_url, timeout_duration=timeout)
+                            if study_data == "TIMEOUT":
+                                study_id = "TIMEOUT"
+                            elif study_data == "ERROR" or study_data is None:
+                                study_id = "Error"
+                            else:
+                                study_id = study_data.get("accessionId", "Not found")
+                        else:
+                            study_id = "Not available"
                     else:
                         study_id = None
                         
@@ -109,14 +134,13 @@ async def query_gwas_catalog_coroutine(snps, p_threshold=5e-8, return_p=False, r
                 results_snp = [(trait, min_trait[trait]) for trait in min_trait]
                 
             results_global[snp] = results_snp
-        else:
-            errors.append(snp)
-    
+
     async with aiohttp.ClientSession() as session:
         tasks = [process_snp(session, snp) for snp in snps]
-        await tqdm_asyncio.gather(*tasks)
+        # Initialize tqdm progress bar
+        with tqdm(total=len(tasks), desc="Processing SNPs") as pbar:
+            for coro in asyncio.as_completed(tasks):
+                await coro
+                pbar.update(1)
     
-    # Exclude timeouts from errors
-    #errors = [error for error in errors if error not in timeouts]
-
     return results_global, errors, timeouts

@@ -223,6 +223,8 @@ class Geno:
             and "EA" in data.columns
         )
         if missing_nea_condition and preprocessing in ['Fill', 'Fill_delete']:
+            check_allele_column(data, "EA", keep_multi)
+            self.checks["EA"] = True
             data = fill_nea(data, self.get_reference_panel(reference_panel))
 
         # Fill missing EA and NEA columns from reference data if necessary and preprocessing is enabled
@@ -254,7 +256,7 @@ class Geno:
             check_allele_condition = (allele_col in data.columns) and (
                 (preprocessing in ['Fill', 'Fill_delete']) or (not keep_multi)
             )
-            if check_allele_condition:
+            if check_allele_condition and not self.checks[allele_col]:
                 check_allele_column(data, allele_col, keep_multi)
                 self.checks[allele_col] = True
 

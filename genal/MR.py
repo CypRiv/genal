@@ -196,8 +196,6 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
         SE_e (numpy array): Standard errors corresponding to `BETA_e`.
         BETA_o (numpy array): Effect sizes of the same genetic variants on the outcome.
         SE_o (numpy array): Standard errors corresponding to `BETA_o`.
-        nboot (int): Number of boostrap iterations to obtain the standard error and p-value
-        cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
 
     Returns:
         list of dict: A list containing two dictionaries with the results for the egger regression estimate and the egger regression intercept (horizontal pleiotropy estimate):

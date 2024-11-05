@@ -1,14 +1,16 @@
-import os, subprocess
+import os, subprocess, sys
 import pandas as pd
 import json
 import wget
 import shutil
 import tarfile
+import platform
+import requests
+import zipfile
 
 from .constants import REF_PANELS, REF_PANELS_URL
 
 config_path = os.path.join(os.path.expanduser("~/.genal/"), "config.json")
-# default_ref_path = os.path.join(os.getcwd(), "tmp_GENAL", "Reference_files")
 default_ref_path = os.path.join(os.path.expanduser("~/.genal/"), "Reference_files")
 
 
@@ -79,6 +81,25 @@ def create_tmp():
                 "Unable to create the 'tmp_GENAL' directory. Check permissions."
             )
 
+def check_bfiles(filepath):
+    """Check if the path specified leads to a bed/bim/fam triple."""
+    if (
+        os.path.exists("{}.bed".format(filepath))
+        and os.path.exists("{}.bim".format(filepath))
+        and os.path.exists("{}.fam".format(filepath))
+    ):
+        return True
+    return False
+
+
+def delete_tmp():
+    """Delete the tmp folder."""
+    if os.path.isdir("tmp_GENAL"):
+        shutil.rmtree("tmp_GENAL")
+        print("The tmp_GENAL folder has been successfully deleted.")
+    else:
+        print("There is no tmp_GENAL folder to delete in the current directory.")
+    return
 
 def set_reference_folder(path=""):
     """
@@ -234,6 +255,7 @@ def load_reference_panel(reference_panel="eur"):
         reference_panel_df["CHR"] = reference_panel_df["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
     return reference_panel_df
 
+
 def set_plink(path=""):
     """Set the plink 1.9 path and verify that it is the correct version."""
     if not path:
@@ -279,22 +301,125 @@ def get_plink19_path():
         return config["paths"]["plink19_path"]
 
 
-def check_bfiles(filepath):
-    """Check if the path specified leads to a bed/bim/fam triple."""
-    if (
-        os.path.exists("{}.bed".format(filepath))
-        and os.path.exists("{}.bim".format(filepath))
-        and os.path.exists("{}.fam".format(filepath))
-    ):
-        return True
-    return False
+def is_plink_installed(plink_path):
+    try:
+        result = subprocess.run([plink_path, '--version'],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                check=True)
+        # Parse version from output
+        if 'plink v1.9' in result.stdout.lower():
+            return True
+        else:
+            return False
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    
 
-
-def delete_tmp():
-    """Delete the tmp folder."""
-    if os.path.isdir("tmp_GENAL"):
-        shutil.rmtree("tmp_GENAL")
-        print("The tmp_GENAL folder has been successfully deleted.")
+def install_plink(path=None):
+    """Install plink 1.9 for the current operating system.
+    
+    Args:
+        path (str, optional): Path to the folder to install plink in. If not provided, install it in the .genal folder at root.
+    """
+    # Determine operating system and architecture
+    system = platform.system()
+    system_arch = platform.architecture()[0][:2]
+    
+    # Handle path variable
+    if not path:
+        path = os.path.join(os.path.expanduser("~/.genal/"), "plink")
+        print(f"You have not specified a path for the installation of plink. The following directory will be used: {path}")
+           
+    # Determine the path of the plink binary
+    if system == 'Windows':
+        plink_path = os.path.join(path, 'plink.exe')
     else:
-        print("There is no tmp_GENAL folder to delete in the current directory.")
+        plink_path = os.path.join(path, 'plink')
+        
+    # Check that it does not already exists
+    if is_plink_installed(plink_path):
+        print(f"Plink1.9 is already installed at {plink_path}. Installation is skipped.")
+        return
+    
+    # If the directory doesn't exist, attempt to create it
+    if not os.path.isdir(path):
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError:
+            raise OSError(
+                f"Unable to create the '{path}' directory. Check permissions."
+            )
+            
+    # Determine appropriate download link
+    if system == "Linux":
+        if system_arch == "64":
+            download_url = "https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20241022.zip"
+        else:
+            download_url = "https://s3.amazonaws.com/plink1-assets/plink_linux_i686_20241022.zip"
+    elif system == "Windows":
+        if system_arch == "64":
+            download_url = "https://s3.amazonaws.com/plink1-assets/plink_win64_20241022.zip"
+        else:
+            download_url = "https://s3.amazonaws.com/plink1-assets/plink_win32_20241022.zip"
+    elif system == "Darwin":
+        download_url = "https://s3.amazonaws.com/plink1-assets/plink_mac_20241022.zip"
+    else:
+        raise ValueError("Your operating system is not Linux, Windows, or Mac OS and plink1.9 can't be installed automatically. \
+        Please install plink1.9 manually from https://www.cog-genomics.org/plink/1.9/")
+        
+    # Create tmp folder if it does not exist and zip file path
+    create_tmp()
+    zip_path = os.path.join("tmp_GENAL", 'plink1.9.zip')
+    
+    # Download plink
+    print(f"Downloading plink1.9 for {system} {system_arch}bits from {download_url}...")
+    try:
+        response = requests.get(download_url, stream=True)
+        response.raise_for_status()
+        with open(zip_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print("Download completed.")
+    except requests.RequestException as e:
+        print(f"Failed to download plink1.9: {e}")
+        sys.exit(1)
+        
+    # Extract the zip file
+    print("Extracting plink1.9...")
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(path)
+        print("Extraction completed.")
+    except zipfile.BadZipFile as e:
+        print(f"Failed to extract plink1.9: {e}")
+        sys.exit(1)
+        
+    # Clean zip file
+    os.remove(zip_path)
+    
+    # Make the file executable
+    try:
+        os.chmod(plink_path, 0o755)  # Set permissions to rw-r--r--
+    except PermissionError:
+        print("Permission denied: cannot change file permissions.")
+    except FileNotFoundError:
+        print("File not found: cannot change permissions on a non-existent file.")
+    except OSError as e:
+        print(f"OS error occurred: {e}")
+        
+    # Test the installation
+    if is_plink_installed(plink_path):
+        print("plink1.9 has been successfully installed and is accessible.")
+    else:
+        print("plink1.9 installation may have failed. \
+        Please install manually from https://www.cog-genomics.org/plink/1.9/ and set the path using set_plink(path).")
+        
+    # Change config file
+    config = read_config()
+    config["paths"]["plink19_path"] = path
+    write_config(config)
+    print(f"Path to plink 1.9 successfully set: '{path}'")
+
     return

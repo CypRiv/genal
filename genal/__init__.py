@@ -1,9 +1,9 @@
 import os
 import json
-from .tools import default_config, write_config, set_plink, delete_tmp, get_reference_panel_path
+from .tools import default_config, write_config, set_plink, install_plink, delete_tmp, get_reference_panel_path
 from .geno_tools import Combine_Geno
 
-__version__ = "0.9"
+__version__ = "1.0"
 
 config_dir = os.path.expanduser(
     "~/.genal/"
