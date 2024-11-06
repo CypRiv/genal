@@ -1,3 +1,7 @@
+[![Python 3.8](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)](https://www.python.org/downloads/release/python-3100/)
+
+<img src="/genal_logo.png" data-canonical-src="/genal_logo.png" height="80" />  
+
 <center><h1> genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization </h1></center>
 
 
@@ -67,7 +71,7 @@ If you have already installed plink v1.9, you can set the path to its executable
 genal.set_plink(path="/path/to/plink/executable/file")
 ```
 
-If plink is not installed, genal can install the correct version for your system with the following line.
+If plink is not installed, genal can install the correct version for your system with the following line:
 
 ```
 genal.install_plink()

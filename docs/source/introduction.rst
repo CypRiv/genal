@@ -29,7 +29,7 @@ If you have already installed plink v1.9, you can set the path to its executable
 
     genal.set_plink(path="/path/to/plink/executable/file")
 
-If plink is not installed, genal can install the correct version for your system with the following line.
+If plink is not installed, genal can install the correct version for your system with the :meth:`~genal.tools.install_plink` function:
 
 .. code-block:: python
 

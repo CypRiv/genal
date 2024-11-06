@@ -418,8 +418,8 @@ def install_plink(path=None):
         
     # Change config file
     config = read_config()
-    config["paths"]["plink19_path"] = path
+    config["paths"]["plink19_path"] = plink_path
     write_config(config)
-    print(f"Path to plink 1.9 successfully set: '{path}'")
+    print(f"Path to plink 1.9 successfully set: '{plink_path}'")
 
     return
