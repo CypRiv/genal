@@ -36,7 +36,7 @@ Genal draws on concepts from well-established R packages such as TwoSampleMR, MR
 
 <img src="/Genal_flowchart.png" data-canonical-src="/Genal_flowchart.png" style="max-width:100%;" />
 
-Genal flowchart. Created in BioRender. Falcone, G. (2024) https://BioRender.com/q72r861
+Genal flowchart. Created in https://www.BioRender.com
 ## Citation <a name="citation"></a> 
 If you're using genal, please cite the following paper:
 **Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. medRxiv 2024.05.23.24307776; doi: https://doi.org/10.1101/2024.05.23.24307776
