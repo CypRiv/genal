@@ -34,7 +34,7 @@ The module prioritizes user-friendliness and intuitive operation, aiming to redu
 
 Genal draws on concepts from well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, adapting their proven methodologies to the Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
 
-<img src="/Genal_flowchart.pdf" data-canonical-src="/Genal_flowchart.pdf" style="max-width:100%;" />
+<img src="/Genal_flowchart.png" data-canonical-src="/Genal_flowchart.png" style="max-width:100%;" />
 
 Genal flowchart. Created in BioRender. Falcone, G. (2024) https://BioRender.com/q72r861
 ## Citation <a name="citation"></a> 
