@@ -34,6 +34,8 @@ The module prioritizes user-friendliness and intuitive operation, aiming to redu
 
 Genal draws on concepts from well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, adapting their proven methodologies to the Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
 
+<img src="/Genal_flowchart.png" data-canonical-src="/Genal_flowchart.png" style="max-width:100%;" />
+
 ## Citation <a name="citation"></a> 
 If you're using genal, please cite the following paper:
 **Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. medRxiv 2024.05.23.24307776; doi: https://doi.org/10.1101/2024.05.23.24307776
