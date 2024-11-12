@@ -145,7 +145,7 @@ def fill_ea_nea(data, reference_panel_df):
     )
     if perc_missing > 50:
         warnings.warn(
-            f"The EA (Effect Allele) and NEA (Non-Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
+            f"The EA (Effect Allele) and NEA (Non-Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in the same build as the reference panel (GRCh37 (hg19) for the default one). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
         )
     return data
 
@@ -167,7 +167,7 @@ def fill_nea(data, reference_panel_df):
     )
     if perc_missing > 50:
         warnings.warn(
-            f"The NEA (Non Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
+            f"The NEA (Non Effect Allele) for many SNPs could not been found. Make sure the CHR/POS coordinates are in the same build as the reference panel (GRCh37 (hg19) for the default one). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
         )
     return data
 
@@ -184,7 +184,7 @@ def fill_coordinates_func(data, reference_panel_df):
     data["CHR"] = data["CHR"].astype("Int32")
     data["POS"] = data["POS"].astype("Int32")
     print(
-        f"The coordinates columns (CHR for chromosome and POS for position) have been created following build GRCh37 (hg19). {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data and their values set to nan."
+        f"The coordinates columns (CHR for chromosome and POS for position) have been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data and their values set to nan."
     )
     return data
 
@@ -232,7 +232,7 @@ def fill_snpids_func(data, reference_panel_df):
         
     if perc_missing > 50:
         warnings.warn(
-            f"The SNPid for many SNPs could not been found. Make sure the CHR/POS coordinates are in build GRCh37 (hg19). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
+            f"The SNPid for many SNPs could not been found. Make sure the CHR/POS coordinates are in the same build as the reference panel (GRCh37 (hg19) for the default one). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
         )
 
     return data
