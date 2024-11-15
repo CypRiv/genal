@@ -10,7 +10,7 @@ from concurrent.futures import ProcessPoolExecutor
 from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs, expand_limits
 
 
-from .proxy import find_proxies, apply_proxies, query_outcome_proxy
+from .proxy import find_proxies, apply_proxies
 from .MR_tools import query_outcome_func, harmonize_MR, MR_func, mrpresso_func
 from .clump import clump_data
 from .lift import lift_data
@@ -595,8 +595,10 @@ class Geno:
                     window_snps=window_snps,
                     threads=self.cpus,
                 )
-                data_prs = apply_proxies(data_prs, ld, searchspace = genetic_snps)
-                check_snp_column(data_prs)
+                # If ld exists
+                if ld:
+                    data_prs = apply_proxies(data_prs, ld, searchspace = genetic_snps)
+                    check_snp_column(data_prs)
 
         # Compute PRS
         prs_data = prs_func(data_prs, weighted, path, ram=self.ram, name=self.name)

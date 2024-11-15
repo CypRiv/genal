@@ -301,8 +301,12 @@ def query_outcome_func(
             window_snps=window_snps,
             threads=cpus,
         )
-        outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
-        exposure = data[data.SNP.isin(outcome.SNP)]
+        if ld:
+            outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
+            exposure = data[data.SNP.isin(outcome.SNP)]
+        else:
+            exposure = data[data.SNP.isin(snps_present)]
+            outcome = df_outcome[df_outcome.SNP.isin(snps_present)]
     else:
         exposure = data[data.SNP.isin(snps_present)]
         outcome = df_outcome[df_outcome.SNP.isin(snps_present)]

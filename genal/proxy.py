@@ -30,6 +30,9 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     Returns:
         pd.DataFrame: Dataframe with queried SNPs and their proxies.
     """
+    # If ld is None
+    if not ld:
+        raise ValueError("ld is None (The SNPs to be proxied were not found in the reference panel)")
 
     # If snps_df is empty, populate it with SNPs from df
     if not snps_df:
@@ -109,6 +112,10 @@ def apply_proxies(df, ld, searchspace=None):
     Returns:
         DataFrame: A DataFrame with SNPs replaced by their best proxies, if they exist.
     """
+    # If ld is None
+    if not ld:
+        raise ValueError("ld is None (The SNPs to be proxied were not found in the reference panel)")
+    
     # Check mandatory columns
     mandatory_cols = ["EA", "SNP", "BETA"]
     for col in mandatory_cols:
@@ -221,7 +228,19 @@ def find_proxies(
 
     # Construct and execute the plink command
     command = f"{get_plink19_path()} --bfile {get_reference_panel_path(reference_panel)} {extract_arg} --keep-allele-order --r in-phase with-freqs gz --ld-snp-list tmp_GENAL/snps_to_proxy.txt --ld-window-kb {kb} --ld-window-r2 {r2} --ld-window {window_snps} --out tmp_GENAL/proxy.targets --threads {threads}"
-    subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
+    
+    try:
+        subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        # Read log file 
+        log_path = os.path.join("tmp_GENAL", "proxy.targets.log")
+        with open(log_path, 'r') as log_file:
+            # If none of the SNPs to be proxied are in the ref panel: return a None object
+            if "No valid variants specified" in log_file.read():
+                print("None of the SNPs to be proxied are present in the reference panel.")
+                return None
+            else:
+                raise ValueError(f"Plink returned an error, check log file: {e}")
 
     # Read and process the output
     cmd = f"gunzip -c tmp_GENAL/proxy.targets.ld.gz"

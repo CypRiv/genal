@@ -225,8 +225,11 @@ def handle_multiallelic_variants(name, merge_command, bedlist_path):
     """Handle multiallelic variants detected during merging."""
 
     def remove_multiallelic():
+        missnp_path = os.path.join(
+            "tmp_GENAL", f"{name}_allchr-merge.missnp"
+            )
         snps_to_exclude = pd.read_csv(
-            os.path.join("tmp_GENAL", f"{name}_allchr-merge.missnp"), header=None
+            missnp_path, header=None
         )
         for i in range(1, 23):
             bim_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{i}.bim")
@@ -252,11 +255,7 @@ def handle_multiallelic_variants(name, merge_command, bedlist_path):
             # If there is at least one multiallelic SNP for this chr
             elif n_to_exclude > 0:
                 bfile_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{i}")
-                missnp_path = os.path.join(
-                    "tmp_GENAL", f"{name}_allchr-merge.missnp"
-                )
-                output_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{i}")
-                command = f"{get_plink19_path()} --bfile {bfile_path} --exclude {missnp_path} --make-bed --out {output_path}"
+                command = f"{get_plink19_path()} --bfile {bfile_path} --exclude {missnp_path} --make-bed --out {bfile_path}"
                 subprocess.run(
                     command,
                     shell=True,
