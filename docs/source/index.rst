@@ -5,6 +5,7 @@
 
 .. image:: Images/genal_logo.png
    :alt: genal_logo
+   :width: 400px
 
 genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization
 ============================================================================
