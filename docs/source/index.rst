@@ -3,6 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. image:: Images/genal_logo.png
+   :alt: genal_logo
+
 genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization
 ============================================================================
 
@@ -47,7 +50,7 @@ If you use genal in your work, please cite the following paper:
 
 .. [Rivier.2024] *Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization*
    Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. 
-   medRxiv. 2024 May `10.1101/2024.05.23.24307776 <https://doi.org/10.1101/2024.05.23.24307776>`_.
+   Bioinformatics Advances. 2024 December; `10.1093/bioadv/vbae207 <https://doi.org/10.1093/bioadv/vbae207>`_.
 
 References
 ----------

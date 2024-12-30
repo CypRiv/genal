@@ -39,7 +39,7 @@ Genal draws on concepts from well-established R packages such as TwoSampleMR, MR
 Genal flowchart. Created in https://www.BioRender.com
 ## Citation <a name="citation"></a> 
 If you're using genal, please cite the following paper:
-**Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. medRxiv 2024.05.23.24307776; doi: https://doi.org/10.1101/2024.05.23.24307776
+**Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.** Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta. Bioinformatics Advances 2024.2024:vbae207; doi: https://doi.org/10.1093/bioadv/vbae207
 
 ## Requirements for the genal module <a name="paragraph1"></a> 
 ***Python 3.8 or later***. https://www.python.org/ <br> 
@@ -525,7 +525,7 @@ df_pheno = pd.read_csv("path/to/trait/data")
 
 > **Note:**
 > 
->    One important point is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
+>    One important point is to make sure that both the Family IDs (FID) and Individual IDs (IID) of the participants are identical in the phenotypic data and in the genetic data. 
 
 Then, it is advised to make a copy of the `genal.Geno` instance containing our instruments as we are going to update their coefficients and to avoid any confusion:
 
@@ -536,7 +536,7 @@ SBP_adjusted = SBP_clumped.copy()
 We can then call the `genal.Geno.set_phenotype` method, specifying which column contains our trait of interest (for the association testing) and which column contains the individual IDs:
 
 ```python
-SBP_adjusted.set_phenotype(df_pheno, PHENO = "htn", IID = "IID")
+SBP_adjusted.set_phenotype(df_pheno, PHENO = "htn", IID = "IID", FID = "FID")
 ```
 
 At this point, genal will identify if the phenotype is binary or quantitative in order to choose the appropriate regression model. If the phenotype is binary, it will assume that the most frequent value is coding for control (and the other value for case), this can be changed with `alternate_control = True`:

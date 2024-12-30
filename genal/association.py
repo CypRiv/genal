@@ -194,8 +194,6 @@ def _process_results(output, method, data, pheno_type):
         )
     return data
 
-
-# to do : Need to specify FID too
 def set_phenotype_func(data_original, PHENO, PHENO_type, IID, FID=None, alternate_control=False):
     """
     Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.

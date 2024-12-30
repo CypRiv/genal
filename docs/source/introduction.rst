@@ -39,6 +39,9 @@ If plink is not installed, genal can install the correct version for your system
 Tutorial
 ========
 
+.. image:: Images/Genal_flowchart.png
+   :alt: Genal_flowchart
+
 For the purpose of this tutorial, we are going to build a PRS of systolic blood pressure (SBP) and investigate the genetically-determined effect of SBP on the risk of stroke. We will use both summary statistics from Genome-Wide Association Studies (GWAS) and individual-level data from the UK Biobank as our test population. We are going to go through the following steps:
 
 Table of contents
@@ -506,7 +509,7 @@ Let's start by loading phenotypic data:
     df_pheno = pd.read_csv("path/to/trait/data")
 
 .. note::
-   One important point is to make sure that the IDs of the participants are identical in the phenotypic data and in the genetic data.
+   One important point is to make sure that both the Family IDs (FID) and Individual IDs (IID) of the participants are identical in the phenotypic data and in the genetic data.
 
 Then, it is advised to make a copy of the :class:`~genal.Geno` instance containing our instruments as we are going to update their coefficients and to avoid any confusion:
 
@@ -518,7 +521,7 @@ We can then call the :meth:`~genal.Geno.set_phenotype` method, specifying which 
 
 .. code-block:: python
 
-    SBP_adjusted.set_phenotype(df_pheno, PHENO="htn", IID="IID")
+    SBP_adjusted.set_phenotype(df_pheno, PHENO="htn", IID="IID", FID="FID")
 
 At this point, genal will identify if the phenotype is binary or quantitative in order to choose the appropriate regression model. If the phenotype is binary, it will assume that the most frequent value is coding for control (and the other value for case), this can be changed with ``alternate_control=True``::
 
