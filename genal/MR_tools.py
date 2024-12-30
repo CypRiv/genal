@@ -301,7 +301,7 @@ def query_outcome_func(
             window_snps=window_snps,
             threads=cpus,
         )
-        if ld:
+        if isinstance(ld, pd.DataFrame) and not ld.empty:
             outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
             exposure = data[data.SNP.isin(outcome.SNP)]
         else:

@@ -63,15 +63,15 @@ def _prepare_fam_file(genetic_path, data_pheno, pheno_type, standardize):
     """Helper function to prepare the FAM file with phenotype data."""
     # Read the FAM file
     fam = pd.read_csv(genetic_path + ".fam", header=None, delimiter=" ")
-    # Extract relevant phenotype data
-    data_pheno_trait = data_pheno[["IID", "PHENO"]].rename(columns={"IID": 0}).copy()
+    # Extract relevant phenotype data with both FID and IID
+    data_pheno_trait = data_pheno[["FID", "IID", "PHENO"]].rename(columns={"FID": 0, "IID": 1}).copy()
     # Merge phenotype data with the FAM dataframe
-    fam = fam.merge(data_pheno_trait, how="left", on=0, indicator=True)
+    fam = fam.merge(data_pheno_trait, how="left", on=[0, 1], indicator=True)
     fam[5] = fam.PHENO
     # Verify that the merge was successful
     if (fam["_merge"] == "both").sum() == 0:
         raise ValueError(
-            "The IDs in the phenotype dataframe are inconsistent with those in the genetic dataset. Call set_phenotype() method again, specifying the correct column name for the genetic IDs."
+            "The IDs in the phenotype dataframe are inconsistent with those in the genetic dataset. Call set_phenotype() method again, specifying the correct column names for the genetic IDs (IID and FID)."
         )
     fam.drop(axis=1, columns=["PHENO", "_merge"], inplace=True)
     # Count the number of individuals with a valid phenotype trait
@@ -104,8 +104,8 @@ def _handle_covariates(covar_list, data_pheno, name):
                     f"The {col} column is not found in the .phenotype dataframe."
                 )
         # Select required columns and rename columns
-        data_cov = data_pheno[["IID", "IID"] + covar_list].copy()
-        data_cov.columns = ["FID"] + list(data_cov.columns[1:])
+        data_cov = data_pheno[["FID", "IID"] + covar_list].copy()
+        
         # Remove rows with NA values and print their number
         nrows = data_cov.shape[0]
         data_cov.dropna(inplace=True)
@@ -195,7 +195,8 @@ def _process_results(output, method, data, pheno_type):
     return data
 
 
-def set_phenotype_func(data_original, PHENO, PHENO_type, IID, alternate_control):
+# to do : Need to specify FID too
+def set_phenotype_func(data_original, PHENO, PHENO_type, IID, FID=None, alternate_control=False):
     """
     Set a phenotype dataframe containing individual IDs and phenotype columns formatted for single-SNP association testing.
 
@@ -203,21 +204,20 @@ def set_phenotype_func(data_original, PHENO, PHENO_type, IID, alternate_control)
         data (pd.DataFrame): Contains at least an individual IDs column and one phenotype column.
         IID (str): Name of the individual IDs column in data.
         PHENO (str): Name of the phenotype column in data.
-        PHENO_type (str, optional): Type of the phenotype column. Either "quant" for quantitative (continuous) or "binary".The function tries to infer the type if not provided.
-        alternate_control (bool): Assumes that for a binary trait, the controls are coded with the most frequent value. Use True to reverse the assumption.
+        PHENO_type (str, optional): Type of the phenotype column. Either "quant" for quantitative (continuous) or "binary".
+            The function tries to infer the type if not provided.
+        FID (str, optional): Name of the family ID column in data. If not provided, FID will be set to IID values.
+        alternate_control (bool): Assumes that for a binary trait, the controls are coded with the most frequent value. 
+            Use True to reverse the assumption.
 
     Returns:
         pd.DataFrame: The modified data.
         str: The inferred or provided PHENO_type.
-
-    Raises:
-        ValueError: For inconsistencies in the provided data or arguments.
-
-    This function corresponds to the following GENO method: :meth:`GENO.set_phenotype`.
     """
     data = data_original.copy()
-    _validate_columns_existence(data, PHENO, IID)
-    data = _standardize_column_names(data, PHENO, IID)
+    _validate_columns_existence(data, PHENO, IID, FID)
+    
+    data = _standardize_column_names(data, PHENO, IID, FID)
     PHENO_type = _determine_phenotype_type(data, PHENO_type)
     data = _validate_and_process_phenotype(data, PHENO, PHENO_type, alternate_control)
     _report_na_values(data)
@@ -226,7 +226,7 @@ def set_phenotype_func(data_original, PHENO, PHENO_type, IID, alternate_control)
     return data, PHENO_type
 
 
-def _validate_columns_existence(data, PHENO, IID):
+def _validate_columns_existence(data, PHENO, IID, FID):
     """Checks if columns exist and raises errors if not."""
     for column in [PHENO, IID]:
         # Raise an error if the column name is not provided
@@ -237,11 +237,16 @@ def _validate_columns_existence(data, PHENO, IID):
             raise ValueError(
                 f"The column '{column}' is not present in the dataset. This column is required!"
             )
+        
+    # Handle FID column
+    if FID is not None and FID not in data.columns:
+        raise ValueError(f"The column '{FID}' is not present in the dataset.")
+    
     if data.shape[0] == 0:
         raise ValueError("The phenotype dataframe is empty.")
 
 
-def _standardize_column_names(data, PHENO, IID):
+def _standardize_column_names(data, PHENO, IID, FID):
     """Standardizes the column names to 'IID' and 'PHENO'."""
     # Drop redundant columns if they exist and rename the target columns to standard names
     if PHENO != "PHENO":
@@ -249,6 +254,17 @@ def _standardize_column_names(data, PHENO, IID):
     if IID != "IID":
         data.drop(axis=1, columns=["IID"], errors="ignore", inplace=True)
     data.rename(columns={IID: "IID", PHENO: "PHENO"}, inplace=True)
+    
+    if FID is not None:
+        if FID != "FID":
+            data.drop(axis=1, columns=["FID"], errors="ignore", inplace=True)
+        data.rename(columns={FID: "FID"}, inplace=True)
+    else:
+        data["FID"] = data["IID"]
+        print(
+            "The FID column was not provided. The IID column will be used as the FID column."
+        )
+    
     return data
 
 

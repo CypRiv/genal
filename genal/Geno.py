@@ -7,14 +7,15 @@ import psutil
 import uuid
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
+import scipy.stats as st
 from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs, expand_limits
 
 
 from .proxy import find_proxies, apply_proxies
-from .MR_tools import query_outcome_func, harmonize_MR, MR_func, mrpresso_func
+from .MR_tools import query_outcome_func, MR_func, mrpresso_func
 from .clump import clump_data
 from .lift import lift_data
-from .tools import create_tmp, get_plink19_path, load_reference_panel, setup_genetic_path
+from .tools import create_tmp, load_reference_panel, setup_genetic_path
 from .geno_tools import (
     save_data,
     check_arguments,
@@ -596,7 +597,7 @@ class Geno:
                     threads=self.cpus,
                 )
                 # If ld exists
-                if ld:
+                if isinstance(ld, pd.DataFrame) and not ld.empty:
                     data_prs = apply_proxies(data_prs, ld, searchspace = genetic_snps)
                     check_snp_column(data_prs)
 
@@ -612,36 +613,30 @@ class Geno:
         return
 
     def set_phenotype(
-        self, data, IID=None, PHENO=None, PHENO_type=None, alternate_control=False
+        self, data, IID=None, PHENO=None, PHENO_type=None, FID=None, alternate_control=False
     ):
         """
         Assign a phenotype dataframe to the .phenotype attribute.
 
         Args:
             data (pd.DataFrame): DataFrame containing individual-level row data with at least an individual IDs column
-                                 and one phenotype column.
+                                and one phenotype column.
             IID (str, optional): Name of the individual IDs column in 'data'. These IDs should
-                                 correspond to the genetic IDs in the FAM file that will be used for association testing.
+                                correspond to the genetic IDs in the FAM file that will be used for association testing.
             PHENO (str, optional): Name of the phenotype column in 'data' which will be used
-                                   as the dependent variable for association tests.
+                                as the dependent variable for association tests.
             PHENO_type (str, optional): If not specified, the function will try to infer if
                                         the phenotype is binary or quantitative. To bypass this,
                                         use "quant" for quantitative or "binary" for binary phenotypes.
                                         Default is None.
+            FID (str, optional): Name of the family ID column in 'data'. If not provided,
+                                FID values will be set to the same as IID values.
             alternate_control (bool, optional): By default, the function assumes that for a binary
                                                 trait, the controls have the most frequent value.
                                                 Set to True if this is not the case. Default is False.
-
-        Returns:
-            None: Sets the .phenotype attribute for the instance.
-
-        Note:
-            This method sets the .phenotype attribute which is essential to perform single-SNP association tests using the association_test method.
-
         """
-        
         processed_data, inferred_pheno_type = set_phenotype_func(
-            data, PHENO, PHENO_type, IID, alternate_control
+            data, PHENO, PHENO_type, IID, FID, alternate_control
         )
 
         # Assign the processed data and inferred phenotype type to the .phenotype attribute

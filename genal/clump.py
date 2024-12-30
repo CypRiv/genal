@@ -3,7 +3,7 @@ import subprocess
 import pandas as pd
 import uuid
 
-from .tools import read_config, get_plink19_path, get_reference_panel_path, create_tmp
+from .tools import get_plink19_path, get_reference_panel_path
 
 
 def clump_data(
@@ -32,7 +32,6 @@ def clump_data(
     Returns:
         pd.DataFrame: Data after clumping, if any.
     """
-    plink19_path = get_plink19_path()
 
     # Create unique ID for the name if none is passed
     if not name:
@@ -44,7 +43,7 @@ def clump_data(
 
     # Construct and execute the plink clumping command
     output_path = os.path.join("tmp_GENAL", name)
-    plink_command = f"{plink19_path} --memory {ram} --bfile {get_reference_panel_path(reference_panel)} \
+    plink_command = f"{get_plink19_path()} --memory {ram} --bfile {get_reference_panel_path(reference_panel)} \
                      --clump {to_clump_filename} --clump-kb {kb} --clump-r2 {r2} --clump-p1 {p1} \
                      --clump-p2 {p2} --out {output_path}"
     output = subprocess.run(

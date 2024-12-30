@@ -31,7 +31,7 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
         pd.DataFrame: Dataframe with queried SNPs and their proxies.
     """
     # If ld is None
-    if not ld:
+    if not isinstance(ld, pd.DataFrame):
         raise ValueError("ld is None (The SNPs to be proxied were not found in the reference panel)")
 
     # If snps_df is empty, populate it with SNPs from df
@@ -113,7 +113,7 @@ def apply_proxies(df, ld, searchspace=None):
         DataFrame: A DataFrame with SNPs replaced by their best proxies, if they exist.
     """
     # If ld is None
-    if not ld:
+    if not isinstance(ld, pd.DataFrame):
         raise ValueError("ld is None (The SNPs to be proxied were not found in the reference panel)")
     
     # Check mandatory columns

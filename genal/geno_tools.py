@@ -257,6 +257,7 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
     Rename columns to the standard names making sure that there are no duplicated names.
     Delete other columns if keep_columns=False, keep them if True.
     """
+
     # Check keep_columns argument
     if not isinstance(keep_columns, bool):
         raise TypeError(f"{keep_columns} only accepts values: True or False.")
@@ -275,11 +276,13 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
     for key, value in rename_dict.items():
         if key != value and key not in data.columns:
             raise TypeError(f"Column {key} is not found in the dataframe.")
+
     if not keep_columns:
-        cols_to_keep = [CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF]
-        cols_to_drop = [col for col in data.columns if col not in cols_to_keep]
+        cols_to_drop = [col for col in data.columns if col not in rename_dict.keys()]
         data.drop(columns=cols_to_drop, inplace=True)
+
     data.rename(columns=rename_dict, inplace=True)
+
     # Check duplicated column names
     column_counts = Counter(data.columns)
     duplicated_columns = [
@@ -291,6 +294,10 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
         raise ValueError(
             f"After adjusting the column names, the resulting dataframe has duplicated columns. Make sure your dataframe does not have a different column named {duplicated_columns}."
         )
+    
+    # Print columns found
+    print(f"The following columns were found: {list(set(rename_dict.values()) & set(data.columns.to_list()))}")
+    
     return data
 
 

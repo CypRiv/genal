@@ -4,7 +4,7 @@ import os, subprocess, re
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 
-from .tools import check_bfiles, read_config, write_config, setup_genetic_path, get_plink19_path
+from .tools import check_bfiles, setup_genetic_path, get_plink19_path
 
 
 def prs_func(data, weighted=True, path=None, ram=10000, name=""):

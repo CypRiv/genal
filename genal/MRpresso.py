@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 from numpy.random import default_rng

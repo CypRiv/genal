@@ -1,14 +1,10 @@
 import numpy as np
-import pandas as pd
 import statsmodels.api as sm
-import statsmodels.formula.api as smf
 from scipy import stats
 from scipy.stats import norm, chi2, binomtest, t
-from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
-from sklearn.linear_model import LinearRegression
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from sklearn.neighbors import KernelDensity
 from tqdm import tqdm
-from numpy.random import default_rng
 from functools import partial
 
 from .constants import MR_METHODS_NAMES
