@@ -13,7 +13,7 @@ from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, the
 
 from .proxy import find_proxies, apply_proxies
 from .MR_tools import query_outcome_func, MR_func, mrpresso_func
-from .clump import clump_data
+from .clump import clump_data_plink2
 from .lift import lift_data
 from .tools import create_tmp, load_reference_panel, setup_genetic_path
 from .geno_tools import (
@@ -32,7 +32,7 @@ from .geno_tools import (
     check_snp_column,
     remove_na
 )
-from .association import set_phenotype_func, association_test_func
+from .association import set_phenotype_func, association_test_func_plink2
 from .extract_prs import extract_snps_func, prs_func
 from .snp_query import async_query_gwas_catalog
 from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METHODS_NAMES
@@ -42,9 +42,7 @@ from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METH
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
 # Get proxies (simply return a list of proxies)
 # Multi-MR with python MR
-# Switch to plink2.0 (but check that all functions exist)
-# Handle genetic files in pgen (requires plink2.0)
-# Helper function to read bim or pvar (or other variant files) from a genetic path and handle the cases where the chr column is not only a number
+# Check stability with variants on sexual chromosomes
 
 
 class Geno:
@@ -183,7 +181,6 @@ class Geno:
         # Check arguments and solve arguments logic.
         keep_multi, keep_dups, fill_snpids, fill_coordinates = check_arguments(
             preprocessing,
-            reference_panel,
             effect_column,
             fill_snpids,
             fill_coordinates,
@@ -267,11 +264,9 @@ class Geno:
             self.checks["SNP"] = True
 
         # Warn if essential columns are missing
-        for column in STANDARD_COLUMNS:
-            if not (column in data.columns):
-                print(
-                    f"Warning: the data doesn't include a {column} column. This may become an issue later on."
-                )
+        missing_columns = [column for column in STANDARD_COLUMNS if column not in data.columns]
+        if missing_columns:
+            print(f"Warning: the data doesn't include the following columns: {', '.join(missing_columns)}. Some methods may need them.")
 
         # Remove missing values if preprocessing level is set to 'Fill_delete'
         if preprocessing == 'Fill_delete':
@@ -290,7 +285,7 @@ class Geno:
         If the Geno object does not have a reference panel attribute set,
         this method will try to set it based on the provided `reference_panel`
         argument. This can be either a string indicating a predefined reference panel
-        or a DataFrame with specific columns or a path to a .bim file.
+        or a DataFrame with specific columns or a path to a .bim or .pvar file.
 
         Args:
             reference_panel (str or pd.DataFrame, optional): Either a string indicating a predefined
@@ -370,7 +365,7 @@ class Geno:
         create_tmp()
 
         # Clump the data using the specified parameters
-        clumped_data = clump_data(
+        clumped_data = clump_data_plink2(
             self.data,
             reference_panel,
             kb,
@@ -395,7 +390,7 @@ class Geno:
         Update or create the column of SNP name based on genetic data and genomic position.
         
         Args:
-            path (str, optional): Path to a bed/bim/fam set of genetic files.
+            path (str, optional): Path to a bed/bim/fam or pgen/pvar/psam set of genetic files.
                 If files are split by chromosomes, replace the chromosome number with '$'.
                 For instance: path = "ukb_chr$_file". Defaults to the path from the configuration.
             replace (bool, optional): To update the .data attribute with the updated SNP column or not.
@@ -415,37 +410,49 @@ class Geno:
                     f"The column {column} is not found in the data and is mandatory to update snpIDs!"
                 )
         data = self.data.copy() # We don't want to modify the data attribute
-        path = setup_genetic_path(path) #Verify the path
-        filetype = "split" if "$" in path else "combined" #If data is split by chromosomes or not
-        # Merge data with the bim dataframe
-        if filetype == "combined":
-            bim = pd.read_csv(
-                path + ".bim", sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
-            )
+        path, filetype = setup_genetic_path(path) #Verify the path and get filetype
+        is_split = "$" in path #If data is split by chromosomes or not
+        
+        # Merge data with the variant info dataframe
+        if not is_split:
+            if filetype == "bed":
+                variant_info = pd.read_csv(
+                    path + ".bim", sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
+                )
+            else: # pgen
+                variant_info = pd.read_csv(
+                    path + ".pvar", sep="\t", comment="#", names=["CHR", "POS", "SNP", "A1", "A2"]
+                )
 
-            # Convert CHR to string and remove 'chr' prefix if present, then convert to int
-            if str(bim["CHR"][0]).startswith("chr"):
-                bim["CHR"] = bim["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
+            # Convert CHR to string and remove 'chr' prefix if present
+            variant_info["CHR"] = variant_info["CHR"].astype(str).str.replace("^chr", "", regex=True)
+            # Convert to int if possible (not X/Y), keeping X/Y as strings
+            variant_info["CHR"] = pd.to_numeric(variant_info["CHR"], errors='ignore')
+            # For numeric values, ensure they are integers without decimals
+            variant_info.loc[variant_info["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"] = \
+                variant_info.loc[variant_info["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"].astype(int)
 
             data = data.merge(
-                bim[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
+                variant_info[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
             )
         else:
             chr_dict = {k: v for k, v in data.groupby('CHR')} #Split the dataframe by chromosome
             partial_merge_command_parallel = partial(
-                merge_command_parallel, path=path
+                merge_command_parallel, path=path, filetype=filetype
             )  # Wrapper function
             with ProcessPoolExecutor() as executor: #Merge each dataframe subset
                 results = list(executor.map(partial_merge_command_parallel, chr_dict.values()))
                 data = pd.concat(results, ignore_index=True, axis=0) #And combine them again
+                
         # Update the SNP column
         data['SNP'] = data['SNP_new'].fillna(data['SNP'])
-        n_absent = data['SNP_new'].isna().sum()
-        data.drop(columns = ['SNP_new'], inplace=True)
+        #n_absent = data['SNP_new'].isna().sum()
         #if n_absent > 0:
         #    print(f"{n_absent}({n_absent/data.shape[0]*100:.3f}%) are not present in the genetic data.")
         #else:
         #    print("All SNPs are present in the genetic data.")
+        data.drop(columns = ['SNP_new'], inplace=True)
+        
         if replace: self.data = data #Update attribute if replace argument
         return data
     
@@ -514,12 +521,9 @@ class Geno:
 
         Returns:
             pd.DataFrame: The computed PRS data.
-
-        Raises:
-            ValueError: If the data hasn't been clumped and 'clumped' parameter is True.
         """
         
-        path = setup_genetic_path(path) # Check path
+        path, filetype = setup_genetic_path(path) # Check path
         create_tmp() #Make sure temporary folder exists
         
         # Check for mandatory columns in data
@@ -558,36 +562,61 @@ class Geno:
         if proxy:
             print("Identifying the SNPs present in the genetic data...")
             # Obtain the list of SNPs present in the genetic data
-            if path.count("$") == 1: #If split: merge all SNP columns of the .bim files in parallel
+            if path.count("$") == 1: #If split: merge all SNP columns of the variant files in parallel
                 genetic_snp_list = []
-                
-                def read_bim_file(i, path):
-                    path_i = path.replace("$", str(i)) + ".bim"
-                    if os.path.exists(path_i):
-                        bim_i = pd.read_csv(
-                            path_i, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"], usecols=["SNP"]
-                        )
-                        genetic_snp_list.extend(bim_i.SNP.tolist())
+                for i in range(1,23):
+                    path_i = path.replace("$", str(i))
+                    if filetype == "bed":
+                        variant_file = path_i + ".bim"
+                        if os.path.exists(variant_file):
+                            variants = pd.read_csv(
+                                variant_file, sep="\t", 
+                                names=["CHR", "SNP", "F", "POS", "A1", "A2"], 
+                                usecols=["SNP"]
+                            )
+                            genetic_snp_list.extend(variants.SNP.tolist())
+                    else: # filetype == "pgen"
+                        variant_file = path_i + ".pvar"
+                        if os.path.exists(variant_file):
+                            variants = pd.read_csv(
+                                variant_file, sep="\t", comment="#",
+                                names=["CHR", "POS", "SNP", "A1", "A2"],
+                                usecols=["SNP"]
+                            )
+                            genetic_snp_list.extend(variants.SNP.tolist())
             else: #If not split
-                bim_path = path + ".bim"
-                if os.path.exists(bim_path):
-                    bim = pd.read_csv(
-                            bim_path, 
-                            sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
+                if filetype == "bed":
+                    variant_file = path + ".bim"
+                    if os.path.exists(variant_file):
+                        variants = pd.read_csv(
+                            variant_file, sep="\t",
+                            names=["CHR", "SNP", "F", "POS", "A1", "A2"]
                         )
-                else:
-                    raise ValueError(f"The file {bim_path} does not exist.")
-                genetic_snp_list = bim.SNP.tolist()
+                    else:
+                        raise ValueError(f"The file {variant_file} does not exist.")
+                else: # filetype == "pgen"
+                    variant_file = path + ".pvar"
+                    if os.path.exists(variant_file):
+                        variants = pd.read_csv(
+                            variant_file, sep="\t", comment="#",
+                            names=["CHR", "POS", "SNP", "A1", "A2"]
+                        )
+                    else:
+                        raise ValueError(f"The file {variant_file} does not exist.")
+                genetic_snp_list = variants.SNP.tolist()
+                
             # Identify the SNPs already present in the genetic data
             genetic_snps = set(genetic_snp_list)
             exposure_snps = set(data_prs.SNP.values)
-            snps_present = exposure_snps & genetic_snps
+            snps_present = len(exposure_snps & genetic_snps)
+            snps_absent = exposure_snps - genetic_snps
+
             print(
-                f"{len(snps_present)} SNPs out of {len(exposure_snps)} are present in the genetic data."
+                f"{snps_present} SNPs out of {len(exposure_snps)} are present in the genetic data."
             )
-            # Search proxies for absent SNPs
-            if len(exposure_snps) - len(snps_present) > 0:
-                snps_absent = exposure_snps - snps_present
+
+            # Search proxies only if there are absent SNPs
+            if snps_absent:
                 print(f"Searching proxies for {len(snps_absent)} SNPs...")
                 ld = find_proxies(
                     snps_absent,
@@ -595,13 +624,17 @@ class Geno:
                     kb=kb,
                     r2=r2,
                     window_snps=window_snps,
-                    threads=self.cpus,
+                    threads=self.cpus
                 )
-                # If ld exists
+                # Apply proxies if found
                 if isinstance(ld, pd.DataFrame) and not ld.empty:
-                    data_prs = apply_proxies(data_prs, ld, searchspace = genetic_snps)
-                    check_snp_column(data_prs)
-
+                    data_prs = apply_proxies(data_prs, ld, searchspace=genetic_snps)
+                    # Remove duplicates in the SNP column
+                    duplicate_indices = data_prs[data_prs.duplicated(subset=["SNP"], keep="first")].index
+                    n_del = len(duplicate_indices)
+                    if n_del > 0:
+                        data_prs.drop(index=duplicate_indices, inplace=True)
+                        print(f"After proxying, {n_del} SNPs had duplicated IDs and were removed.")
         # Compute PRS
         prs_data = prs_func(data_prs, weighted, path, ram=self.ram, name=self.name)
 
@@ -636,12 +669,13 @@ class Geno:
                                                 trait, the controls have the most frequent value.
                                                 Set to True if this is not the case. Default is False.
         """
+
         processed_data, inferred_pheno_type = set_phenotype_func(
             data, PHENO, PHENO_type, IID, FID, alternate_control
         )
 
         # Assign the processed data and inferred phenotype type to the .phenotype attribute
-        self.phenotype = (processed_data, inferred_pheno_type)
+        self.phenotype = (processed_data, inferred_pheno_type, PHENO)
 
     def association_test(self, path=None, covar=[], standardize=True):
         """
@@ -670,10 +704,16 @@ class Geno:
             raise ValueError(
                 "You first need to set a phenotype using .set_phenotype(data, PHENO, PHENO_type, IID)!"
             )
+        
+        # Ensure that covar does not contain the PHENO column
+        if self.phenotype[2] in covar:
+            print(f"The phenotype column {self.phenotype[2]} is also present in the covariates list and will be removed from the association tests.")
+            covar.remove(self.phenotype[2])
 
         create_tmp() #Make sure temporary folder exists
         
-        # Based on column presents, extract the SNP based names or genomic positions (with preference for positions)
+        n_original = self.data.shape[0]
+        # Based on column presents, extract the SNPs based on names or genomic positions (with preference for positions)
         if "CHR" in self.data.columns and "POS" in self.data.columns:
             print("CHR/POS columns present: SNPs searched based on genomic positions.")
             data = self.update_snpids(path = path)
@@ -692,7 +732,7 @@ class Geno:
             raise ValueError("No SNPs were extracted from the genetic data and the association test can't be run.")
         
         # Perform the association test
-        updated_data = association_test_func(
+        updated_data = association_test_func_plink2(
             data,
             covar,
             standardize,
@@ -701,10 +741,13 @@ class Geno:
             self.phenotype[1],
         )
 
+        n_updated = updated_data.shape[0]
+        print(f"The BETA, SE, P columns of the .data attribute have been updated for {n_updated} SNPs.")
+        if n_updated < n_original:
+            print(f"{n_original - n_updated}({(n_original - n_updated)/n_original*100:.3f}%) SNPs have been removed.")
+
         # Update the instance data
         self.data = updated_data
-
-        print(f"The BETA, SE, P columns of the .data attribute have been updated.")
         return
 
     def query_outcome(
@@ -1294,29 +1337,40 @@ class Geno:
             fmt (str, optional): File format. Options: .h5 (default), .csv, .txt. Future: .vcf, .vcf.gz.
             sep (str, optional): Delimiter for .csv and .txt formats. Default is tab.
             header (bool, optional): Save column names for .csv and .txt formats. Default is True.
-
-        Raises:
-            ValueError: If clumped data is requested but data is not clumped.
         """
         save_data(self.data, name=self.name, path=path, fmt=fmt, sep=sep, header=header)
         return
 
-def merge_command_parallel(df_subset, path):
+def merge_command_parallel(df_subset, path, filetype):
     """Helper function of the update_snpids method to update SNP in parallel when genetic data is split by chromosome."""
     chr_number = df_subset.iloc[0]['CHR']
-    bim_path = path.replace("$", str(chr_number)) + ".bim"
-    if not os.path.exists(bim_path):
-        return
-    bim = pd.read_csv(
-        bim_path, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
-    )
-
-    # Convert CHR to string and remove 'chr' prefix if present, then convert to int
-    if str(bim["CHR"][0]).startswith("chr"):
-        bim["CHR"] = bim["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
     
-    bim.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
+    if filetype == "bed":
+        variant_file = path.replace("$", str(chr_number)) + ".bim"
+        if not os.path.exists(variant_file):
+            return
+        variants = pd.read_csv(
+            variant_file, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"]
+        )
+    else:  # filetype == "pgen"
+        variant_file = path.replace("$", str(chr_number)) + ".pvar"
+        if not os.path.exists(variant_file):
+            return
+        variants = pd.read_csv(
+            variant_file, sep="\t", comment="#",
+            names=["CHR", "POS", "SNP", "A1", "A2"]
+        )
+
+    # Convert CHR to string and remove 'chr' prefix if present
+    variants["CHR"] = variants["CHR"].astype(str).str.replace("^chr", "", regex=True)
+    # Convert to int if possible (not X/Y), keeping X/Y as strings
+    variants["CHR"] = pd.to_numeric(variants["CHR"], errors='ignore')
+    # For numeric values, ensure they are integers without decimals
+    variants.loc[variants["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"] = \
+        variants.loc[variants["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"].astype(int)
+    
+    variants.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
 
     return df_subset.merge(
-        bim[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
+        variants[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
     )

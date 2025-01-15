@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 project = 'genal'
 copyright = '2023, Cyprien A. Rivier'
 author = 'Cyprien A. Rivier'
-release = 'v1.0'
+release = 'v1.1'
 
 
 # -- General configuration ---------------------------------------------------

@@ -1,7 +1,10 @@
+import os
+
 STANDARD_COLUMNS = ["CHR", "POS", "SNP", "EA", "NEA", "BETA", "SE", "P"]
 REF_PANELS = ["eur", "sas", "eas", "amr", "afr"]
 REF_PANEL_COLUMNS = ["CHR", "SNP", "POS", "A1", "A2"]
 REF_PANELS_URL = "https://storage.googleapis.com/genal_files/1kg.v3.tgz"
+CONFIG_DIR = os.path.expanduser("~/.genal/")
 CHECKS_DICT = {
     "CHR": False,
     "POS": False,

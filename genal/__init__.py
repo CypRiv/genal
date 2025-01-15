@@ -1,17 +1,15 @@
 import os
 import json
-from .tools import default_config, write_config, set_plink, install_plink, delete_tmp, get_reference_panel_path
+from .tools import default_config, write_config, set_plink, install_plink, delete_tmp, get_reference_panel_path, get_plink_path
 from .geno_tools import Combine_Geno
+from .constants import CONFIG_DIR
 
-__version__ = "1.0"
+__version__ = "1.1"
 
-config_dir = os.path.expanduser(
-    "~/.genal/"
-)  # Don't forget to change the config_path dans tools.py
-config_path = os.path.join(config_dir, "config.json")
+config_path = os.path.join(CONFIG_DIR, "config.json")
 
-if not os.path.exists(config_dir):
-    os.makedirs(config_dir)
+if not os.path.exists(CONFIG_DIR):
+    os.makedirs(CONFIG_DIR)
 
 if not os.path.exists(config_path):
     write_config(default_config())

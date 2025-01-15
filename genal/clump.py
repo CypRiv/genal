@@ -2,11 +2,11 @@ import os
 import subprocess
 import pandas as pd
 import uuid
+import re
 
-from .tools import get_plink19_path, get_reference_panel_path
+from .tools import get_reference_panel_path, get_plink_path
 
-
-def clump_data(
+def clump_data_plink2(
     data,
     reference_panel="eur",
     kb=250,
@@ -41,11 +41,21 @@ def clump_data(
     to_clump_filename = os.path.join("tmp_GENAL", f"{name}_to_clump.txt")
     data[["SNP", "P"]].to_csv(to_clump_filename, index=False, sep="\t")
 
+    # Get reference panel path and type
+    ref_path, filetype = get_reference_panel_path(reference_panel)
+
     # Construct and execute the plink clumping command
     output_path = os.path.join("tmp_GENAL", name)
-    plink_command = f"{get_plink19_path()} --memory {ram} --bfile {get_reference_panel_path(reference_panel)} \
-                     --clump {to_clump_filename} --clump-kb {kb} --clump-r2 {r2} --clump-p1 {p1} \
-                     --clump-p2 {p2} --out {output_path}"
+    
+    # Base command differs based on filetype
+    base_cmd = f"{get_plink_path()} --memory {ram}"
+    if filetype == "bed":
+        base_cmd += f" --bfile {ref_path}"
+    else:  # pgen
+        base_cmd += f" --pfile {ref_path}"
+        
+    plink_command = f"{base_cmd} --clump {to_clump_filename} --clump-kb {kb} \
+                     --clump-r2 {r2} --clump-p1 {p1} --clump-p2 {p2} --out {output_path}"
     output = subprocess.run(
         plink_command, shell=True, capture_output=True, text=True, check=True
     )
@@ -55,21 +65,27 @@ def clump_data(
         raise RuntimeError(
             f"PLINK execution failed with the following error: {output.stderr}"
         )
-    if "more top variant IDs missing" in output.stderr:
-        missing_variants = output.stderr.split("more top variant IDs missing")[0].split(
-            "\n"
-        )[-1]
+    
+    # Read log file to get the number of missing top variant IDs
+    log_content = open(os.path.join("tmp_GENAL", f"{name}.log")).read()
+    match = re.search(r"(\d+)\s+top\s+variant\s+ID", log_content)
+    if match:
+        missing_variants = int(match.group(1))
         print(f"Warning: {missing_variants} top variant IDs missing")
-    if "No significant --clump results." in output.stderr:
+
+    if "No significant --clump results." in log_content:
         print("No SNPs remaining after clumping.")
         return
-    print(output.stdout.split("--clump: ")[1].split("\n")[0])
+    
+    match = re.search(r"(\d+)\s+clump[s]?\s+formed\s+from\s+(\d+)\s+index", log_content)
+    if match:
+        print(f"{match.group(1)} clumps formed from {match.group(2)} top variants.")
 
     # Extract the list of clumped SNPs and get the relevant data subset
-    clumped_filename = os.path.join("tmp_GENAL", f"{name}.clumped")
+    clumped_filename = os.path.join("tmp_GENAL", f"{name}.clumps")
     if not os.path.exists(clumped_filename):
         raise FileNotFoundError(f"'{clumped_filename}' is missing.")
-    plink_clumped = pd.read_csv(clumped_filename, sep="\s+", usecols=["SNP"])
-    clumped_data = data[data["SNP"].isin(plink_clumped["SNP"])]
+    plink_clumped = pd.read_csv(clumped_filename, sep="\s+", usecols=["ID"])
+    clumped_data = data[data["SNP"].isin(plink_clumped["ID"])]
     clumped_data.reset_index(drop=True, inplace=True)
     return clumped_data

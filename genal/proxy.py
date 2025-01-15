@@ -2,10 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 import subprocess
+import re
 
-from io import StringIO
-
-from .tools import get_reference_panel_path, get_plink19_path
+from .tools import get_reference_panel_path, get_plink_path
 
 ## TO DO: accept lists of CHR/POS instead of SNP names for these functions
 
@@ -44,7 +43,7 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     # Remove original SNPs
     ld = ld[ld["SNP_A"] != ld["SNP_B"]]
 
-    # Sort by r2 and select the best proxy for each SNP
+    # Sort by r and select the best proxy for each SNP
     ld = ld.reindex(ld["R"].abs().sort_values(ascending=False).index)
     ld = ld.groupby("SNP_A").first().reset_index(drop=False)
 
@@ -56,25 +55,28 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     output = df_queried.merge(ld, how="left", left_on="SNP", right_on="SNP_B")
     output["proxy"] = output["SNP_B"].notnull()
 
-    # Flip BETA if the proxied SNP alleles are switched in the reference panel
+    # In the plink output, the alleles taken as reference for proxying are "MAJ_A" and "MAJ_B" (major alleles in the reference panel)
+    # We want to use as effect allele for the original SNP its minor allele in the reference panel
+    # So, we flip BETA if the proxied SNP's effect allele is the major allele in the reference panel
     conditions = [
-        (output["EA"] == output["B2"]),
-        (output["EA"] == output["B1"]),
-        (~output["proxy"]),
-        (
-            (output["EA"].isin([output["B1"], output["B2"]]) == False)
-            & (output["proxy"])
-        ),
+        output["EA"] == output["MAJ_B"],
+        output["EA"] == output["NONMAJ_B"],
+        ~output["proxy"],
+        True,
     ]
     choices = [
-        -output["BETA"],  # if EA == B2, flip the sign of BETA
-        output["BETA"],  # if EA == B1, BETA does not change
-        output["BETA"],  # if the original SNP was not proxied, BETA does not change
-        np.nan,  # if the original SNP was proxied but EA is neither "B1" nor "B2", BETA is NaN
+        -output["BETA"],  # if EA == MAJ_B, flip the sign of BETA 
+        output["BETA"],  # if EA == NONMAJ_B, BETA does not change
+        output["BETA"],  # if SNP_B is NaN (The original SNP was not proxied), BETA does not change
+        np.nan,  # if the original SNP was proxied but "EA" is neither "MAJ_A" nor "NONMAJ_A", BETA is NaN
     ]
     output["BETA"] = np.select(conditions, choices)
 
-    # Drop rows with NaN BETA values
+    # Flip BETA if the sign of R is negative: indicates that the positive correlation corresponds to MAJ_A with NONMAJ_B
+    sign_r = np.sign(output["R"]) # Sign of R
+    output["BETA"] = np.where(sign_r == -1, -output["BETA"], output["BETA"])
+
+    # Delete SNPs with mismatched alleles
     nrow = output.shape[0]
     output = output.dropna(subset=["BETA"])
     if output.shape[0] < nrow:
@@ -83,14 +85,14 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
         )
     print(f"Found proxies for {output['proxy'].sum()} SNPs.")
 
-    # Replace original SNPs with their proxy (if proxied)
+    # Replace the proxied SNPs with the position and alleles of the original SNPs
     output["SNP"] = np.where(output["proxy"], output["SNP_A"], output["SNP"])
     output["POS"] = np.where(output["proxy"], output["BP_A"], output["POS"])
     output["CHR"] = np.where(output["proxy"], output["CHR_A"], output["CHR"])
-    output["EA"] = np.where(output["proxy"], output["A1"], output["EA"])
-    output["NEA"] = np.where(output["proxy"], output["A2"], output["NEA"])
+    output["EA"] = np.where(output["proxy"], output["NONMAJ_A"], output["EA"])
+    output["NEA"] = np.where(output["proxy"], output["MAJ_A"], output["NEA"])
     if "EAF" in output.columns:
-        output["EAF"] = np.where(output["proxy"], output["MAF_A"], output["EAF"])
+        output["EAF"] = np.where(output["proxy"], output["NONMAJ_FREQ_A"], output["EAF"])
 
     # Drop columns related to ld
     output = output.drop(columns=ld.columns)
@@ -127,7 +129,7 @@ def apply_proxies(df, ld, searchspace=None):
         print("Filtering the potential proxies with the searchspace provided.")
         ld = ld[ld.SNP_B.isin(searchspace)]
 
-    # Remove original SNPs and sort by r2
+    # Remove original SNPs and sort by r
     ld = ld[ld["SNP_A"] != ld["SNP_B"]]
     ld = ld.reindex(ld["R"].abs().sort_values(ascending=False).index)
 
@@ -138,20 +140,26 @@ def apply_proxies(df, ld, searchspace=None):
     output = df.merge(ld, how="left", left_on="SNP", right_on="SNP_A")
     output["proxy"] = pd.notnull(output["SNP_B"])
 
-    # Flip BETA if the original SNP alleles are switched in the reference panel
+    # In the plink output, the alleles taken as reference for proxying are "MAJ_A" and "MAJ_B" (major alleles in the reference panel)
+    # We want to use as effect allele for the proxy SNP its minor allele in the reference panel
+    # So, we flip BETA if the original SNP's effect allele is the major allele in the reference panel
     conditions = [
-        output["EA"] == output["A2"],
-        output["EA"] == output["A1"],
+        output["EA"] == output["MAJ_A"],
+        output["EA"] == output["NONMAJ_A"],
         ~output["proxy"],
-        ~output["EA"].isin([output["A1"], output["A2"]]) & output["proxy"],
+        True,
     ]
     choices = [
-        -output["BETA"],  # if EA == A2, flip the sign of BETA
-        output["BETA"],  # if EA == A1, BETA does not change
-        output["BETA"],  # if SNP_A is NaN (The original SNP was not proxied), BETA does not change
-        np.nan,  # if the original SNP was proxied but EA is neither "A1" nor "A2", BETA is NaN
+        -output["BETA"],  # if EA == MAJ_A, flip the sign of BETA 
+        output["BETA"],  # if EA == NONMAJ_A, BETA does not change
+        output["BETA"],  # if SNP_B is NaN (The original SNP was not proxied), BETA does not change
+        np.nan,  # if the original SNP was proxied but "EA" is neither "MAJ_A" nor "NONMAJ_A", BETA is NaN
     ]
     output["BETA"] = np.select(conditions, choices)
+
+    # Flip BETA if the sign of R is negative: indicates that the positive correlation corresponds to MAJ_A with NONMAJ_B
+    sign_r = np.sign(output["R"]) # Sign of R
+    output["BETA"] = np.where(sign_r == -1, -output["BETA"], output["BETA"])
 
     # Delete SNPs with mismatched alleles
     nrow = output.shape[0]
@@ -160,22 +168,23 @@ def apply_proxies(df, ld, searchspace=None):
         print(
             f"Deleted {nrow-output.shape[0]} base SNPs that did not have matching alleles in reference data."
         )
-    print(f"Found proxies for {output['proxy'].sum()} missing SNPs.")
+    print(f"Found proxies for {output['proxy'].sum()} SNPs.")
 
     # Replace the original SNPs with their proxy (if proxied)
+    # As said above, we use as effect allele the minor allele in the reference panel
     output["SNP"] = np.where(output["proxy"], output["SNP_B"], output["SNP"])
-    output["EA"] = np.where(output["proxy"], output["B1"], output["EA"])
+    output["EA"] = np.where(output["proxy"], output["NONMAJ_B"], output["EA"])
     if "POS" in output.columns:
         output["POS"] = np.where(output["proxy"], output["BP_B"], output["POS"])
     if "CHR" in output.columns:
         output["CHR"] = np.where(output["proxy"], output["CHR_B"], output["CHR"])
     if "NEA" in output.columns:
-        output["NEA"] = np.where(output["proxy"], output["B2"], output["NEA"])
+        output["NEA"] = np.where(output["proxy"], output["MAJ_B"], output["NEA"])
     if "EAF" in output.columns:
-        output["EAF"] = np.where(output["proxy"], output["MAF_B"], output["EAF"])
+        output["EAF"] = np.where(output["proxy"], output["NONMAJ_FREQ_B"], output["EAF"])
 
     # Drop ld columns
-    output = output.drop(columns=ld.columns)
+    output.drop(columns=ld.columns, inplace=True)
 
     return output
 
@@ -187,10 +196,10 @@ def find_proxies(
     kb=5000,
     r2=0.6,
     window_snps=5000,
-    threads=1,
+    threads=1
 ):
     """
-    Given a list of SNPs, return a table of proxies.
+    Given a list of SNPs, return a table of proxies using PLINK 2.0.
 
     Args:
         snp_list (list): List of rsids.
@@ -205,7 +214,6 @@ def find_proxies(
 
     Returns:
         DataFrame: A DataFrame containing the proxies. Only biallelic SNPs are returned.
-
     """
     # Ensure tmp_GENAL directory exists
     os.makedirs(f"tmp_GENAL/", exist_ok=True)
@@ -226,37 +234,76 @@ def find_proxies(
     # Save snp_list to a file
     np.savetxt("tmp_GENAL/snps_to_proxy.txt", snp_list, fmt="%s", delimiter=" ")
 
-    # Construct and execute the plink command
-    command = f"{get_plink19_path()} --bfile {get_reference_panel_path(reference_panel)} {extract_arg} --keep-allele-order --r in-phase with-freqs gz --ld-snp-list tmp_GENAL/snps_to_proxy.txt --ld-window-kb {kb} --ld-window-r2 {r2} --ld-window {window_snps} --out tmp_GENAL/proxy.targets --threads {threads}"
+    # Get reference panel path and type
+    ref_path, filetype = get_reference_panel_path(reference_panel)
+
+    # Construct base command based on filetype
+    base_cmd = f"{get_plink_path()}"
+    if filetype == "bed":
+        base_cmd += f" --bfile {ref_path}"
+    else:  # pgen
+        base_cmd += f" --pfile {ref_path}"
+
+    # Construct base command based on filetype
+    base_cmd = f"{get_plink_path()}"
+    if filetype == "bed":
+        base_cmd += f" --bfile {ref_path}"
+    else:  # pgen
+        base_cmd += f" --pfile {ref_path}"
+
+    # Construct and execute the plink2 command
+    command = (
+        f"{base_cmd} {extract_arg} "
+        f"--r-unphased 'cols=chrom,pos,id,maj,nonmaj,freq' "
+        f"--ld-snp-list tmp_GENAL/snps_to_proxy.txt "
+        f"--ld-window-kb {kb} "
+        f"--ld-window-r2 {r2} "
+        f"--ld-window {window_snps} "
+        f"--threads {threads} "
+        f"--out tmp_GENAL/proxy.targets"
+    )
     
     try:
         subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        # Read log file 
-        log_path = os.path.join("tmp_GENAL", "proxy.targets.log")
-        with open(log_path, 'r') as log_file:
-            # If none of the SNPs to be proxied are in the ref panel: return a None object
-            if "No valid variants specified" in log_file.read():
-                print("None of the SNPs to be proxied are present in the reference panel.")
-                return None
-            else:
-                raise ValueError(f"Plink returned an error, check log file: {e}")
+        raise ValueError(f"Plink returned an error, check log file: {e}")
+
+    # Read log file to return amount of SNPs to be proxied present in the ref panel
+    log_path = os.path.join("tmp_GENAL", "proxy.targets.log")
+    log_content = open(log_path).read()
+    match = re.search(r'(\d+) variant[s] remaining', log_content)
+    if match:
+        n_present = int(match.group(1))
+        if n_present == 0:
+            print("None of the SNPs to be proxied are present in the reference panel.")
+            return None
+        else:
+            print(f"{n_present} SNPs to be proxied are present in the reference panel.")
 
     # Read and process the output
-    cmd = f"gunzip -c tmp_GENAL/proxy.targets.ld.gz"
-    unzipped_content = subprocess.check_output(cmd, shell=True).decode("utf-8")
-    ld = pd.read_csv(StringIO(unzipped_content), sep="\s+")
+    try:
+        ld = pd.read_csv("tmp_GENAL/proxy.targets.vcor", sep="\s+")
+    except FileNotFoundError:
+        print("No proxies found that meet the specified criteria.")
+        return None
+      
+    # Rename columns to match the expected format
+    ld.rename(columns={
+        'ID_A': 'SNP_A',
+        'ID_B': 'SNP_B',
+        '#CHROM_A': 'CHR_A',
+        'CHROM_B': 'CHR_B',
+        'POS_A': 'BP_A',
+        'POS_B': 'BP_B',
+        'UNPHASED_R': 'R',
+    }, inplace=True)
+
+    # Create PHASE column for compatibility
+    #ld['PHASE'] = ld['A1'] + ld['B1'] + ld['A2'] + ld['B2']
 
     # Filter out multiallelic SNPs
-    ld["PHASE"] = ld["PHASE"].str.replace("/", "")
-    ld = ld[ld["PHASE"].apply(len) == 4]
-    ld = ld.reset_index(drop=True)
-
-    # Split the "PHASE" column into separate characters
-    temp = pd.DataFrame(
-        ld["PHASE"].apply(list).to_list(), columns=["A1", "B1", "A2", "B2"]
-    )
-    ld = pd.concat([ld, temp], axis=1)
+    #ld = ld[ld["PHASE"].str.len() == 4]
+    #ld = ld.reset_index(drop=True)
 
     # Convert integer columns to Int64 type
     for int_col in ["CHR_A", "CHR_B", "BP_A", "BP_B"]:

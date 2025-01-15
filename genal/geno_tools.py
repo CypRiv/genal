@@ -303,7 +303,6 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
 
 def check_arguments(
     preprocessing,
-    reference_panel,
     effect_column,
     fill_snpids,
     fill_coordinates,
