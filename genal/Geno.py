@@ -558,10 +558,11 @@ class Geno:
         if proxy:
             print("Identifying the SNPs present in the genetic data...")
             # Obtain the list of SNPs present in the genetic data
-            if path.count("$") == 1: #If split: merge all SNP columns of the .bim files
+            if path.count("$") == 1: #If split: merge all SNP columns of the .bim files in parallel
                 genetic_snp_list = []
-                for i in range(1,23):
-                    path_i = path.replace("$", str(i))+ ".bim"
+                
+                def read_bim_file(i, path):
+                    path_i = path.replace("$", str(i)) + ".bim"
                     if os.path.exists(path_i):
                         bim_i = pd.read_csv(
                             path_i, sep="\t", names=["CHR", "SNP", "F", "POS", "A1", "A2"], usecols=["SNP"]
