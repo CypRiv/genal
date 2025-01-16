@@ -22,7 +22,7 @@ def default_config():
             "plink2_path": "",
             "liftover_path": "",
             "geno_path": "",
-            "geno_filetype": "bed",
+            "geno_filetype": "",
             "ref_path": default_ref_path,
             "ref_filetype": "bed"
         }
@@ -328,7 +328,8 @@ def set_plink(path=""):
 
         if not "PLINK v2" in process.stdout:
             raise TypeError(
-                "The path provided is an executable, but not the plink 2.0 executable. Check the path and plink version."
+                "The path provided is an executable, but not the plink 2.0 executable. Check the path and plink version.\
+                 Otherwise, run genal.install_plink() to install it automatically."
             )
     except Exception as e:
         raise TypeError(e)
@@ -346,7 +347,7 @@ def get_plink_path():
     config = read_config()
     if not config["paths"]["plink2_path"]:
         raise ValueError(
-            "The path to plink 2.0 has not been set yet. Use set_plink2(path_to_plink) first."
+            "The path to plink 2.0 has not been set yet. Use genal.set_plink(path_to_plink) first or run genal.install_plink() to install it automatically."
         )
     else:
         return config["paths"]["plink2_path"]

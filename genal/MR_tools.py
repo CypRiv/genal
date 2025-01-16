@@ -79,7 +79,6 @@ def MR_func(
     data,
     methods,
     action,
-    heterogeneity,
     eaf_threshold,
     nboot,
     penk,
@@ -190,24 +189,21 @@ def MR_func(
     res = pd.DataFrame(results)
     res["exposure"], res["outcome"] = name_exposure, name_outcome
 
-    if not heterogeneity:
-        res = res[["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]
-    else:
-        res = res[
-            [
-                "exposure",
-                "outcome",
-                "method",
-                "nSNP",
-                "b",
-                "se",
-                "pval",
-                "Q",
-                "Q_df",
-                "Q_pval",
-            ]
+    res = res[
+        [
+            "exposure",
+            "outcome",
+            "method",
+            "nSNP",
+            "b",
+            "se",
+            "pval",
+            "Q",
+            "Q_df",
+            "Q_pval",
         ]
-        res["Q_df"] = res["Q_df"].astype("Int64")
+    ]
+    res["Q_df"] = res["Q_df"].astype("Int64")
 
     return res, df_mr
 
@@ -424,18 +420,18 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
     )  # Neither aligned nor inverted nor palindromic
 
     # Flip the SNPs to be flipped
-    if df.to_flip.sum() > 0:
+    if df["to_flip"].sum() > 0:
         to_flip_idx = df[df["to_flip"]].index  # Get indices of SNPs to be flipped
         df.loc[to_flip_idx, "EA_o"] = flip_alleles(df.loc[to_flip_idx, "EA_o"])
         df.loc[to_flip_idx, "NEA_o"] = flip_alleles(df.loc[to_flip_idx, "NEA_o"])
 
     # Recheck inverted SNPS to flag those that are inverted after being flipped
     df["inverted"] = np.where(
-        (df.EA_e == df.NEA_o) & (df.NEA_e == df.EA_o), True, False
+        (df["EA_e"] == df["NEA_o"]) & (df["NEA_e"] == df["EA_o"]), True, False
     )
 
     # Switch the inverted SNPs to align them
-    if df.inverted.sum() > 0:
+    if df["inverted"].sum() > 0:
         inverted_idx = df[df["inverted"]].index  # Get indices of inverted SNPs
         df.loc[inverted_idx, ["EA_o", "NEA_o"]] = df.loc[
             inverted_idx, ["NEA_o", "EA_o"]
@@ -446,7 +442,7 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
         )  # Invert outcome EAF
 
     # All the SNPs should be aligned at this point. If not, they have an allele mismatch and need to be removed
-    df["aligned"] = (df.EA_e == df.EA_o) & (df.NEA_e == df.NEA_o)  # Recheck aligned
+    df["aligned"] = (df["EA_e"] == df["EA_o"]) & (df["NEA_e"] == df["NEA_o"])  # Recheck aligned
     df["allele_mismatch"] = ~df[
         "aligned"
     ]  # If still not aligned: requires exclusion due to allele mismatch

@@ -81,9 +81,9 @@ def mr_presso(
         global_p if global_p > 1 / n_iterations else f"< {1/n_iterations:.1e}"
     )
     if outlier_test:
-        GlobalTest = {"RSSobs": RSSobs[0], "Global_test_p": global_p_str}
+        GlobalTest = {"RSSobs": RSSobs[0], "global_test_p": global_p_str}
     else:
-        GlobalTest = {"RSSobs": RSSobs, "Global_test_p": global_p_str}
+        GlobalTest = {"RSSobs": RSSobs, "global_test_p": global_p_str}
 
     # 3- Computing the single IV outlier test
     if global_p < significance_p and outlier_test:
@@ -166,21 +166,21 @@ def mr_presso(
                 p_value = np.sum(np.abs(BiasExp) > np.abs(BiasObs)) / n_iterations
 
                 BiasTest = {
-                    "Outliers Indices": list(ref_outlier),
-                    "Distortion test coefficient": 100 * BiasObs.values[0],
-                    "Distortion test p-value": p_value.iloc[0],
+                    "outliers_indices": list(ref_outlier),
+                    "distortion_test_coefficient": 100 * BiasObs.values[0],
+                    "distortion_test_p": p_value.iloc[0],
                 }
             else:
                 BiasTest = {
-                    "Outliers Indices": "All SNPs considered as outliers",
-                    "Distortion test coefficient": np.nan,
-                    "Distortion test p-value": np.nan,
+                    "outliers_indices": "All SNPs considered as outliers",
+                    "distortion_test_coefficient": np.nan,
+                    "distortion_test_p": np.nan,
                 }
         else:
             BiasTest = {
-                "Outliers Indices": "No significant outliers",
-                "Distortion test coefficient": np.nan,
-                "Distortion test p-value": np.nan,
+                "outliers_indices": "No significant outliers",
+                "distortion_test_coefficient": np.nan,
+                "distortion_test_p": np.nan,
             }
 
     # 5- Format

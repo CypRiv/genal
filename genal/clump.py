@@ -21,7 +21,7 @@ def clump_data_plink2(
 
     Args:
         data (pd.DataFrame): Input data with at least 'SNP' and 'P' columns.
-        reference_panel (str): The reference population for linkage disequilibrium values. Accepts values "eur", "sas", "afr", "eas", "amr". Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is "eur".
+        reference_panel (str): The reference population for linkage disequilibrium values. Accepts values "eur", "sas", "afr", "eas", "amr". Alternatively, a path leading to a specific bed/bim/fam or pgen/pvar/psam reference panel can be provided. Default is "eur".
         kb (int, optional): Clumping window in terms of thousands of SNPs. Default is 250.
         r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.
         p1 (float, optional): P-value threshold during clumping. SNPs above this value are not considered. Default is 5e-8.

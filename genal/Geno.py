@@ -168,7 +168,7 @@ class Geno:
                 - "Fill": Missing columns are added based on reference data and invalid values set to NaN, but no rows are deleted.
                 - "Fill_delete": Missing columns are added, and rows with missing, duplicated, or invalid values are deleted.
                 Defaults to 'Fill'.
-            reference_panel (str or pd.DataFrame, optional): Reference panel for SNP adjustments. Can be a string representing ancestry classification ("eur", "afr", "eas", "sas", "amr") or a DataFrame with ["CHR","SNP","POS","A1","A2"] columns or a path to a .bim file. Defaults to "eur".
+            reference_panel (str or pd.DataFrame, optional): Reference panel for SNP adjustments. Can be a string representing ancestry classification ("eur", "afr", "eas", "sas", "amr") or a DataFrame with ["CHR","SNP","POS","A1","A2"] columns or a path to a .bim or .pvar file. Defaults to "eur".
             effect_column (str, optional): Specifies the type of effect column ("BETA" or "OR"). If None, the method tries to determine it. Odds Ratios will be log-transformed and the standard error adjusted. Defaults to None.
             keep_multi (bool, optional): Determines if multiallelic SNPs should be kept. If None, defers to preprocessing value. Defaults to None.
             keep_dups (bool, optional): Determines if rows with duplicate SNP IDs should be kept. If None, defers to preprocessing value. Defaults to None.
@@ -331,7 +331,7 @@ class Geno:
             r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.
             p1 (float, optional): P-value threshold during clumping. SNPs with a P-value higher than this value are excluded. Default is 5e-8.
             p2 (float, optional): P-value threshold post-clumping to further filter the clumped SNPs. If p2 < p1, it won't be considered. Default is 0.01.
-            reference_panel (str, optional): The reference population for linkage disequilibrium values. Accepts values "eur", "sas", "afr", "eas", "amr". Alternatively, a path leading to a specific bed/bim/fam reference panel can be provided. Default is "eur".
+            reference_panel (str, optional): The reference population for linkage disequilibrium values. Accepts values "eur", "sas", "afr", "eas", "amr". Alternatively, a path leading to a specific bed/bim/fam or pgen/pvar/psam reference panel can be provided. Default is "eur".
 
         Returns:
             genal.Geno: A new Geno object based on the clumped data.
@@ -426,11 +426,10 @@ class Geno:
 
             # Convert CHR to string and remove 'chr' prefix if present
             variant_info["CHR"] = variant_info["CHR"].astype(str).str.replace("^chr", "", regex=True)
-            # Convert to int if possible (not X/Y), keeping X/Y as strings
-            variant_info["CHR"] = pd.to_numeric(variant_info["CHR"], errors='ignore')
-            # For numeric values, ensure they are integers without decimals
-            variant_info.loc[variant_info["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"] = \
-                variant_info.loc[variant_info["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"].astype(int)
+            # Convert numeric values to int, leave X/Y as strings
+            variant_info["CHR"] = variant_info["CHR"].apply(
+                lambda x: int(float(x)) if x.replace(".", "").isdigit() else x
+            )
 
             data = data.merge(
                 variant_info[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
@@ -461,12 +460,12 @@ class Geno:
         Extract the list of SNPs of this Geno object from the genetic data provided.
 
         Args:
-            path (str, optional): Path to a bed/bim/fam set of genetic files.
+            path (str, optional): Path to a bed/bim/fam or pgen/pvar/psam set of genetic files.
                 If files are split by chromosomes, replace the chromosome number with '$'.
                 For instance: path = "ukb_chr$_file". Default is None.
 
         Returns:
-            None: The output is a bed/bim/fam triple in the tmp_GENAL folder
+            None: The output is a pgen/pvar/psam triple in the tmp_GENAL folder
             with the format "{name}_extract_allchr" which includes the SNPs from the UKB.
 
         Notes:
@@ -501,7 +500,7 @@ class Geno:
             name (str, optional): Name or path of the saved PRS file.
             weighted (bool, optional): If True, performs a PRS weighted by the BETA column estimates.
                                        If False, performs an unweighted PRS. Default is True.
-            path (str, optional): Path to a bed/bim/fam set of genetic files for PRS calculation.
+            path (str, optional): Path to a bed/bim/fam or pgen/pvar/psam set of genetic files for PRS calculation.
                                   If files are split by chromosomes, replace the chromosome number
                                   with '$'. For instance: path = "ukb_chr$_file".
                                   If not provided, it will use the genetic path most recently used 
@@ -511,7 +510,7 @@ class Geno:
             proxy (bool, optional): If true, proxies are searched. Default is True.
             reference_panel (str, optional): The reference population used to derive linkage
                 disequilibrium values and find proxies (only if proxy=True). Acceptable values
-                include "EUR", "SAS", "AFR", "EAS", "AMR" or a path to a specific bed/bim/fam panel.
+                include "EUR", "SAS", "AFR", "EAS", "AMR" or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
                 Default is "EUR".
             kb (int, optional): Width of the genomic window to look for proxies. Default is 5000.
             r2 (float, optional): Minimum linkage disequilibrium value with the main SNP
@@ -682,7 +681,7 @@ class Geno:
         Conduct single-SNP association tests against a phenotype.
 
         Args:
-            path (str, optional): Path to a bed/bim/fam set of genetic files.
+            path (str, optional): Path to a bed/bim/fam or pgen/pvar/psam set of genetic files.
                 If files are split by chromosomes, replace the chromosome number with '$'.
                 For instance: path = "ukb_chr$_file". Default is None.
             covar (list, optional): List of columns in the phenotype dataframe to be used
@@ -772,7 +771,7 @@ class Geno:
             proxy (bool, optional): If true, proxies are searched. Default is True.
             reference_panel (str, optional): The reference population to get linkage
                 disequilibrium values and find proxies (only if proxy=True). Acceptable values
-                include "EUR", "SAS", "AFR", "EAS", "AMR" or a path to a specific bed/bim/fam panel.
+                include "EUR", "SAS", "AFR", "EAS", "AMR" or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
                 Default is "EUR".
             kb (int, optional): Width of the genomic window to look for proxies. Default is 5000.
             r2 (float, optional): Minimum linkage disequilibrium value with the main SNP
@@ -811,7 +810,8 @@ class Geno:
         phi=1,
         exposure_name=None,
         outcome_name=None,
-        cpus=-1
+        cpus=-1,
+        odds=False
     ):
         """
         Executes Mendelian Randomization (MR) using the `data_clumped` attribute as exposure data and `MR_data` attribute as outcome data queried using the `query_outcome` method.
@@ -844,6 +844,7 @@ class Geno:
             phi (int, optional): Factor for the bandwidth parameter used in the kernel density estimation of the mode methods
             exposure_name (str, optional): Name of the exposure data (only for display purposes).
             outcome_name (str, optional): Name of the outcome data (only for display purposes).
+            odds (bool, optional): If True, adds an odds ratio column with 95% confidence intervals. Default is False.
 
         Returns:
             pd.DataFrame: A table with MR results.
@@ -861,7 +862,6 @@ class Geno:
             self.MR_data,
             methods,
             action,
-            heterogeneity,
             eaf_threshold,
             nboot,
             penk,
@@ -871,6 +871,17 @@ class Geno:
         )
         
         self.MR_results = (res, df_mr, exposure_name, outcome_name)
+
+        if not heterogeneity:
+            res = res.loc[:,["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]
+        
+        if odds:
+            # Calculate odds ratios and confidence intervals using .loc
+            res.loc[:,'OR_95CI'] = res.apply(lambda row: 
+                f"{np.exp(row['b']):.3f} ({np.exp(row['b'] - 1.96*row['se']):.3f}-{np.exp(row['b'] + 1.96*row['se']):.3f})" 
+                if not pd.isna(row['b']) and not pd.isna(row['se']) 
+                else np.nan, axis=1)
+                   
         return res
     
     def MR_plot(
@@ -1126,7 +1137,7 @@ class Geno:
             raise ValueError("You must first call query_outcome() before running MR.")
         cpus = self.cpus if cpus == -1 else cpus
 
-        return mrpresso_func(
+        res = mrpresso_func(
             self.MR_data,
             action,
             eaf_threshold,
@@ -1136,6 +1147,10 @@ class Geno:
             significance_p,
             cpus,
         )
+
+        self.MRpresso_results = res
+
+        return res
 
     def lift(
         self,
@@ -1363,11 +1378,10 @@ def merge_command_parallel(df_subset, path, filetype):
 
     # Convert CHR to string and remove 'chr' prefix if present
     variants["CHR"] = variants["CHR"].astype(str).str.replace("^chr", "", regex=True)
-    # Convert to int if possible (not X/Y), keeping X/Y as strings
-    variants["CHR"] = pd.to_numeric(variants["CHR"], errors='ignore')
-    # For numeric values, ensure they are integers without decimals
-    variants.loc[variants["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"] = \
-        variants.loc[variants["CHR"].apply(lambda x: isinstance(x, (int, float))), "CHR"].astype(int)
+    # Convert numeric values to int, leave X/Y as strings
+    variants["CHR"] = variants["CHR"].apply(
+        lambda x: int(float(x)) if x.replace(".", "").isdigit() else x
+    )
     
     variants.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
 

@@ -11,6 +11,7 @@ config_path = os.path.join(CONFIG_DIR, "config.json")
 if not os.path.exists(CONFIG_DIR):
     os.makedirs(CONFIG_DIR)
 
+
 if not os.path.exists(config_path):
     write_config(default_config())
     print(f"Configuration file for genal placed at '{config_path}'")

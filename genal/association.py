@@ -360,6 +360,12 @@ def _process_binary_phenotype(data, PHENO, alternate_control):
     # Update the control and case codings
     data.replace({"PHENO": {code_control: 0, code_case: 1}}, inplace=True)
 
+    # Print number and percentage of cases
+    n_case = int(data.PHENO.sum())
+    print(
+        f"There are {n_case}({n_case/data.shape[0]*100:.3f}%) cases in the 'PHENO' column."
+    )
+
 
 def _validate_quantitative_phenotype(data, PHENO):
     """Validates a quantitative phenotype."""

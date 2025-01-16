@@ -42,7 +42,6 @@ If you're using genal, please cite the following paper:
 **Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.**  
 Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta.  
 Bioinformatics Advances 2024.  
-2024:vbae207;  
 doi: https://doi.org/10.1093/bioadv/vbae207
 
 ## Requirements for the genal module <a name="paragraph1"></a> 
@@ -71,8 +70,8 @@ And import it in a python environment with:
 import genal
 ```
 
-The main genal functionalities require a working installation of PLINK v1.9 (and not 2.0 as certain functionalities have not been updated yet). 
-If you have already installed plink v1.9, you can set the path to its executable with:
+The main genal functionalities require a working installation of PLINK v2.0. 
+If you have already installed plink v2.0, you can set the path to its executable with:
 
 ```
 genal.set_plink(path="/path/to/plink/executable/file")
@@ -236,7 +235,7 @@ You do not need to obtain the 1000 genome reference panel yourself, genal will d
 SBP_Geno.preprocess_data(preprocessing = 'Fill_delete', reference_panel = "afr")
 ```
 
-You can also use a custom reference panel by specifying to the reference_panel argument a path to bed/bim/fam files (without the extension).
+You can also use a custom reference panel by specifying to the reference_panel argument a path to bed/bim/fam (plink v1.9 format) or pgen/pvar/psam files (plink v2.0 format), without the extension.
 
 ### Clumping <a name="paragraph3.3"></a>
 
@@ -269,7 +268,7 @@ Computing a Polygenic Risk Score (PRS) can be done in one line with the `genal.G
 SBP_clumped.prs(name = "SBP_prs", path = "path/to/genetic/files")
 ```
 
-The genetic files of the target population can be either contained in one triple of bed/bim/fam files with information for all SNPs, or divided by chromosome (one bed/bim/fam triple for chr 1, another for chr 2, etc...). In the latter case, provide the path by replacing the chromosome number by `$` and genal will extract the necessary SNPs from each chromosome and merge them before running the PRS. For instance, if the genetic files are named `Pop_chr1.bed`, `Pop_chr1.bim`, `Pop_chr1.fam`, `Pop_chr2.bed`, ..., you can use:
+The genetic files of the target population can be either contained in one triple of bed/bim/fam or pgen/pvar/psam files with information for all SNPs, or divided by chromosome (one bed/bim/fam or pgen/pvar/psam triple for chr 1, another for chr 2, etc...). In the latter case, provide the path by replacing the chromosome number by `$` and genal will extract the necessary SNPs from each chromosome and merge them before running the PRS. For instance, if the genetic files are named `Pop_chr1.bed`, `Pop_chr1.bim`, `Pop_chr1.fam`, `Pop_chr2.bed`, ..., you can use:
 
 ```python
 SBP_clumped.prs(name = "SBP_prs", path = "Pop_chr$")
@@ -500,6 +499,12 @@ And that will give:
 | SBP      | Stroke_eur | Egger Intercept          | 1499 | -0.001381 | 0.000813  | 8.935529e-02  | 2959.965136 | 1497 | 1.253763e-98 |
 | SBP      | Stroke_eur | Inverse-Variance Weighted| 1499 | 0.023049  | 0.001061  | 1.382645e-104 | 2965.678836 | 1498 | 4.280737e-99 |
     
+If you wish to display the coefficients as odds ratios with confidence intervals for a binary outcome trait, you can use the `odds = True` argument:
+
+```python
+SBP_clumped.MR(action = 2, methods = ["Egger","IVW"], exposure_name = "SBP", outcome_name = "Stroke_eur", heterogeneity = True, odds = True)
+```
+
 As expected, many MR methods indicate that SBP is strongly associated with stroke, but there could be concerns for horizontal pleiotropy (instruments influencing the outcome through a different pathway than the one used as exposure) given the almost significant MR-Egger intercept p-value.
 To investigate horizontal pleiotropy in more details, a very useful method is Mendelian Randomization Pleiotropy RESidual Sum and Outlier (MR-PRESSO). MR-PRESSO is a method designed to detect and correct for horizontal pleiotropy. It will identify which instruments are likely to be pleiotropic on their effect on the outcome, and it will rerun an inverse-variance weighted MR after excluding them. It can be run using the `genal.Geno.MRpresso` method:
 

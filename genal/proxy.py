@@ -206,7 +206,7 @@ def find_proxies(
         searchspace (list, optional): List of SNPs to include in the search. By default, includes the whole reference panel.
         reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies.
                                          Accepts values: "EUR", "SAS", "AFR", "EAS", "AMR".
-                                         Alternatively, provide a path leading to a specific bed/bim/fam reference panel.
+                                         Alternatively, provide a path leading to a specific bed/bim/fam or pgen/pvar/psam reference panel.
         kb (int, optional): Width of the genomic window to look for proxies. Defaults to 5000.
         r2 (float, optional): Minimum linkage disequilibrium value with the main SNP for a proxy to be included. Defaults to 0.6.
         window_snps (int, optional): Compute the LD value for SNPs that are not more than x SNPs apart from the main SNP. Defaults to 5000.
