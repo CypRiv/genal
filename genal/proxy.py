@@ -266,7 +266,10 @@ def find_proxies(
     try:
         subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        raise ValueError(f"Plink returned an error, check log file: {e}")
+        print(f"Error running PLINK command: {e}")
+        print(f"PLINK stdout: {e.stdout}")
+        print(f"PLINK stderr: {e.stderr}")
+        raise ValueError("PLINK command failed. Check the error messages above for details.")
 
     # Read log file to return amount of SNPs to be proxied present in the ref panel
     log_path = os.path.join("tmp_GENAL", "proxy.targets.log")

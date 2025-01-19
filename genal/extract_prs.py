@@ -6,6 +6,10 @@ from concurrent.futures import ProcessPoolExecutor
 from .tools import check_bfiles, check_pfiles, setup_genetic_path, get_plink_path
 
 
+### ____________________
+### PRS functions
+### ____________________
+
 def prs_func(data, weighted=True, path=None, ram=10000, name=""):
     """
     Compute a PRS (Polygenic Risk Score) using provided SNP-level data. Corresponds to the :meth:`Geno.prs` method
@@ -79,6 +83,12 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=""):
         )
 
 
+### _____________________
+### Extract SNPs functions
+### _____________________   
+
+# We are currently excluding all multiallelic variants by forcing first on all duplicates. 
+# Could be improved by keeping the relevant version of the multiallelic SNPs based on allele matching
 def extract_snps_func(snp_list, name, path=None):
     """
     Extracts a list of SNPs from the given path. This function corresponds to the following Geno method: :meth:`Geno.extract_snps`.
@@ -102,8 +112,14 @@ def extract_snps_func(snp_list, name, path=None):
     # Get path and filetype
     path, filetype = setup_genetic_path(path)
 
-    snp_list, snp_list_path, nrow = prepare_snp_list(snp_list, name)
+    # Prepare the SNP list
+    snp_list = snp_list.dropna()
+    snp_list_name = f"{name}_list.txt"
+    snp_list_path = os.path.join("tmp_GENAL", snp_list_name)
+    snp_list.to_csv(snp_list_path, sep=" ", index=False, header=None)
+    nrow = len(snp_list)
 
+    # Check if the data is split by chromosome
     filetype_split = "split" if "$" in path else "combined"
 
     output_path = os.path.join("tmp_GENAL", f"{name}_allchr")
@@ -122,21 +138,14 @@ def extract_snps_func(snp_list, name, path=None):
             print("None of the provided SNPs were found in the genetic data.")
             return "FAILED"
         else:
-            print(f"Created pgen/pvar/psam fileset with extracted SNPs: {output_path}")
+            if check_pfiles(output_path):
+                print(f"Created pgen/pvar/psam fileset with extracted SNPs: {output_path}")
+            else:
+                print(f"Could not extract the SNPs from the provided genetic data: check plink .log file")
             # Report SNPs not found
             report_snps_not_found(nrow, name)
 
     return output_path
-
-
-def prepare_snp_list(snp_list, name):
-    """Prepare the SNP list for extraction."""
-    snp_list = snp_list.dropna()
-    snp_list_name = f"{name}_list.txt"
-    snp_list_path = os.path.join("tmp_GENAL", snp_list_name)
-    snp_list.to_csv(snp_list_path, sep=" ", index=False, header=None)
-    nrow = len(snp_list)
-    return snp_list, snp_list_path, nrow
 
 
 def extract_command_parallel(task_id, name, path, snp_list_path, filetype):
@@ -168,7 +177,7 @@ def extract_command_parallel(task_id, name, path, snp_list_path, filetype):
     else:  # pgen
         base_cmd += f" --pfile {input_path}"
         
-    command = f"{base_cmd} --extract {snp_list_path} --make-pgen --out {output_path}"
+    command = f"{base_cmd} --extract {snp_list_path} --rm-dup force-first --make-pgen --out {output_path}"
     
     subprocess.run(
         command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -187,7 +196,7 @@ def create_bedlist(bedlist_path, output_name, not_found):
         n_lines = 0
         for i in range(1, 23):
             if i in not_found:
-                print(f"pgen/pvar/psam files not found for chr{i}.")
+                print(f"bed/bim/fam or pgen/pvar/psam files not found for chr{i}.")
             elif check_pfiles(f"{output_name}_chr{i}"):
                 bedlist_file.write(f"{output_name}_chr{i}\n")
                 n_lines += 1
@@ -224,11 +233,54 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
 
     print("Merging SNPs extracted from each chromosome...")
     merge_command = f"{get_plink_path()} --pmerge-list {bedlist_path} pfile --out {output_path}"
-    subprocess.run(
-        merge_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    try:
+        subprocess.run(
+            merge_command, shell=True, capture_output=True, text=True, check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Error running PLINK command: {e}")
+        print(f"PLINK stdout: {e.stdout}")
+        print(f"PLINK stderr: {e.stderr}")
+        raise ValueError("PLINK command failed. Check the error messages above for details.")
 
     return merge_command, bedlist_path
+
+
+def extract_snps_from_combined_data(name, path, output_path, snp_list_path, filetype):
+    """Extract SNPs from combined data."""
+    print("Extracting SNPs...")
+    
+    # Build command based on filetype
+    base_cmd = f"{get_plink_path()}"
+    if filetype == "bed":
+        base_cmd += f" --bfile {path}"
+    else:  # pgen
+        base_cmd += f" --pfile {path}"
+        
+    extract_command = f"{base_cmd} --extract {snp_list_path} --rm-dup force-first --make-pgen --out {output_path}"
+    
+    subprocess.run(
+        extract_command,
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def report_snps_not_found(nrow, name):
+    """Report the number of SNPs not found in the data."""
+
+    def count_lines(filepath):
+        with open(filepath, "r") as file:
+            return sum(1 for line in file)
+
+    file_path = os.path.join("tmp_GENAL", f"{name}_allchr.pvar")
+    extracted_snps_count = count_lines(file_path)-1 #pvar files include column names
+    delta_nrow = nrow - extracted_snps_count
+    if delta_nrow > 0:
+        print(
+            f"{delta_nrow}({delta_nrow/nrow*100:.3f}%) SNPs were not extracted from the genetic data."
+        )
 
 # TODO: Check if this function is still needed with plink2
 def handle_multiallelic_variants(name, merge_command, bedlist_path):
@@ -287,39 +339,3 @@ def handle_multiallelic_variants(name, merge_command, bedlist_path):
             stderr=subprocess.DEVNULL,
         )
 
-
-def extract_snps_from_combined_data(name, path, output_path, snp_list_path, filetype):
-    """Extract SNPs from combined data."""
-    print("Extracting SNPs...")
-    
-    # Build command based on filetype
-    base_cmd = f"{get_plink_path()}"
-    if filetype == "bed":
-        base_cmd += f" --bfile {path}"
-    else:  # pgen
-        base_cmd += f" --pfile {path}"
-        
-    extract_command = f"{base_cmd} --extract {snp_list_path} --make-pgen --out {output_path}"
-    
-    subprocess.run(
-        extract_command,
-        shell=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-
-def report_snps_not_found(nrow, name):
-    """Report the number of SNPs not found in the data."""
-
-    def count_lines(filepath):
-        with open(filepath, "r") as file:
-            return sum(1 for line in file)
-
-    file_path = os.path.join("tmp_GENAL", f"{name}_allchr.pvar")
-    extracted_snps_count = count_lines(file_path)-1 #pvar files include column names
-    delta_nrow = nrow - extracted_snps_count
-    if delta_nrow > 0:
-        print(
-            f"{delta_nrow}({delta_nrow/nrow*100:.3f}%) SNPs were not extracted from the genetic data."
-        )

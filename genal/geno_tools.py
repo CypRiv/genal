@@ -241,9 +241,13 @@ def fill_snpids_func(data, reference_panel_df):
 def check_int_column(data, int_col):
     """Set the type of the int_col column to Int32 and non-numeric values to NA."""
     nrows = data.shape[0]
-    if not pd.api.types.is_integer_dtype(data[int_col].dtype):
-        data[int_col] = pd.to_numeric(data[int_col].astype(str).str.strip(), errors="coerce")
-    data[int_col] = data[int_col].round(0).astype("Int32")
+    # Remove any non-digit characters, convert to numeric, setting non-numeric to NaN
+    data[int_col] = pd.to_numeric(
+        data[int_col].astype(str).str.replace(r'[^\d]', '', regex=True),
+        errors='coerce'
+    )
+    # Convert to Int32 which handles NaN values
+    data[int_col] = data[int_col].astype('Int32')
     n_nan = data[int_col].isna().sum()
     if n_nan > 0:
         print(

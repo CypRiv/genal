@@ -46,7 +46,7 @@ def mr_presso(
     data["Weights"] = 1 / (data["SE_o"] ** 2)
 
     if len(data) <= len(BETA_e_columns) + 2:
-        raise Exception("Not enough instrumental variables")
+        raise Exception("Not enough instrumental variables (variants)")
     if len(data) >= n_iterations:
         raise Exception(
             "Not enough elements to compute empirical P-values, increase n_iterations"
@@ -58,7 +58,7 @@ def mr_presso(
     RSSobs = getRSS_LOO(data, BETA_e_columns, outlier_test)
 
     # 2- Computing the distribution of expected residual sum of squares (RSS)
-    print("Computing the global MRPRESSO p-value...")
+    print("Computing the global MR-PRESSO p-value...")
     partial_parallel_RSS_LOO = partial(
         parallel_RSS_LOO, data=data, BETA_e_columns=BETA_e_columns
     )  # Wrapper function freezing the parallel_RSS_LOO call
@@ -87,7 +87,7 @@ def mr_presso(
 
     # 3- Computing the single IV outlier test
     if global_p < significance_p and outlier_test:
-        print("Running the Outlier test.")
+        print("Global p-value is below the significance threshold. Running the Outlier test.")
 
         if len(BETA_e_columns) == 1:
             Dif = data["BETA_o"].values - data["BETA_e"].values * RSSobs[1]
@@ -114,11 +114,11 @@ def mr_presso(
         OutlierTest = pd.DataFrame()
 
     # 4- Computing the test of the distortion of the causal estimate
-    print("Running the Distortion test.")
     formula = f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}"
     mod_all = smf.wls(formula, data=data, weights=data["Weights"]).fit()
 
     BiasTest = {}
+    subset_data = None
 
     if distortion_test and outlier_test:
         ## Is there an error in the MRPRESSO code? The outlier indices are supposed to be excluded from the expected bias computation (as per the paper).
@@ -144,6 +144,7 @@ def mr_presso(
 
         if len(ref_outlier) > 0:
             if len(ref_outlier) < len(data):
+                print(f"{len(ref_outlier)}/{len(data)} ({len(ref_outlier)/len(data)*100:.2f}%) outliers found. Running the Distortion test.")
                 BiasExp = [
                     get_random_bias(BETA_e_columns, data, ref_outlier)
                     for _ in range(n_iterations)
@@ -171,12 +172,14 @@ def mr_presso(
                     "distortion_test_p": p_value.iloc[0],
                 }
             else:
+                print("All SNPs considered as outliers. Skipping the Distortion test.")
                 BiasTest = {
                     "outliers_indices": "All SNPs considered as outliers",
                     "distortion_test_coefficient": np.nan,
                     "distortion_test_p": np.nan,
                 }
         else:
+            print("No significant outliers found. Skipping the Distortion test.")
             BiasTest = {
                 "outliers_indices": "No significant outliers",
                 "distortion_test_coefficient": np.nan,
@@ -213,7 +216,7 @@ def mr_presso(
 
     mod_table = pd.DataFrame([row_original, row_corrected])
 
-    return mod_table, GlobalTest, OutlierTest, BiasTest
+    return mod_table, GlobalTest, OutlierTest, BiasTest, subset_data
 
 
 ## MR-PRESSO helper functions

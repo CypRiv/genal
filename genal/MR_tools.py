@@ -43,6 +43,11 @@ def mrpresso_func(
     df_outcome = data[1]
     name_outcome = data[2]
 
+    # Check number of instruments
+    if df_exposure.shape[0] < 3:
+        print("Not enough instruments to run MRpresso. At least 3 are required.")
+        return pd.DataFrame(), pd.DataFrame()
+    
     # Check EAF columns if action = 2
     if action == 2:
         if "EAF" not in df_exposure.columns:
@@ -85,6 +90,7 @@ def MR_func(
     phi,
     name_exposure,
     cpus,
+    subset_data
 ):
     """
     Wrapper function corresponding to the :meth:`Geno.MR` method. Refer to them for more details regarding arguments and return values.
@@ -98,10 +104,6 @@ def MR_func(
         - MR methods execution
         - Compiles results and return a pd.DataFrame
     """
-    # Check that action argument is a correct input
-    if action not in [1, 2, 3]:
-        raise ValueError("The action argument only takes 1,2 or 3 as value")
-
     # Check the methods argument (contains either MR method names or "all")
     valid_methods = list(MR_METHODS_NAMES.keys())
     valid_methods.append("all")
@@ -111,41 +113,50 @@ def MR_func(
             f"The list of methods can only contain strings in {valid_methods}"
         )
 
-    # Unpack data (coming from MR_data attribute)
-    df_exposure = data[0]
-    df_outcome = data[1]
-    name_outcome = data[2]
+    # If subset_data is provided, skip harmonization and use it directly
+    if subset_data is not None:
+        df_mr = subset_data
+        name_outcome = data[2]
+    else:
+        # Check that action argument is a correct input
+        if action not in [1, 2, 3]:
+            raise ValueError("The action argument only takes 1,2 or 3 as value")
 
-    # Check number of instruments
-    if df_exposure.shape[0] < 2:
-        print("Not enough instruments to run MR. At least 2 are required.")
-        return pd.DataFrame(), pd.DataFrame()
+        # Unpack data (coming from MR_data attribute)
+        df_exposure = data[0]
+        df_outcome = data[1]
+        name_outcome = data[2]
 
-    # Check EAF columns if action = 2
-    if action == 2:
-        if "EAF" not in df_exposure.columns:
-            print(
-                "Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3)."
-            )
-            action = 3
-        elif "EAF" not in df_outcome.columns:
-            print(
-                "Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3)."
-            )
-            action = 3
+        # Check number of instruments
+        if df_exposure.shape[0] < 2:
+            print("Not enough instruments to run MR. At least 2 are required.")
+            return pd.DataFrame(), pd.DataFrame()
 
-    # Harmonize exposure and outcome data
-    df_mr = harmonize_MR(
-        df_exposure, df_outcome, action=action, eaf_threshold=eaf_threshold
-    )
+        # Check EAF columns if action = 2
+        if action == 2:
+            if "EAF" not in df_exposure.columns:
+                print(
+                    "Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3)."
+                )
+                action = 3
+            elif "EAF" not in df_outcome.columns:
+                print(
+                    "Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3)."
+                )
+                action = 3
 
-    df_mr = df_mr_formatting(df_mr)
+        # Harmonize exposure and outcome data
+        df_mr = harmonize_MR(
+            df_exposure, df_outcome, action=action, eaf_threshold=eaf_threshold
+        )
 
-    # Check number of remaining instruments
-    n_snps = df_mr.shape[0]
-    if n_snps < 2:
-        print(f"{n_snps} SNPs remaining after harmonization step but at least 2 are required to run MR.")
-        return pd.DataFrame(), df_mr
+        df_mr = df_mr_formatting(df_mr)
+
+        # Check number of remaining instruments
+        n_snps = df_mr.shape[0]
+        if n_snps < 2:
+            print(f"{n_snps} SNPs remaining after harmonization step but at least 2 are required to run MR.")
+            return pd.DataFrame(), df_mr
 
     # Prepare values for MR methods
     BETA_e, BETA_o, SE_e, SE_o = (
@@ -235,106 +246,6 @@ def df_mr_formatting(df_mr):
     
     return df_mr
 
-
-def query_outcome_func(
-    data, outcome, name, proxy, reference_panel, kb, r2, window_snps, cpus
-):
-    """
-    Wrapper function corresponding to the :meth:`Geno.query_outcome` method.
-    Refer to it for more details on the arguments and return values.
-
-    Notes:
-        - Validation of the required columns
-        - Load outcome data from Geno or path.
-        - Identify SNPs present in the outcome data
-        - Find proxies for the absent SNPs if needed
-        - Return exposure dataframe, outcome dataframe, outcome name
-    """
-    # Check required columns in the exposure data
-    for column in REQUIRED_COLUMNS:
-        if column not in data.columns:
-            raise ValueError(
-                f"The column {column} is not found in the data and is necessary."
-            )
-
-    # Load the outcome dataframe (to be queried)
-    import genal
-
-    if isinstance(outcome, genal.Geno):
-        df_outcome, name = load_outcome_from_geno_object(outcome)
-    elif isinstance(outcome, str):
-        df_outcome, name = load_outcome_from_filepath(outcome)
-    else:
-        raise ValueError(
-            "You need to provide either a Geno object or filepath string to the outcome variable."
-        )
-
-    # Check necessary columns from outcome
-    for column in REQUIRED_COLUMNS:
-        if column not in df_outcome.columns:
-            raise ValueError(
-                f"The column {column} is not found in the outcome data and is necessary."
-            )
-
-    # Identify the exposure SNPs present in the outcome data
-    print("Identifying the exposure SNPs present in the outcome data...")
-    outcome_snps = set(df_outcome.SNP.values)
-    exposure_snps = set(data.SNP.values)
-    snps_present = exposure_snps & outcome_snps
-    print(
-        f"{len(snps_present)} SNPs out of {len(exposure_snps)} are present in the outcome data."
-    )
-
-    # Find proxies for absent SNPs if needed
-    if proxy and (len(exposure_snps) - len(snps_present) > 0):
-        snps_absent = exposure_snps - snps_present
-        print(f"Searching proxies for {len(snps_absent)} SNPs...")
-        ld = find_proxies(
-            snps_absent,
-            reference_panel=reference_panel,
-            kb=kb,
-            r2=r2,
-            window_snps=window_snps,
-            threads=cpus,
-        )
-        if isinstance(ld, pd.DataFrame) and not ld.empty:
-            outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
-            exposure = data[data.SNP.isin(outcome.SNP)]
-        else:
-            exposure = data[data.SNP.isin(snps_present)]
-            outcome = df_outcome[df_outcome.SNP.isin(snps_present)]
-    else:
-        exposure = data[data.SNP.isin(snps_present)]
-        outcome = df_outcome[df_outcome.SNP.isin(snps_present)]
-
-    exposure.reset_index(drop=True, inplace=True)
-    outcome.reset_index(drop=True, inplace=True)
-
-    print(
-        f"(Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute."
-    )
-
-    return exposure, outcome, name
-
-
-def load_outcome_from_geno_object(outcome):
-    """Load outcome data from a Geno object."""
-    df_outcome = outcome.data
-    name = outcome.name
-    print(f"Outcome data successfully loaded from '{name}' Geno instance.")
-    return df_outcome, name
-
-
-def load_outcome_from_filepath(outcome):
-    """Load outcome data from a file path."""
-    if not os.path.isfile(outcome):
-        raise ValueError("The path provided doesn't lead to a file.")
-    if not (outcome.endswith(".h5") or outcome.endswith(".hdf5")):
-        raise ValueError("The file provided needs to be in .h5 or .hdf5 format.")
-    df_outcome = pd.read_hdf(outcome, key="data")
-    name = os.path.splitext(os.path.basename(outcome))[0]
-    print(f"Outcome data successfully loaded from path provided.")
-    return df_outcome, name
 
 
 def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
@@ -534,3 +445,107 @@ def apply_action_2(df, eaf_threshold):
 
     df.reset_index(drop=True, inplace=True)
     return df
+
+### ___________________________ 
+### Query outcome functions
+### ___________________________
+
+def query_outcome_func(
+    data, outcome, name, proxy, reference_panel, kb, r2, window_snps, cpus
+):
+    """
+    Wrapper function corresponding to the :meth:`Geno.query_outcome` method.
+    Refer to it for more details on the arguments and return values.
+
+    Notes:
+        - Validation of the required columns
+        - Load outcome data from Geno or path.
+        - Identify SNPs present in the outcome data
+        - Find proxies for the absent SNPs if needed
+        - Return exposure dataframe, outcome dataframe, outcome name
+    """
+    # Check required columns in the exposure data
+    for column in REQUIRED_COLUMNS:
+        if column not in data.columns:
+            raise ValueError(
+                f"The column {column} is not found in the data and is necessary."
+            )
+
+    # Load the outcome dataframe (to be queried)
+    import genal
+
+    if isinstance(outcome, genal.Geno):
+        df_outcome, name = load_outcome_from_geno_object(outcome)
+    elif isinstance(outcome, str):
+        df_outcome, name = load_outcome_from_filepath(outcome)
+    else:
+        raise ValueError(
+            "You need to provide either a Geno object or filepath string to the outcome variable."
+        )
+
+    # Check necessary columns from outcome
+    for column in REQUIRED_COLUMNS:
+        if column not in df_outcome.columns:
+            raise ValueError(
+                f"The column {column} is not found in the outcome data and is necessary."
+            )
+
+    # Identify the exposure SNPs present in the outcome data
+    print("Identifying the exposure SNPs present in the outcome data...")
+    outcome_snps = set(df_outcome.SNP.values)
+    exposure_snps = set(data.SNP.values)
+    snps_present = exposure_snps & outcome_snps
+    print(
+        f"{len(snps_present)} SNPs out of {len(exposure_snps)} are present in the outcome data."
+    )
+
+    # Find proxies for absent SNPs if needed
+    if proxy and (len(exposure_snps) - len(snps_present) > 0):
+        snps_absent = exposure_snps - snps_present
+        print(f"Searching proxies for {len(snps_absent)} SNPs...")
+        ld = find_proxies(
+            snps_absent,
+            reference_panel=reference_panel,
+            kb=kb,
+            r2=r2,
+            window_snps=window_snps,
+            threads=cpus,
+        )
+        if isinstance(ld, pd.DataFrame) and not ld.empty:
+            outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
+            exposure = data[data.SNP.isin(outcome.SNP)]
+        else:
+            exposure = data[data.SNP.isin(snps_present)]
+            outcome = df_outcome[df_outcome.SNP.isin(snps_present)]
+    else:
+        exposure = data[data.SNP.isin(snps_present)]
+        outcome = df_outcome[df_outcome.SNP.isin(snps_present)]
+
+    exposure.reset_index(drop=True, inplace=True)
+    outcome.reset_index(drop=True, inplace=True)
+
+    print(
+        f"(Exposure data, Outcome data, Outcome name) stored in the .MR_data attribute."
+    )
+
+    return exposure, outcome, name
+
+
+def load_outcome_from_geno_object(outcome):
+    """Load outcome data from a Geno object."""
+    df_outcome = outcome.data
+    name = outcome.name
+    print(f"Outcome data successfully loaded from '{name}' Geno instance.")
+    return df_outcome, name
+
+
+def load_outcome_from_filepath(outcome):
+    """Load outcome data from a file path."""
+    if not os.path.isfile(outcome):
+        raise ValueError("The path provided doesn't lead to a file.")
+    if not (outcome.endswith(".h5") or outcome.endswith(".hdf5")):
+        raise ValueError("The file provided needs to be in .h5 or .hdf5 format.")
+    df_outcome = pd.read_hdf(outcome, key="data")
+    name = os.path.splitext(os.path.basename(outcome))[0]
+    print(f"Outcome data successfully loaded from path provided.")
+    return df_outcome, name

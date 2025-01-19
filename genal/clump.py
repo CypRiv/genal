@@ -54,11 +54,17 @@ def clump_data_plink2(
     else:  # pgen
         base_cmd += f" --pfile {ref_path}"
         
-    plink_command = f"{base_cmd} --clump {to_clump_filename} --clump-kb {kb} \
+    plink_command = f"{base_cmd} --rm-dup force-first --clump {to_clump_filename} --clump-kb {kb} \
                      --clump-r2 {r2} --clump-p1 {p1} --clump-p2 {p2} --out {output_path}"
-    output = subprocess.run(
-        plink_command, shell=True, capture_output=True, text=True, check=True
-    )
+    try:
+        output = subprocess.run(
+            plink_command, shell=True, capture_output=True, text=True, check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Error running PLINK command: {e}")
+        print(f"PLINK stdout: {e.stdout}")
+        print(f"PLINK stderr: {e.stderr}")
+        raise ValueError("PLINK command failed. Check the error messages above for details.")
 
     # Check and print the outputs for relevant information
     if output.returncode != 0:

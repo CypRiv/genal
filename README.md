@@ -326,26 +326,7 @@ and the output is:
     7(0.455%) duplicated SNPs have been removed. Use keep_dups=True to keep them.
     Extracting SNPs for each chromosome...
     SNPs extracted for chr1.
-    SNPs extracted for chr2.
-    SNPs extracted for chr3.
-    SNPs extracted for chr4.
-    SNPs extracted for chr5.
-    SNPs extracted for chr6.
-    SNPs extracted for chr7.
-    SNPs extracted for chr8.
-    SNPs extracted for chr9.
-    SNPs extracted for chr10.
-    SNPs extracted for chr11.
-    SNPs extracted for chr12.
-    SNPs extracted for chr13.
-    SNPs extracted for chr14.
-    SNPs extracted for chr15.
-    SNPs extracted for chr16.
-    SNPs extracted for chr17.
-    SNPs extracted for chr18.
-    SNPs extracted for chr19.
-    SNPs extracted for chr20.
-    SNPs extracted for chr21.
+    ...
     SNPs extracted for chr22.
     Merging SNPs extracted from each chromosome...
     Created bed/bim/fam fileset with extracted SNPs: tmp_GENAL/4f4ce6a7_allchr
@@ -414,7 +395,6 @@ Genal will print how many SNPs were successfully found and extracted from the ou
     
 
 > **Note:**
->Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
 >
 > Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
 >
@@ -458,7 +438,7 @@ You can specify several arguments. We refer to the API for a full list, but the 
 - `action = 2`: Uses effect allele frequencies to attempt to flip them (conservative, default)
 - `action = 3`: Removes all palindromic SNPs (very conservative)
 
-If you choose the option 2 or 3 (recommended), genal will print the list of palindromic SNPs that have been removed from the analysis.
+When choosing the option 2 or 3 (recommended), genal will print the list of palindromic SNPs that have been removed from the analysis.
 
 By default, only some MR methods (inverse-variance weighted, weighted median, Simple mode, MR-Egger) are going to be run. But if you wish to run a different set of MR methods, you can pass a list of strings to the `methods` argument. The possible strings are:
 - `IVW` for the classical Inverse-Variance Weighted method with random effects
@@ -475,7 +455,7 @@ By default, only some MR methods (inverse-variance weighted, weighted median, Si
 - `Weighted-mode` for the Weighted mode method
 - `all` to run all the above methods
 
-For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API: [https://genal.readthedocs.io/en/latest/modules.html#id4](MR method).
+For more fine-tuning, such as settings for the number of boostrapping iterations, please refer to the API: [https://genal.readthedocs.io/en/latest/modules.html#id4] (MR method).
 
 If you want to visualize the obtained MR results, you can use the `genal.Geno.MR_plot` method that will plot each SNP in an `effect_on_exposure x effect_on_outcome` plane as well as lines corresponding to different MR methods:
 
@@ -484,9 +464,9 @@ SBP_clumped.MR_plot(filename="MR_plot_SBP_AS")
 ```
 
 ![MR plot](docs/build/_images/MR_plot_SBP_AS.png)
-You can select which MR methods you wish to plot with the `methods` argument. Note that for an MR method to be plotted, they must be included in the latest `genal.Geno.MR` call of this `genal.Geno` instance.
+You can select which MR methods to plot with the `methods` argument. Note that for an MR method to be plotted, they must be included in the latest `genal.Geno.MR` call of this `genal.Geno` instance.
 
-If you wish to include the heterogeneity values (Cochran's Q) in the results, you can use the heterogeneity argument in the `genal.Geno.MR` call. Here, the heterogeneity for the inverse-variance weighted method:
+To include the heterogeneity values (Cochran's Q) in the results, you can use the heterogeneity argument in the `genal.Geno.MR` call. Here, the heterogeneity for the inverse-variance weighted method:
 
 ```python
 SBP_clumped.MR(action = 2, methods = ["Egger","IVW"], exposure_name = "SBP", outcome_name = "Stroke_eur", heterogeneity = True)
@@ -499,7 +479,7 @@ And that will give:
 | SBP      | Stroke_eur | Egger Intercept          | 1499 | -0.001381 | 0.000813  | 8.935529e-02  | 2959.965136 | 1497 | 1.253763e-98 |
 | SBP      | Stroke_eur | Inverse-Variance Weighted| 1499 | 0.023049  | 0.001061  | 1.382645e-104 | 2965.678836 | 1498 | 4.280737e-99 |
     
-If you wish to display the coefficients as odds ratios with confidence intervals for a binary outcome trait, you can use the `odds = True` argument:
+To display the coefficients as odds ratios with confidence intervals for a binary outcome trait, you can use the `odds = True` argument:
 
 ```python
 SBP_clumped.MR(action = 2, methods = ["Egger","IVW"], exposure_name = "SBP", outcome_name = "Stroke_eur", heterogeneity = True, odds = True)
@@ -565,26 +545,7 @@ Genal will print information regarding the number of individuals used in the tes
     CHR/POS columns present: SNPs searched based on genomic positions.
     Extracting SNPs for each chromosome...
     SNPs extracted for chr1.
-    SNPs extracted for chr2.
-    SNPs extracted for chr3.
-    SNPs extracted for chr4.
-    SNPs extracted for chr5.
-    SNPs extracted for chr6.
-    SNPs extracted for chr7.
-    SNPs extracted for chr8.
-    SNPs extracted for chr9.
-    SNPs extracted for chr10.
-    SNPs extracted for chr11.
-    SNPs extracted for chr12.
-    SNPs extracted for chr13.
-    SNPs extracted for chr14.
-    SNPs extracted for chr15.
-    SNPs extracted for chr16.
-    SNPs extracted for chr17.
-    SNPs extracted for chr18.
-    SNPs extracted for chr19.
-    SNPs extracted for chr20.
-    SNPs extracted for chr21.
+    ...
     SNPs extracted for chr22.
     Merging SNPs extracted from each chromosome...
     Created bed/bim/fam fileset with extracted SNPs: tmp_GENAL/e415aab3_allchr

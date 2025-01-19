@@ -345,11 +345,11 @@ class Geno:
         create_tmp() #Make sure temporary folder exists
 
         # Validate and process SNP and P columns, if not already done
-        if "SNP" not in self.checks:
+        if not self.checks.get("SNP"):
             check_snp_column(self.data)
             self.checks["SNP"] = True
 
-        if "P" not in self.checks:
+        if not self.checks.get("P"):
             check_p_column(self.data)
             self.checks["P"] = True
 
@@ -430,6 +430,9 @@ class Geno:
             variant_info["CHR"] = variant_info["CHR"].apply(
                 lambda x: int(float(x)) if x.replace(".", "").isdigit() else x
             )
+            # Remove duplicates in the CHR/POS columns
+            variant_info.drop_duplicates(subset=["CHR", "POS"], keep="first", inplace=True)
+            variant_info.drop_duplicates(subset=["SNP"], keep="first", inplace=True)
 
             data = data.merge(
                 variant_info[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
@@ -542,11 +545,11 @@ class Geno:
             raise ValueError("Either the SNP or the CHR/POS columns need to be present to run a PRS.")
 
         # Check SNP and EA columns
-        if "SNP" not in self.checks:
+        if not self.checks.get("SNP"):
             check_snp_column(data_prs)
-        if "EA" not in self.checks:
+        if not self.checks.get("EA"):
             check_allele_column(data_prs, "EA", keep_multi=False)
-        if "BETA" not in self.checks:
+        if not self.checks.get("BETA"):
             check_beta_column(data_prs, effect_column=None, preprocessing='Fill_delete')
 
         initial_rows = data_prs.shape[0]
@@ -811,7 +814,8 @@ class Geno:
         exposure_name=None,
         outcome_name=None,
         cpus=-1,
-        odds=False
+        odds=False,
+        use_mrpresso_data=False
     ):
         """
         Executes Mendelian Randomization (MR) using the `data_clumped` attribute as exposure data and `MR_data` attribute as outcome data queried using the `query_outcome` method.
@@ -845,6 +849,7 @@ class Geno:
             exposure_name (str, optional): Name of the exposure data (only for display purposes).
             outcome_name (str, optional): Name of the outcome data (only for display purposes).
             odds (bool, optional): If True, adds an odds ratio column with 95% confidence intervals. Default is False.
+            use_mrpresso_data (bool, optional): If True and MRpresso has been run, uses the subset of instruments after outlier removal. Default is False.
 
         Returns:
             pd.DataFrame: A table with MR results.
@@ -853,6 +858,18 @@ class Geno:
         # Ensure that query_outcome has been previously called
         if not hasattr(self, "MR_data"):
             raise ValueError("You must first call query_outcome() before running MR.")
+
+        # Get MRpresso subset data if requested and available
+        subset_data = None
+        if use_mrpresso_data:
+            if not hasattr(self, "MRpresso_subset_data"):
+                raise ValueError("Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first.")
+            elif self.MRpresso_subset_data is None:
+                raise ValueError("Use_mrpresso_data is set to True but MRpresso did not identify any outliers.")
+            else:
+                subset_data = self.MRpresso_subset_data
+                print(f"Using data for {len(subset_data)} instruments after MR-PRESSO outlier removal. The action is the one used in MR-PRESSO.")
+
 
         if outcome_name:
             self.MR_data[2] = outcome_name
@@ -868,6 +885,7 @@ class Geno:
             phi,
             exp_name,
             self.cpus,
+            subset_data
         )
         
         self.MR_results = (res, df_mr, exposure_name, outcome_name)
@@ -985,108 +1003,6 @@ class Geno:
             plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
         
         return plot
-  
-#    def MR_forest(
-#        self,
-#        methods=[
-#            "IVW",
-#            "WM",
-#            "Simple-median",
-#            "Egger",
-#        ],
-#        exposure_name=None,
-#        outcome_name=None,
-#        filename=None
-#    ):
-#        """
-#        Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the 'methods' argument is represented as a line in the plot.
-#
-#        Args:
-#            methods (list of str, optional): A list of MR methods to be included in the plot. Default methods are "IVW", "WM", "Simple-median", and "Egger".
-#            exposure_name (str, optional): A custom label for the exposure effect axis. If None, uses the label provided in the MR function call or a default label.
-#            outcome_name (str, optional): A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.
-#            filename (str, optional): The filename where the plot will be saved. If None, the plot is not saved.
-#
-#        Returns:
-#            plotnine.ggplot.ggplot: A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.
-#
-#        Raises:
-#            ValueError: If MR analysis has not been performed prior to calling this function.
-#
-#        Note:
-#            This function requires prior execution of the `MR` method to compute MR results. Make sure the MR analysis is performed on the data before calling `MR_plot`.
-#        """
-#        if not hasattr(self, "MR_results"):
-#            raise ValueError("You need to run an MR analysis with the MR method before calling the MR_plot function.")
-#        
-#        ## Extract the previously computed MR results
-#        df_mr = self.MR_results[1]
-#        res = self.MR_results[0]
-#        exposure_name = self.MR_results[2] if not exposure_name else exposure_name
-#        exposure_name = "Effect on the exposure" if not exposure_name else f"Effect on {exposure_name}"
-#        outcome_name = self.MR_results[3] if not outcome_name else outcome_name
-#        outcome_name = "Effect on the outcome" if not outcome_name else f"Effect on {outcome_name}"
-#        
-#        ## Switch all exposure betas to >= 0
-#        df_mr['BETA_e'], df_mr['BETA_o'] = np.where(df_mr['BETA_e'] < 0, (-df_mr['BETA_e'], -df_mr['BETA_o']), (df_mr['BETA_e'], df_mr['BETA_o']))
-#
-#        ## Create the scatter plot with error bars
-#        plot = (
-#            ggplot(df_mr, aes('BETA_e', 'BETA_o'))
-#
-#            + geom_errorbarh(aes(xmin='BETA_e-SE_e', xmax='BETA_e+SE_e'), height=0, color="gray", size=0.1) 
-#            + geom_errorbar(aes(ymin='BETA_o-SE_o', ymax='BETA_o+SE_o'), width=0, color="gray", size=0.1)
-#            + geom_point(color='black', size=0.2) 
-#            + geom_abline(slope=0, intercept=0, color='black')
-#            + labs(x=exposure_name, y=outcome_name) 
-#            + theme(
-#                axis_title=element_text(size=12),
-#                axis_text=element_text(size=10),
-#                figure_size=(10,6)
-#            )
-#            + expand_limits(x=0)
-#        )
-#        
-#        ## Add the lines corresponding to the specified MR methods (if present in the computation)
-#        lines = []
-#        for method in methods:
-#            if method not in MR_METHODS_NAMES.keys():
-#                warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
-#                continue
-#            ## If not an Egger method: simply need to get the slope
-#            if not method.startswith("Egger"):
-#                method_name = MR_METHODS_NAMES[method]
-#                res_row = res[res.method == method_name]
-#                if res_row.shape[0] == 0:
-#                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-#                elif res_row.shape[0] == 1:
-#                    lines.append({
-#                        'slope': res_row["b"].values[0], 
-#                        'intercept': 0, 
-#                        'MR Methods': method_name  # Use method_name as the color label
-#                    })
-#            ## For Egger methods: need to get the slope and the intercept
-#            else:
-#                method_name = MR_METHODS_NAMES[method][0]
-#                method_name_intercept = MR_METHODS_NAMES[method][1]
-#                res_row = res[res.method == method_name]
-#                res_row_intercept = res[res.method == method_name_intercept]
-#                if res_row.shape[0] == 0:
-#                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-#                elif res_row.shape[0] == 1 and res_row_intercept.shape[0] == 1:
-#                    lines.append({
-#                        'slope': res_row["b"].values[0], 
-#                        'intercept': res_row_intercept["b"].values[0], 
-#                        'MR Methods': method_name  # Use method_name as the color label
-#                    })
-#        line_data = pd.DataFrame(lines)
-#        plot += geom_abline(aes(slope='slope', intercept='intercept', color='MR Methods'), data=line_data)
-#        
-#        ## Save plot if filename is specified
-#        if filename:
-#            plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
-#        
-#        return plot
     
     
 
@@ -1137,7 +1053,7 @@ class Geno:
             raise ValueError("You must first call query_outcome() before running MR.")
         cpus = self.cpus if cpus == -1 else cpus
 
-        res = mrpresso_func(
+        mod_table, GlobalTest, OutlierTest, BiasTest, subset_data = mrpresso_func(
             self.MR_data,
             action,
             eaf_threshold,
@@ -1147,10 +1063,12 @@ class Geno:
             significance_p,
             cpus,
         )
+        if subset_data is not None:
+            subset_data.drop(columns=["Weights"], inplace=True, errors='ignore')
+        self.MRpresso_subset_data = subset_data
+        self.MRpresso_results = mod_table, GlobalTest, OutlierTest, BiasTest
 
-        self.MRpresso_results = res
-
-        return res
+        return mod_table, GlobalTest, OutlierTest, BiasTest
 
     def lift(
         self,
@@ -1194,9 +1112,9 @@ class Geno:
             data = self.data
 
         # Do the appropriate preprocessing on CHR and POS columns if not already done
-        if not self.checks["CHR"]:
+        if not self.checks.get("CHR"):
             check_int_column(data, "CHR")
-        if not self.checks["POS"]:
+        if not self.checks.get("POS"):
             check_int_column(data, "POS")
 
         # Update the checks if replace = True
@@ -1384,6 +1302,7 @@ def merge_command_parallel(df_subset, path, filetype):
     )
     
     variants.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
+    variants.drop_duplicates(subset=["SNP"], keep='first', inplace=True)
 
     return df_subset.merge(
         variants[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
