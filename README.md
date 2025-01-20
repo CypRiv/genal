@@ -5,10 +5,6 @@
 <center><h1> genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization </h1></center>
 
 
-
-**This project was developed by Cyprien A. Rivier**
-
-
 # Table of contents
 1. [Introduction](#introduction)
 2. [Citation](#citation)
@@ -38,6 +34,7 @@ Genal draws on concepts from well-established R packages such as TwoSampleMR, MR
 
 Genal flowchart. Created in https://www.BioRender.com
 ## Citation <a name="citation"></a> 
+This project was developed by Cyprien A. Rivier.
 If you're using genal, please cite the following paper:  
 **Genal: A Python Toolkit for Genetic Risk Scoring and Mendelian Randomization.**  
 Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta.  

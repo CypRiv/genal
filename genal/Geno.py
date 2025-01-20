@@ -8,7 +8,7 @@ import uuid
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 import scipy.stats as st
-from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs, expand_limits
+from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs, expand_limits, geom_vline
 
 
 from .proxy import find_proxies, apply_proxies
@@ -76,6 +76,7 @@ class Geno:
         query_outcome: Extracts SNPs from SNP-outcome association data and stores it in the 'MR_data' attribute.
         MR: Performs Mendelian Randomization between the SNP-exposure and SNP-outcome data stored in the 'MR_data' attribute. Stores the results in the 'MR_results' attribute.
         MR_plot: Plot the results of the MR analysis stored in the 'MR_results' attribute.
+        MR_forest: Creates and returns a forest plot of MR results, with one row per method.
         MRpresso: Executes the MR-PRESSO algorithm for horizontal pleiotropy correction between the SNP-exposure and SNP-outcome data stored in the 'MR_data' attribute.
         lift: Lifts SNP data from one genomic build to another.
         query_gwas_catalog: Query the GWAS Catalog for SNP-trait associations.
@@ -969,7 +970,7 @@ class Geno:
             if method not in MR_METHODS_NAMES.keys():
                 warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
                 continue
-            ## If not an Egger method: simply need to get the slope
+            ## If not an Egger method: only need the slope
             if not method.startswith("Egger"):
                 method_name = MR_METHODS_NAMES[method]
                 res_row = res[res.method == method_name]
@@ -1004,7 +1005,115 @@ class Geno:
         
         return plot
     
-    
+    def MR_forest(
+        self,
+        methods=[
+            "IVW",
+            "WM", 
+            "Simple-mode",
+            "Egger",
+        ],
+        exposure_name=None,
+        outcome_name=None,
+        odds=False,
+        filename=None
+    ):
+        """
+        Creates and returns a forest plot of MR results, with one row per method.
+
+        Args:
+            methods (list of str, optional): A list of MR methods to be included in the plot. 
+                Default methods are "IVW", "WM", "Simple-mode", and "Egger".
+            exposure_name (str, optional): A custom label for the exposure. If None, uses 
+                the label provided in the MR function call or a default label.
+            outcome_name (str, optional): A custom label for the outcome. If None, uses 
+                the label provided in the MR function call or a default label.
+            odds (bool, optional): If True, plots odds ratios instead of betas. Default is False.
+            filename (str, optional): The filename where the plot will be saved. If None, 
+                the plot is not saved.
+
+        Returns:
+            plotnine.ggplot.ggplot: A plotnine ggplot object representing the forest plot 
+                of MR results.
+
+        Raises:
+            ValueError: If MR analysis has not been performed prior to calling this function.
+        """
+        if not hasattr(self, "MR_results"):
+            raise ValueError("You need to run an MR analysis with the MR method before calling the MR_forest function.")
+        
+        # Extract the previously computed MR results
+        res = self.MR_results[0]
+        exposure_name = self.MR_results[2] if not exposure_name else exposure_name
+        exposure_name = "Exposure" if not exposure_name else exposure_name
+        outcome_name = self.MR_results[3] if not outcome_name else outcome_name
+        outcome_name = "Outcome" if not outcome_name else outcome_name
+        
+        # Create plotting dataframe
+        plot_data = []
+        for method in methods:
+            if method not in MR_METHODS_NAMES.keys():
+                warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
+                continue
+                
+            # Get the method name, beta estimate, standard error, and number of SNPs
+            method_name = MR_METHODS_NAMES[method]
+            
+            # Handle Egger method which has tuple of names
+            if isinstance(method_name, tuple):
+                method_name = method_name[0]  # Use first element for Egger regression
+                
+            res_row = res[res.method == method_name]
+            if res_row.shape[0] == 0:
+                warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
+            elif res_row.shape[0] == 1:
+                plot_data.append({
+                    'Method': method_name,
+                    'Estimate': res_row["b"].values[0],
+                    'SE': res_row["se"].values[0], 
+                    'nSNP': res_row["nSNP"].values[0]
+                })
+        
+        plot_df = pd.DataFrame(plot_data)
+        
+        # Calculate confidence intervals
+        if odds:
+            plot_df['CI_lower'] = np.exp(plot_df['Estimate'] - 1.96 * plot_df['SE'])
+            plot_df['CI_upper'] = np.exp(plot_df['Estimate'] + 1.96 * plot_df['SE'])
+            plot_df['Estimate'] = np.exp(plot_df['Estimate'])
+            x_label = f"Odds Ratio for {outcome_name} per unit increase in {exposure_name}"
+        else:
+            plot_df['CI_lower'] = plot_df['Estimate'] - 1.96 * plot_df['SE']
+            plot_df['CI_upper'] = plot_df['Estimate'] + 1.96 * plot_df['SE']
+            x_label = f"Effect on {outcome_name} per unit increase in {exposure_name}"
+        
+        # Convert Method to categorical with reversed order to preserve row order in plot
+        plot_df['Method'] = pd.Categorical(plot_df['Method'], categories=plot_df['Method'].values[::-1], ordered=True)
+        
+        # Create the forest plot
+        plot = (
+            ggplot(plot_df, aes(x='Estimate', y='Method'))
+            + geom_point(size=3)
+            + geom_errorbarh(aes(xmin='CI_lower', xmax='CI_upper'), height=0.2)
+            + theme(
+                axis_title=element_text(size=12),
+                axis_text=element_text(size=10),
+                figure_size=(10,6)
+            )
+            + labs(x=x_label, y="")
+        )
+        
+        # Add vertical line at null effect
+        if odds:
+            plot += geom_vline(xintercept=1, linetype='dashed', color='gray')
+        else:
+            plot += geom_vline(xintercept=0, linetype='dashed', color='gray')
+        
+        # Save plot if filename is specified
+        if filename:
+            plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
+        
+        return plot
 
     def MRpresso(
         self,
