@@ -181,8 +181,8 @@ def fill_coordinates_func(data, reference_panel_df):
     data.drop(columns=["CHR", "POS"], inplace=True, errors="ignore")
     data = data.merge(reference_panel_df[["CHR", "POS", "SNP"]], on="SNP", how="left")
     n_missing = data["CHR"].isna().sum()
-    data["CHR"] = data["CHR"].astype("Int32")
-    data["POS"] = data["POS"].astype("Int32")
+    data["CHR"] = data["CHR"].astype("Int64")
+    data["POS"] = data["POS"].astype("Int64")
     print(
         f"The coordinates columns (CHR for chromosome and POS for position) have been created. {n_missing}({n_missing/data.shape[0]*100:.3f}%) SNPs were not found in the reference data and their values set to nan."
     )
@@ -239,15 +239,15 @@ def fill_snpids_func(data, reference_panel_df):
 
 
 def check_int_column(data, int_col):
-    """Set the type of the int_col column to Int32 and non-numeric values to NA."""
+    """Set the type of the int_col column to Int64 and non-numeric values to NA."""
     nrows = data.shape[0]
     # Remove any non-digit characters, convert to numeric, setting non-numeric to NaN
     data[int_col] = pd.to_numeric(
         data[int_col].astype(str).str.replace(r'[^\d]', '', regex=True),
         errors='coerce'
     )
-    # Convert to Int32 which handles NaN values
-    data[int_col] = data[int_col].astype('Int32')
+    # Convert to Int64 which handles NaN values, using round() first to handle floats
+    data[int_col] = data[int_col].round().astype('Int64')
     n_nan = data[int_col].isna().sum()
     if n_nan > 0:
         print(

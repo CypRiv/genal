@@ -77,13 +77,11 @@ def mr_presso(
     Random_data_o = np.vstack([r[2] for r in results])
 
     global_p = np.sum([r > RSSobs[0] for r in RSSexp]) / n_iterations
-    global_p_str = (
-        global_p if global_p > 1 / n_iterations else f"< {1/n_iterations:.1e}"
-    )
+    
     if outlier_test:
-        GlobalTest = {"RSSobs": RSSobs[0], "global_test_p": global_p_str}
+        GlobalTest = {"RSSobs": RSSobs[0], "global_test_p": global_p}
     else:
-        GlobalTest = {"RSSobs": RSSobs, "global_test_p": global_p_str}
+        GlobalTest = {"RSSobs": RSSobs, "global_test_p": global_p}
 
     # 3- Computing the single IV outlier test
     if global_p < significance_p and outlier_test:
