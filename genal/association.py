@@ -78,6 +78,7 @@ def _run_plink2_assoc_test(
         "--glm", 
         *(["allow-no-covars"] if len(covar_list) == 0 else []),
         "no-x-sex",
+        "--no-input-missing-phenotype",
         "--pheno-name", "PHENO1"
     ]
     
@@ -141,11 +142,13 @@ def _prepare_psam_file(genetic_path, data_pheno, pheno_type, standardize):
     # Read the PSAM file
     psam = pd.read_csv(genetic_path + ".psam", delimiter="\t")
     
-    # Extract relevant phenotype data with both FID and IID
-    data_pheno_trait = data_pheno[["FID", "IID", "PHENO"]].rename(columns={"FID": "#FID", "PHENO": "PHENO1"}).copy()
-    
-    # Merge phenotype data with the PSAM dataframe
-    psam = psam.merge(data_pheno_trait, how="left", on=["#FID", "IID"], indicator=True)
+    # Merge phenotype data with the PSAM dataframe depending on column present
+    if "#FID" in psam.columns:
+        data_pheno_trait = data_pheno[["FID", "IID", "PHENO"]].rename(columns={"FID": "#FID", "PHENO": "PHENO1"}).copy()
+        psam = psam.merge(data_pheno_trait, how="left", on=["#FID", "IID"], indicator=True)
+    else:
+        data_pheno_trait = data_pheno[["IID", "PHENO"]].rename(columns={"IID": "#IID", "PHENO": "PHENO1"}).copy()
+        psam = psam.merge(data_pheno_trait, how="left", on=["#IID"], indicator=True)
     
     # Verify that the merge was successful
     if (psam["_merge"] == "both").sum() == 0:
@@ -172,6 +175,9 @@ def _prepare_psam_file(genetic_path, data_pheno, pheno_type, standardize):
         )
         psam["PHENO1"] = (psam["PHENO1"] - psam["PHENO1"].mean(skipna=True)) / psam["PHENO1"].std(skipna=True)
         psam["PHENO1"] = psam["PHENO1"].fillna('NA')
+
+    # Make sure the SEX column is not empty without modifying existing values
+    psam["SEX"] = psam["SEX"].replace('', 'NA').fillna('NA')
 
     psam.to_csv(genetic_path + ".psam", sep="\t", index=False)
     return psam
