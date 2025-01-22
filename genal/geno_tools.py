@@ -242,10 +242,7 @@ def check_int_column(data, int_col):
     """Set the type of the int_col column to Int64 and non-numeric values to NA."""
     nrows = data.shape[0]
     # Remove any non-digit characters, convert to numeric, setting non-numeric to NaN
-    data[int_col] = pd.to_numeric(
-        data[int_col].astype(str).str.replace(r'(\d+)', '', regex=True),
-        errors='coerce'
-    )
+    data[int_col] = pd.to_numeric(data[int_col].astype(str).str.extract('(\d+)', expand=False), errors='coerce')
     # Convert to Int64 which handles NaN values, using round() first to handle floats
     data[int_col] = data[int_col].round().astype('Int64')
     n_nan = data[int_col].isna().sum()
