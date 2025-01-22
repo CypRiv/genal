@@ -4,7 +4,7 @@ from .tools import default_config, write_config, set_plink, install_plink, delet
 from .geno_tools import Combine_Geno
 from .constants import CONFIG_DIR
 
-__version__ = "1.2"
+__version__ = "1.2.2"
 
 config_path = os.path.join(CONFIG_DIR, "config.json")
 
