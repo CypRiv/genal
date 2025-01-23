@@ -309,7 +309,7 @@ def _standardize_column_names(data, PHENO, IID, FID):
     else:
         data["FID"] = data["IID"]
         print(
-            "The FID column was not provided. The IID column will be used as the FID column."
+            "The FID column was not provided. The FIDs are assumed to be the same as the IIDs."
         )
     
     return data

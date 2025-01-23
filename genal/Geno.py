@@ -41,7 +41,8 @@ from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METH
 # Consider reference panels in build 38
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
 # Get proxies (simply return a list of proxies)
-# Multi-MR with python MR
+# Include proxying option to association_test
+# Multi-MR
 # Check stability with variants on sexual chromosomes
 
 
@@ -482,6 +483,8 @@ class Geno:
         # Extract the SNP list
         snp_list = self.data["SNP"]
 
+        # Renaming to avoid conflicts with previous extraction
+        self.name = str(uuid.uuid4())[:8]
         # Extract SNPs using the provided path and SNP list
         _ = extract_snps_func(snp_list, self.name, path)
 
@@ -638,6 +641,9 @@ class Geno:
                     if n_del > 0:
                         data_prs.drop(index=duplicate_indices, inplace=True)
                         print(f"After proxying, {n_del} SNPs had duplicated IDs and were removed.")
+        
+        # Renaming to avoid conflicts with previous extraction
+        self.name = str(uuid.uuid4())[:8]
         # Compute PRS
         prs_data = prs_func(data_prs, weighted, path, ram=self.ram, name=self.name)
 
@@ -729,6 +735,8 @@ class Geno:
         # Extract the SNP list
         snp_list = data["SNP"]
 
+        # Renaming to avoid conflicts with previous extraction
+        self.name = str(uuid.uuid4())[:8]
         # Extract SNPs using the provided path and SNP list
         path = extract_snps_func(snp_list, self.name, path)
         if path == "FAILED":

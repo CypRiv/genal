@@ -193,17 +193,17 @@ def create_bedlist(bedlist_path, output_name, not_found):
         not_found (List[int]): List of chromosome numbers for which no files were found.
     """
     with open(bedlist_path, "w+") as bedlist_file:
-        n_lines = 0
+        found = []
         for i in range(1, 23):
             if i in not_found:
                 print(f"bed/bim/fam or pgen/pvar/psam files not found for chr{i}.")
             elif check_pfiles(f"{output_name}_chr{i}"):
                 bedlist_file.write(f"{output_name}_chr{i}\n")
-                n_lines += 1
+                found.append(i)
                 print(f"SNPs extracted for chr{i}.")
             else:
                 print(f"No SNPs extracted for chr{i}.")
-    return n_lines
+    return found
 
 
 def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetype):
@@ -225,11 +225,18 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
     # Merge extracted SNPs from each chromosome
     bedlist_name = f"{name}_bedlist.txt"
     bedlist_path = os.path.join("tmp_GENAL", bedlist_name)
-    n_lines = create_bedlist(
+    found = create_bedlist(
         bedlist_path, os.path.join("tmp_GENAL", f"{name}_extract"), not_found
     )
-    if n_lines == 0:
+    if len(found) == 0:
         raise Warning("No SNPs were extracted from any chromosome.")
+    
+    # If only one chromosome was extracted, no need to merge, simply rename the files
+    if len(found) == 1:
+        chr_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{found[0]}")
+        for ext in [".pgen", ".pvar", ".psam", ".log"]:
+            os.rename(f"{chr_path}{ext}", f"{output_path}{ext}")
+        return None, bedlist_path
 
     print("Merging SNPs extracted from each chromosome...")
     merge_command = f"{get_plink_path()} --pmerge-list {bedlist_path} pfile --out {output_path}"
@@ -286,6 +293,9 @@ def report_snps_not_found(nrow, name):
 def handle_multiallelic_variants(name, merge_command, bedlist_path):
     """Handle multiallelic variants detected during merging."""
 
+    if merge_command is None:
+        return
+    
     def remove_multiallelic():
         missnp_path = os.path.join(
             "tmp_GENAL", f"{name}_allchr.vmiss"

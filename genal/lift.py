@@ -156,9 +156,13 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
     # Call the liftOver software
     command = f"{liftover_path} {to_lift_filename} \
     {chain_path} {lifted_filename} {unmapped_filename}"
-    output = subprocess.run(
-        command, shell=True, capture_output=True, text=True, check=True
-    )
+    try:
+        output = subprocess.run(
+            command, shell=True, capture_output=True, text=True, check=True
+        )
+    except Exception as e:
+        print(f"Error running liftOver: {e}")
+        raise ValueError("Error running liftOver. Check error message for more details.")
 
     ## Read the output, print the number of unlifted SNPs and remove them from the prelift data.
     df_post = pd.read_csv(lifted_filename, sep="\t", header=None)
