@@ -90,7 +90,27 @@ def _run_plink2_assoc_test(
 
     command.extend(["--out", output])
     
-    subprocess.run(command, capture_output=True, text=True, check=True)
+    try:
+        subprocess.run(command, capture_output=True, text=True, check=True)
+    except Exception as e:
+        #Handle the case where the association fails because of numerical instability in the covariates
+        if "scales vary too widely" in str(e):
+            print("The association test failed because of numerical instability in the covariates. Rescaling the covariates.")
+            command.extend(["--covar-variance-standardize"])
+            try:
+                subprocess.run(command, capture_output=True, text=True, check=True)
+            except Exception as e:
+                print(f"Error running PLINK command: {e}")
+                print(f"PLINK stdout: {e.stdout}")
+                print(f"PLINK stderr: {e.stderr}")
+                raise ValueError("PLINK command failed. Check the error messages above for details.")
+            
+        else:
+            print(f"Error running PLINK command: {e}")
+            print(f"PLINK stdout: {e.stdout}")
+            print(f"PLINK stderr: {e.stderr}")
+            raise ValueError("PLINK command failed. Check the error messages above for details.")
+    
     return output
 
 def _process_results_plink2(output, data, pheno_type):
@@ -113,7 +133,7 @@ def _process_results_plink2(output, data, pheno_type):
     
     # Merge results with the clumped data
     data = data.drop(axis=1, columns=["BETA", "SE", "P"], errors="ignore").merge(
-        assoc[["CHR","POS", "BETA", "A1", "P"]], how="inner", on=["CHR", "POS"]
+        assoc[["CHR","POS", "BETA", "SE", "A1", "P"]], how="inner", on=["CHR", "POS"]
     )
 
     # Adjust beta values based on allele match
