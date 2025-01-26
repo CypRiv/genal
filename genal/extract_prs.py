@@ -23,6 +23,11 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=""):
     if extracted_path == "FAILED":
         raise ValueError("No SNPs were extracted from the genetic data and the PRS can't be computed.")
 
+    # Additional check to ensure there are no duplicates in the data (need to think more about this, should be done upstream)
+    data.drop_duplicates(subset=["SNP"], keep="first", inplace=True)
+    if "CHR" in data.columns and "POS" in data.columns:
+        data.drop_duplicates(subset=["CHR", "POS"], keep="first", inplace=True)
+    
     # Write processed data to file and run plink on it
     data = data[["SNP", "EA", "BETA"]]
     data_path = os.path.join("tmp_GENAL", f"{name}_to_prs.txt")
