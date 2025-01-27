@@ -139,7 +139,7 @@ def extract_snps_func(snp_list, name, path=None):
     #Check that at least 1 variant has been extracted. If not, return "FAILED" to warn downstream functions (prs, association_test)
     log_path = output_path + ".log"
     with open(log_path, 'r') as log_file:
-        if "0 variants remaining" in log_file.read():
+        if " 0 variants remaining" in log_file.read():
             print("None of the provided SNPs were found in the genetic data.")
             return "FAILED"
         else:

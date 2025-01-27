@@ -193,9 +193,9 @@ def find_proxies(
     snp_list,
     searchspace=None,
     reference_panel="eur",
-    kb=5000,
+    kb=10000,
     r2=0.6,
-    window_snps=5000,
+    window_snps=10000,
     threads=1
 ):
     """

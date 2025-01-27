@@ -495,9 +495,9 @@ class Geno:
             path=None, 
             proxy=False,
             reference_panel="eur",
-            kb=5000,
+            kb=10000,
             r2=0.6,
-            window_snps=5000,
+            window_snps=10000,
             
            ):
         """
@@ -767,9 +767,9 @@ class Geno:
         name=None,
         proxy=True,
         reference_panel="eur",
-        kb=5000,
+        kb=10000,
         r2=0.6,
-        window_snps=5000,
+        window_snps=10000,
     ):
         """
         Prepares dataframes required for Mendelian Randomization (MR) with the SNP information in `data` as exposure.
