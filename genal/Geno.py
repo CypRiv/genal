@@ -36,6 +36,7 @@ from .association import set_phenotype_func, association_test_func_plink2
 from .extract_prs import extract_snps_func, prs_func
 from .snp_query import async_query_gwas_catalog
 from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METHODS_NAMES
+from .colocalization import coloc_abf_func
 
 # Do all the MR steps (query_outcome, harmonize etc) based on CHR/POS and not SNPs
 # Consider reference panels in build 38
@@ -450,11 +451,6 @@ class Geno:
                 
         # Update the SNP column
         data['SNP'] = data['SNP_new'].fillna(data['SNP'])
-        #n_absent = data['SNP_new'].isna().sum()
-        #if n_absent > 0:
-        #    print(f"{n_absent}({n_absent/data.shape[0]*100:.3f}%) are not present in the genetic data.")
-        #else:
-        #    print("All SNPs are present in the genetic data.")
         data.drop(columns = ['SNP_new'], inplace=True)
         
         if replace: self.data = data #Update attribute if replace argument
@@ -896,19 +892,19 @@ class Geno:
             self.cpus,
             subset_data
         )
-        
-        self.MR_results = (res, df_mr, exposure_name, outcome_name)
 
         if not heterogeneity:
             res = res.loc[:,["exposure", "outcome", "method", "nSNP", "b", "se", "pval"]]
-        
-        if odds:
+
+        if odds and not res.empty:
             # Calculate odds ratios and confidence intervals using .loc
             res.loc[:,'OR_95CI'] = res.apply(lambda row: 
                 f"{np.exp(row['b']):.3f} ({np.exp(row['b'] - 1.96*row['se']):.3f}-{np.exp(row['b'] + 1.96*row['se']):.3f})" 
                 if not pd.isna(row['b']) and not pd.isna(row['se']) 
                 else np.nan, axis=1)
-                   
+
+        self.MR_results = (res, df_mr, exposure_name, outcome_name)
+
         return res
     
     def MR_plot(
@@ -1186,6 +1182,103 @@ class Geno:
         self.MRpresso_results = mod_table, GlobalTest, OutlierTest, BiasTest
 
         return mod_table, GlobalTest, OutlierTest, BiasTest
+
+    def colocalize(self, outcome, method="abf", trait1_type=None, trait2_type=None,
+                   sdY1=None, sdY2=None, n1=None, n2=None, p1=1e-4, p2=1e-4, p12=1e-5):
+        """
+        Perform colocalization analysis between two GWAS datasets.
+        
+        Args:
+            outcome: Another Geno object containing the outcome dataset
+            method: Method to use for colocalization (default: "abf")
+            trait1_type: Type of exposure trait ("quant" or "cc")
+            trait2_type: Type of outcome trait ("quant" or "cc")
+            sdY1: Standard deviation of exposure trait (required for quantitative traits)
+            sdY2: Standard deviation of outcome trait (required for quantitative traits)
+            n1: Sample size for exposure (used to estimate sdY1 if not provided)
+            n2: Sample size for outcome (used to estimate sdY2 if not provided)
+            p1: Prior probability SNP associated with exposure
+            p2: Prior probability SNP associated with outcome
+            p12: Prior probability SNP associated with both traits
+        """
+        # Ensure required columns exist in both datasets
+        required_cols = ['BETA', 'SE']
+        for col in required_cols:
+            if col not in self.data.columns:
+                raise ValueError(f"Column {col} must be present in exposure dataset")
+            if col not in outcome.data.columns:
+                raise ValueError(f"Column {col} must be present in outcome dataset")
+            
+        if trait1_type is None:
+            print("trait1_type not specified. Assuming trait 1 is a quantitative trait.")
+            trait1_type = "quant"
+        if trait2_type is None:
+            print("trait2_type not specified. Assuming trait 2 is a quantitative trait.")
+            trait2_type = "quant"
+                
+        # Make copies of the data to avoid modifying the original data
+        data1 = self.data.copy()
+        data2 = outcome.data.copy()
+        
+        # Ensure that the BETA columns are preprocessed
+        check_beta_column(data1, 'BETA', 'Fill')
+        check_beta_column(data2, 'BETA', 'Fill')
+
+        # Adjust EAF column names before merging in case one of the datasets does not have it
+        if 'EAF' in data1.columns:
+            data1.rename(columns={'EAF': 'EAF_1'}, inplace=True)
+        if 'EAF' in data2.columns:
+            data2.rename(columns={'EAF': 'EAF_2'}, inplace=True)
+        
+        # Determine merge strategy based on available columns
+        if all(col in self.data.columns for col in ['CHR', 'POS']) and \
+           all(col in outcome.data.columns for col in ['CHR', 'POS']):
+            print("Merging datasets using CHR and POS")
+
+            #Ensure that the CHR, POS columns are preprocessed
+            check_int_column(data1, "CHR")
+            check_int_column(data1, "POS")
+            check_int_column(data2, "CHR")
+            check_int_column(data2, "POS")
+
+            # Merge the datasets
+            merged_data = pd.merge(data1, data2,
+                                 on=['CHR', 'POS'],
+                                 suffixes=('_1', '_2'))
+            
+        elif 'SNP' in self.data.columns and 'SNP' in outcome.data.columns:
+            print("Merging datasets using SNP IDs")
+
+            # Ensure that the SNP column is preprocessed
+            check_snp_column(data1)
+            check_snp_column(data2)
+
+            # Merge the datasets
+            merged_data = pd.merge(data1, data2,
+                                   on='SNP',
+                                   suffixes=('_1', '_2'))
+        else:
+            raise ValueError("Either CHR/POS or SNP columns must be present in both datasets for merging")
+        
+        # Drop any rows with missing values
+        merged_data = merged_data.dropna()
+        if merged_data.empty:
+            raise ValueError("No overlapping variants found between the datasets")
+        
+        print(f"Using {len(merged_data)} overlapping variants for colocalization analysis")
+            
+        # Call the implementation function
+        return coloc_abf_func(merged_data, 
+                             trait1_type=trait1_type,
+                             trait2_type=trait2_type,
+                             sdY1=sdY1, 
+                             sdY2=sdY2,
+                             n1=n1,
+                             n2=n2,
+                             p1=p1,
+                             p2=p2,
+                             p12=p12)
+
 
     def lift(
         self,

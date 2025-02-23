@@ -287,6 +287,7 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
             "EAF": "EAF_e",
             "BETA": "BETA_e",
             "SE": "SE_e",
+            "P": "P_e",
         },
         errors="ignore",
     )
@@ -297,12 +298,14 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
             "EAF": "EAF_o",
             "BETA": "BETA_o",
             "SE": "SE_o",
+            "P": "P_o",
         },
         errors="ignore",
     )
+
     df_outcome = df_outcome[
         df_outcome.columns.intersection(
-            ["SNP", "EA_o", "NEA_o", "EAF_o", "BETA_o", "SE_o"]
+            ["SNP", "EA_o", "NEA_o", "EAF_o", "BETA_o", "SE_o", "P_o"]
         )
     ]
 
