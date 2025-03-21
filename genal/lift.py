@@ -177,10 +177,8 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
         c = Lines[i].strip()
         (chrom, pos, pos) = c.split("\t")
         indices.append(str(chrom) + ":" + str(pos))
-    data["SNP_IDS"] = data.CHR_liftover.astype(str) + ":" + data.POS.astype(str)
-    drop_indices = data[data.SNP_IDS.isin(indices)].index
+    drop_indices = data[(data.CHR_liftover.astype(str) + ":" + data.POS.astype(str)).isin(indices)].index
     data.drop(index=drop_indices, inplace=True)
-    data.drop(columns="SNP_IDS", inplace=True)
     data.reset_index(drop=True, inplace=True)
 
     # Check the length of files
@@ -228,9 +226,11 @@ def lift_coordinates_python(data, chain_path):
     results = list(ThreadPoolExecutor().map(convert_coordinate, args))
 
     data["POS"] = [res[0][1] if res else np.nan for res in results]
+    data["CHR"] = [res[0][0].split("chr")[1] if res else np.nan for res in results]
     nrows = data.shape[0]
-    data.dropna(subset=["POS"], inplace=True)
+    data.dropna(subset=["POS", "CHR"], inplace=True)
     data["POS"] = data["POS"].astype("Int32")
+    data["CHR"] = data["CHR"].astype("Int32")
     data.reset_index(drop=True, inplace=True)
     n_na = nrows - data.shape[0]
     if n_na:

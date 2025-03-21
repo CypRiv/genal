@@ -15,7 +15,7 @@ from .proxy import find_proxies, apply_proxies
 from .MR_tools import query_outcome_func, MR_func, mrpresso_func
 from .clump import clump_data_plink2
 from .lift import lift_data
-from .tools import create_tmp, load_reference_panel, setup_genetic_path
+from .tools import create_tmp, load_reference_panel, setup_genetic_path, check_reference_panel
 from .geno_tools import (
     save_data,
     check_arguments,
@@ -39,7 +39,6 @@ from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METH
 from .colocalization import coloc_abf_func
 
 # Do all the MR steps (query_outcome, harmonize etc) based on CHR/POS and not SNPs
-# Consider reference panels in build 38
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
 # Get proxies (simply return a list of proxies)
 # Include proxying option to association_test
@@ -140,7 +139,7 @@ class Geno:
 
         # Set the maximal amount of ram/cpu to be used by the methods and dask chunksize
         self.cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", default=os.cpu_count()))
-        non_hpc_ram_per_cpu = psutil.virtual_memory().available / (
+        non_hpc_ram_per_cpu = psutil.virtual_memory().total  / (
             1024**2 * self.cpus
         )
         ram_per_cpu = int(
@@ -155,9 +154,9 @@ class Geno:
     def preprocess_data(
         self,
         preprocessing='Fill',
-        reference_panel="eur",
+        reference_panel="38",
         effect_column=None,
-        keep_multi=None,
+        keep_indel=None,
         keep_dups=None,
         fill_snpids=None,
         fill_coordinates=None,
@@ -171,23 +170,29 @@ class Geno:
                 - "Fill": Missing columns are added based on reference data and invalid values set to NaN, but no rows are deleted.
                 - "Fill_delete": Missing columns are added, and rows with missing, duplicated, or invalid values are deleted.
                 Defaults to 'Fill'.
-            reference_panel (str or pd.DataFrame, optional): Reference panel for SNP adjustments. Can be a string representing ancestry classification ("eur", "afr", "eas", "sas", "amr") or a DataFrame with ["CHR","SNP","POS","A1","A2"] columns or a path to a .bim or .pvar file. Defaults to "eur".
+            reference_panel (str or pd.DataFrame, optional): Reference panel for SNP adjustments. 
+                Options include: "37", "38" which correspond to the 1000G phase 3 reference panels in build 37 and 38 respectively.
+                Can also be a pd.DataFrame with the necessary columns (CHR, POS, SNP, A1, A2).
+                Also accepts a path to a specific bed/bim/fam or pgen/pvar/psam panel.
             effect_column (str, optional): Specifies the type of effect column ("BETA" or "OR"). If None, the method tries to determine it. Odds Ratios will be log-transformed and the standard error adjusted. Defaults to None.
-            keep_multi (bool, optional): Determines if multiallelic SNPs should be kept. If None, defers to preprocessing value. Defaults to None.
+            keep_indel (bool, optional): Determines if insertions/deletions should be kept. If None, defers to preprocessing value. Defaults to None.
             keep_dups (bool, optional): Determines if rows with duplicate SNP IDs should be kept. If None, defers to preprocessing value. Defaults to None.
             fill_snpids (bool, optional): Decides if the SNP (rsID) column should be created or replaced based on CHR/POS columns and a reference genome. If None, defers to preprocessing value. Defaults to None.
             fill_coordinates (bool, optional): Decides if CHR and/or POS should be created or replaced based on SNP column and a reference genome. If None, defers to preprocessing value. Defaults to None.
+
+        Note:
+            If you pass a standard reference_panel name (e.g. "EUR_37"), it will be converted to "37".
         """
 
         data = self.data
 
         # Check arguments and solve arguments logic.
-        keep_multi, keep_dups, fill_snpids, fill_coordinates = check_arguments(
+        keep_indel, keep_dups, fill_snpids, fill_coordinates = check_arguments(
             preprocessing,
             effect_column,
             fill_snpids,
             fill_coordinates,
-            keep_multi,
+            keep_indel,
             keep_dups,
         )
 
@@ -204,7 +209,11 @@ class Geno:
             and ("SNP" not in data.columns)
         ) or fill_snpids
         if should_fill_snpids and fill_snpids is not False:
-            data = fill_snpids_func(data, self.get_reference_panel(reference_panel))
+            data = fill_snpids_func(data, self.get_reference_panel(reference_panel), keep_indel)
+            # If EA and NEA were present, they have been preprocessed in fill_snpids_func
+            if "EA" in data.columns and "NEA" in data.columns:
+                self.checks["EA"] = True
+                self.checks["NEA"] = True
 
         # Fill missing CHR/POS columns from reference data if necessary
         should_fill_coordinates = (
@@ -224,7 +233,7 @@ class Geno:
             and "EA" in data.columns
         )
         if missing_nea_condition and preprocessing in ['Fill', 'Fill_delete']:
-            check_allele_column(data, "EA", keep_multi)
+            check_allele_column(data, "EA", keep_indel)
             self.checks["EA"] = True
             data = fill_nea(data, self.get_reference_panel(reference_panel))
 
@@ -255,10 +264,10 @@ class Geno:
         # Process allele columns
         for allele_col in ["EA", "NEA"]:
             check_allele_condition = (allele_col in data.columns) and (
-                (preprocessing in ['Fill', 'Fill_delete']) or (not keep_multi)
+                (preprocessing in ['Fill', 'Fill_delete']) or (not keep_indel)
             )
             if check_allele_condition and not self.checks[allele_col]:
-                check_allele_column(data, allele_col, keep_multi)
+                check_allele_column(data, allele_col, keep_indel)
                 self.checks[allele_col] = True
 
         # Check for and handle duplicate SNPs if necessary
@@ -281,18 +290,20 @@ class Geno:
 
         self.data = data
 
-    def get_reference_panel(self, reference_panel="eur"):
+    def get_reference_panel(self, reference_panel="38"):
         """
         Retrieve or set the reference panel for the Geno object.
 
-        If the Geno object does not have a reference panel attribute set,
-        this method will try to set it based on the provided `reference_panel`
-        argument. This can be either a string indicating a predefined reference panel
+        If the Geno object does not have a reference panel attribute set, this method will try to set it based on the provided `reference_panel` argument. 
+        This can be either "37" or "38" for the provided reference panel (based on 1000G phase 3) 
         or a DataFrame with specific columns or a path to a .bim or .pvar file.
 
+        Note:
+            If you pass a standard reference_panel name (e.g. "EUR_37"), it will be converted to "37".
+
         Args:
-            reference_panel (str or pd.DataFrame, optional): Either a string indicating a predefined
-                reference panel (default is "eur", options are "afr", "amr", "eas", "sas") or a DataFrame with necessary columns or a valid path to a .bim file
+            reference_panel (str or pd.DataFrame, optional): Either "37" or "38" for the provided reference panel (based on 1000G phase 3)
+                or a DataFrame with necessary columns or a valid path to a .bim or .pvar file
 
         Returns:
             pd.DataFrame: The reference panel DataFrame for the Geno object.
@@ -312,6 +323,8 @@ class Geno:
             print(
                 "Using the provided reference_panel dataframe as the reference panel."
             )
+            # Check and standardize the reference panel
+            reference_panel = check_reference_panel(reference_panel)
             self.reference_panel = reference_panel.copy()
             self.reference_panel_name = "USER_PROVIDED"
             
@@ -324,17 +337,20 @@ class Geno:
 
         return self.reference_panel
 
-    def clump(self, kb=250, r2=0.1, p1=5e-8, p2=0.01, reference_panel="eur"):
+    def clump(self, kb=10000, r2=0.01, p1=5e-8, p2=0.01, reference_panel="EUR_37"):
         """
         Clump the data based on linkage disequilibrium and return another Geno object with the clumped data.
         The clumping process is executed using plink.
 
         Args:
-            kb (int, optional): Clumping window in thousands of SNPs. Default is 250.
-            r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. Default is 0.1.
+            kb (int, optional): Clumping window in thousands of SNPs. Default is 10000 (very strict).
+            r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. Default is 0.01 (strict).
             p1 (float, optional): P-value threshold during clumping. SNPs with a P-value higher than this value are excluded. Default is 5e-8.
             p2 (float, optional): P-value threshold post-clumping to further filter the clumped SNPs. If p2 < p1, it won't be considered. Default is 0.01.
-            reference_panel (str, optional): The reference population for linkage disequilibrium values. Accepts values "eur", "sas", "afr", "eas", "amr". Alternatively, a path leading to a specific bed/bim/fam or pgen/pvar/psam reference panel can be provided. Default is "eur".
+            reference_panel (str, optional): The reference population for linkage disequilibrium values. 
+                Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
+                Also accepts or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
+                Default is "EUR_37".
 
         Returns:
             genal.Geno: A new Geno object based on the clumped data.
@@ -490,10 +506,10 @@ class Geno:
             weighted=True, 
             path=None, 
             proxy=False,
-            reference_panel="eur",
-            kb=10000,
-            r2=0.6,
-            window_snps=10000,
+            reference_panel="EUR_37",
+            kb=5000,
+            r2=0.8,
+            window_snps=1000000,
             
            ):
         """
@@ -511,15 +527,15 @@ class Geno:
             position (bool, optional): Use the genomic positions instead of the SNP names to find the
                                   SNPs in the genetic data (recommended).
             proxy (bool, optional): If true, proxies are searched. Default is True.
-            reference_panel (str, optional): The reference population used to derive linkage
-                disequilibrium values and find proxies (only if proxy=True). Acceptable values
-                include "EUR", "SAS", "AFR", "EAS", "AMR" or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
-                Default is "EUR".
+            reference_panel (str, optional): The reference population used to derive linkage disequilibrium values and find proxies (only if proxy=True). 
+                Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
+                Also accepts or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
+                Default is "EUR_37".
             kb (int, optional): Width of the genomic window to look for proxies. Default is 5000.
             r2 (float, optional): Minimum linkage disequilibrium value with the main SNP
-                for a proxy to be included. Default is 0.6.
+                for a proxy to be included. Default is 0.8.
             window_snps (int, optional): Compute the LD value for SNPs that are not
-                more than x SNPs away from the main SNP. Default is 5000.
+                more than x SNPs away from the main SNP. Default is 1000000 (equivalent to infinity, plink default).
 
         Returns:
             pd.DataFrame: The computed PRS data.
@@ -548,7 +564,7 @@ class Geno:
         if not self.checks.get("SNP"):
             check_snp_column(data_prs)
         if not self.checks.get("EA"):
-            check_allele_column(data_prs, "EA", keep_multi=False)
+            check_allele_column(data_prs, "EA", keep_indel=False)
         if not self.checks.get("BETA"):
             check_beta_column(data_prs, effect_column=None, preprocessing='Fill_delete')
 
@@ -762,10 +778,10 @@ class Geno:
         outcome,
         name=None,
         proxy=True,
-        reference_panel="eur",
-        kb=10000,
-        r2=0.6,
-        window_snps=10000,
+        reference_panel="EUR_37",
+        kb=5000,
+        r2=0.8,
+        window_snps=1000000,
     ):
         """
         Prepares dataframes required for Mendelian Randomization (MR) with the SNP information in `data` as exposure.
@@ -777,15 +793,15 @@ class Geno:
             outcome: Can be a Geno object (from a GWAS) or a filepath of types: .h5 or .hdf5 (created with the :meth:`Geno.save` method.
             name (str, optional): Name for the outcome data. Defaults to None.
             proxy (bool, optional): If true, proxies are searched. Default is True.
-            reference_panel (str, optional): The reference population to get linkage
-                disequilibrium values and find proxies (only if proxy=True). Acceptable values
-                include "EUR", "SAS", "AFR", "EAS", "AMR" or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
-                Default is "EUR".
+            reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies (only if proxy=True). 
+                Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
+                Also accepts or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
+                Default is "EUR_37".
             kb (int, optional): Width of the genomic window to look for proxies. Default is 5000.
             r2 (float, optional): Minimum linkage disequilibrium value with the main SNP
-                for a proxy to be included. Default is 0.6.
+                for a proxy to be included. Default is 0.8.
             window_snps (int, optional): Compute the LD value for SNPs that are not
-                more than x SNPs away from the main SNP. Default is 5000.
+                more than x SNPs away from the main SNP. Default is 1000000 (equivalent to infinity, plink default).
 
         Returns:
             None: Sets the `MR_data` attribute for the instance.
@@ -870,7 +886,7 @@ class Geno:
             if not hasattr(self, "MRpresso_subset_data"):
                 raise ValueError("Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first.")
             elif self.MRpresso_subset_data is None:
-                raise ValueError("Use_mrpresso_data is set to True but MRpresso did not identify any outliers.")
+                print("Use_mrpresso_data is set to True but MRpresso did not identify any outliers. Using all instruments.")
             else:
                 subset_data = self.MRpresso_subset_data
                 print(f"Using data for {len(subset_data)} instruments after MR-PRESSO outlier removal. The action is the one used in MR-PRESSO.")

@@ -8,7 +8,7 @@ import platform
 import requests
 import zipfile
 
-from .constants import REF_PANELS, REF_PANELS_URL, CONFIG_DIR
+from .constants import REF_PANELS, REF_PANELS_URL, CONFIG_DIR, BUILDS, REF_PARQUET_URL
 
 config_path = os.path.join(CONFIG_DIR, "config.json")
 default_ref_path = os.path.join(CONFIG_DIR, "Reference_files")
@@ -170,130 +170,194 @@ def set_reference_folder(path=""):
     print(f"Reference files will be downloaded and stored in: '{path}'")
 
 
-def get_reference_panel_path(reference_panel="eur"):
+def get_reference_panel_path(reference_panel="EUR_38"):
     """
     Retrieve the path of the specified reference panel.
 
     This function checks if the provided reference panel is a valid path to bed/bim/fam or pgen/pvar/psam files.
     If not, it checks if the reference panel exists in the reference folder. If it doesn't exist,
     the function attempts to download it.
-
-    Parameters:
-        reference_panel (str, optional): The name of the reference panel or a path to bed/bim/fam or pgen/pvar/psam files. Defaults to "eur".
-
-    Raises:
-        ValueError: If the provided reference panel is not recognized.
-        OSError: If there's an issue creating the directory.
-        FileNotFoundError: If the reference panel is not found.
-
+    
+    Args:
+        reference_panel (str): Reference panel identifier (e.g., "EUR_38", "AFR_37") 
+            or path to custom reference panel (bed/bim/fam or pgen/pvar/psam files)
+    
     Returns:
-        tuple: A tuple containing:
-            - str: The path to the reference panel
-            - str: The filetype ('bed' or 'pgen')
+        tuple: (path to reference panel, filetype ['bed' or 'pgen'])
     """
 
     # Remove file extension and check if it's a path to a bed/bim/fam or pgen/pvar/psam triple
     reference_panel = os.path.splitext(reference_panel)[0]
     if check_bfiles(reference_panel):
-        ref_panel_path = reference_panel
-        filetype = 'bed'
         print(f"Using the provided path as the reference panel (bed format).")
+        return reference_panel, "bed"
     elif check_pfiles(reference_panel):
-        ref_panel_path = reference_panel
-        filetype = 'pgen'
         print(f"Using the provided path as the reference panel (pgen format).")
+        return reference_panel, "pgen"
     else:
-        # If it's not a valid path, check if the reference panel is recognized
-        reference_panel = reference_panel.lower()
-        config = read_config()
+        # Standardize panel name
+        reference_panel = reference_panel.upper()
+        
+        # Validate reference panel name
         if reference_panel not in REF_PANELS:
             raise ValueError(
-                f"The reference_panel argument can only take values in {REF_PANELS} or be a valid path to bed/bim/fam or pgen/pvar/psam files."
+                f"Invalid reference panel: {reference_panel}. Must be one of: {', '.join(REF_PANELS)} "
+                "or a path to a valid reference panel in bed/bim/fam or pgen/pvar/psam format."
             )
-
+        
+        # Get config and set paths
+        config = read_config()
         ref_path = config["paths"]["ref_path"]
-
-        # Create the reference path if it doesn't exist
-        if not os.path.exists(ref_path):
-            try:
-                os.makedirs(ref_path)
-            except OSError:
-                raise OSError(
-                    f"Unable to create the '{ref_path}' directory. Check permissions."
-                )
-
-        ref_panel_name = reference_panel.upper()
-        ref_panel_path = os.path.join(ref_path, ref_panel_name)
-        filetype = 'bed'  # Default reference panels are in bed format
-
-        # If the reference panel files don't exist, attempt to download them
-        if not check_bfiles(ref_panel_path):
-            print(
-                f"The {reference_panel.capitalize()} (build 37) reference panel was not found. Attempting to download it..."
-            )
-            print(
-                "If you have already downloaded it, or wish to use your own reference panel, use genal.set_reference_folder(path) to avoid downloading again."
-            )
-            
-            try:
-                wget.download(REF_PANELS_URL, out=os.path.join(ref_path, "reference_panels.tgz"))
-            except Exception as e:
-                print(f"Download unsuccessful: {e}")
-                print(
-                    "Manually download the reference file and use genal.set_reference_folder(path)."
-                )
-                raise FileNotFoundError(f"Reference panel {reference_panel} not found.")
-
-            print("Download successful. Decompressing...")
-            with tarfile.open(os.path.join(ref_path, "reference_panels.tgz"), "r:gz") as tar_ref:
-                tar_ref.extractall(ref_path)
+        panel_dir = os.path.join(ref_path, reference_panel)
+        panel_path = os.path.join(panel_dir, reference_panel)
+        population, build = reference_panel.split("_")
+        
+        # Check if panel already exists
+        if os.path.exists(panel_dir):
+            if check_pfiles(panel_path):
+                print(f"Using the {population} (build {build}) path as the reference panel (pgen format).")
+                return panel_path, "pgen"
+            elif check_bfiles(panel_path):
+                print(f"Using the {population} (build {build}) path as the reference panel (bed format).")
+                return panel_path, "bed"
+        
+        # Download and extract panel
+        print(f"Downloading reference panel {reference_panel} in {panel_dir} ...")
+        os.makedirs(panel_dir, exist_ok=True)
+        
+        # Download tar.gz file
+        url = REF_PANELS_URL.format(panel=reference_panel)
+        tar_path = os.path.join(panel_dir, f"{reference_panel}.tar.gz")
+        try:
+            wget.download(url, tar_path)
+            print(f"\nExtracting {reference_panel}...")
+            with tarfile.open(tar_path) as tar:
+                tar.extractall(panel_dir)
+            os.remove(tar_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to download/extract reference panel: {e}")
+        
+        # Default reference panels are in pgen format
+        if check_pfiles(panel_path):
+            return panel_path, "pgen"
         else:
-            print(f"Using the {ref_panel_name} (build 37) reference panel.")
-
-    return ref_panel_path, filetype
+            raise RuntimeError(f"Reference panel files not found after extraction")
 
 
-def load_reference_panel(reference_panel="eur"):
-    """Load the bim or pvar file from the reference panel specified."""
+def load_reference_panel(reference_panel="38"):
+    """
+    Load the reference panel variants.
+    
+    Args:
+        reference_panel (str): Can be:
+            - A path to a .bim or .pvar file
+            - A build number ("37" or "38")
+            - A population with build number (e.g. "EUR_37", "AFR_38"), where only the build number is considered
+            If a build number is provided, loads the provided reference variants for that build (based on 1000G phase 3)
+    
+    Returns:
+        pd.DataFrame: Reference panel DataFrame with standardized columns
+    """
+    # Make sure it's a string
+    reference_panel = str(reference_panel)
     
     # Check if it's a path to a .bim or .pvar file
     reference_panel = os.path.splitext(reference_panel)[0]
     if os.path.exists(reference_panel + ".bim"):
-        ref_panel_path = reference_panel
-        file_type = "bim"
         print(f"Using the provided bim file as the reference dataset.")
-    elif os.path.exists(reference_panel + ".pvar"):
-        ref_panel_path = reference_panel
-        file_type = "pvar"
-        print(f"Using the provided pvar file as the reference dataset.")
-        
-    # Else, check if it's one of the reference datasets names and get the path
-    else:
-        reference_panel = reference_panel.lower()
-        if reference_panel == "multi":
-            raise ValueError("Multi reference dataset not implemented yet.") 
-        else:
-            ref_panel_path, file_type = get_reference_panel_path(reference_panel)
-            file_type = "bim"
-            
-    # Load based on file type
-    if file_type == "bim":
         reference_panel_df = pd.read_csv(
-            ref_panel_path + ".bim", sep="\t", names=["CHR","SNP","F","POS","A1","A2"]
+            reference_panel + ".bim", sep="\t", names=["CHR","SNP","F","POS","A1","A2"]
         )
-    else: # pvar
+        reference_panel_df = check_reference_panel(reference_panel_df)
+
+    elif os.path.exists(reference_panel + ".pvar"):
+        print(f"Using the provided pvar file as the reference dataset.")
         reference_panel_df = pd.read_csv(
-            ref_panel_path + ".pvar", sep="\t", comment="#",
+            reference_panel + ".pvar", sep="\t", comment="#",
             names=["CHR","POS","SNP","A1","A2"]
         )
+        reference_panel_df = check_reference_panel(reference_panel_df)
+        
+    # Else, check if it points to a standard 37 or 38 reference panel
+    else:
+        # Extract build number if population is provided
+        if reference_panel.upper() in REF_PANELS:
+            _, build = reference_panel.upper().split("_")
 
-    # Reorder columns (knowing that in pvar, A1 is REF and A2 is ALT)
-    reference_panel_df = reference_panel_df[["CHR","POS","SNP","A1","A2"]]
+        else:
+            build = reference_panel
+            if build not in BUILDS:
+                raise ValueError(
+                    f"Invalid reference panel: {reference_panel}. Must be one of: {', '.join(REF_PANELS)} "
+                    "\n or a path to a valid reference panel in bed/bim/fam or pgen/pvar/psam format."
+                )
+        
+        # Set up paths
+        config = read_config()
+        ref_path = config["paths"]["ref_path"]
+        variants_dir = os.path.join(ref_path, "reference_variants")
+        variants_file = os.path.join(variants_dir, f"reference_variants_{build}.parquet")
+        
+        # Download if not exists
+        if not os.path.exists(variants_file):
+            print(f"Downloading reference variants for build {build} in {variants_dir} ...")
+            os.makedirs(variants_dir, exist_ok=True)
+            
+            # Download parquet file
+            url = REF_PARQUET_URL.format(build=build)
+            try:
+                wget.download(url, variants_file)
+                print("\nDownload complete.")
+            except Exception as e:
+                if os.path.exists(variants_file):
+                    os.remove(variants_file)
+                raise RuntimeError(f"Failed to download reference variants: {e}")
+        
+        # Load parquet file
+        try:
+            reference_panel_df = pd.read_parquet(variants_file, engine="fastparquet")
+            print(f"Using reference variants from build {build}.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load reference variants: {e}")
+        
     
-    # Convert CHR to string and remove 'chr' prefix if present, then convert to int
-    if str(reference_panel_df["CHR"][0]).startswith("chr"):
-        reference_panel_df["CHR"] = reference_panel_df["CHR"].astype(str).str.replace("^chr", "", regex=True).astype(int)
     return reference_panel_df
+
+def check_reference_panel(df):
+    """
+    Check and standardize the reference panel DataFrame.
+    
+    Args:
+        reference_panel_df (pd.DataFrame): Reference panel DataFrame with required columns 
+            ["CHR", "POS", "SNP", "A1", "A2"]
+            
+    Returns:
+        pd.DataFrame: Processed reference panel with standardized columns
+        
+    Raises:
+        ValueError: If required columns are missing or if data types are invalid
+    """
+    
+    # Convert allele columns to uppercase strings
+    for col in ["A1", "A2"]:
+        df[col] = df[col].astype(str).str.upper()
+        
+    # Convert CHR to string and remove 'chr' prefix if present
+    if str(df["CHR"][0]).startswith("chr"):
+        df["CHR"] = df["CHR"].astype(str).str.replace("^chr", "", regex=True)
+    # Convert numeric values to int
+    try:
+        df["CHR"] = df["CHR"].astype(int)
+    except ValueError:
+        raise ValueError("Chromosome (CHR) column of the reference panel must contain integer values")
+    
+    # Convert POS to integer
+    try:
+        df["POS"] = df["POS"].astype(int)
+    except ValueError:
+        raise ValueError("Position (POS) column of the reference panel must contain integer values")
+        
+    return df
 
 def is_plink2_installed(plink_path):
         try:
@@ -497,3 +561,33 @@ def install_plink(path=None):
         raise RuntimeError("PLINK 2 installation failed")
 
     return
+
+def run_plink_command(command):
+    """
+    Execute a PLINK command with proper error handling.
+    
+    Args:
+        command (str): The PLINK command to execute
+        ram_param_name (str): Name of the RAM parameter in the calling method
+        class_name (str): Name of the class containing the RAM parameter
+        
+    Raises:
+        RuntimeError: If PLINK command fails with detailed error message
+    """
+    try:
+        output = subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
+        if output.returncode != 0:
+            raise subprocess.CalledProcessError(output.returncode, command, output.stdout, output.stderr)
+    except subprocess.CalledProcessError as e:
+        if "Out of memory" in e.stderr:
+            raise RuntimeError(
+                f"PLINK command failed due to insufficient memory.\n"
+                f"Try increasing the RAM allocation. Example:\n"
+                f"  # If geno_object is your Geno object\n"
+                f"  geno_object.ram = 25000  # Allocates 25GB of RAM for plink commands\n"
+            )
+        else:
+            print(f"Error running PLINK command: {e}")
+            print(f"PLINK stdout: {e.stdout}")
+            print(f"PLINK stderr: {e.stderr}")
+            raise ValueError("PLINK command failed. Check the error messages above for details.")

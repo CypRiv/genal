@@ -31,18 +31,19 @@ def check_snp_column(data):
     """Remove duplicates in the SNP column."""
     duplicate_indices = data[data.duplicated(subset=["SNP"], keep="first")].index
     n_del = len(duplicate_indices)
+    n_initial = data.shape[0]
     if n_del > 0:
         data.drop(index=duplicate_indices, inplace=True)
         print(
-            f"{n_del}({n_del/data.shape[0]*100:.3f}%) SNPs with duplicated IDs (SNP column) have been removed. Use keep_dups=True to keep them."
+            f"{n_del}({n_del/n_initial*100:.3f}%) SNPs with duplicated IDs (SNP column) have been removed. Use keep_dups=True to keep them."
         )
     return
 
 
-def check_allele_column(data, allele_col, keep_multi):
+def check_allele_column(data, allele_col, keep_indel):
     """
     Verify that the corresponding allele column is upper case strings. Set to nan if not formed with A, T, C, G letters.
-    Set to nan if values are multiallelic unless keep_multi=True.
+    Set to nan if values are insertions/deletions unless keep_indel=True.
     """
     nrows = data.shape[0]
     data[allele_col] = data[allele_col].astype(str).str.upper()
@@ -51,16 +52,16 @@ def check_allele_column(data, allele_col, keep_multi):
     if atcg_count > 0:
         data.loc[~atcg_condition, allele_col] = np.nan
         print(
-            f"{atcg_count}({atcg_count/nrows*100:.3f}%) rows contain non A, T, C, G values in the {allele_col} column and are set to nan."
+            f"{atcg_count}({atcg_count/nrows*100:.3f}%) rows contain non A, T, C, G values in the {allele_col} column and are set to NA."
         )
-    if not keep_multi:
+    if not keep_indel:
         nrows = data.shape[0]
-        multi_condition = data[allele_col].str.len() > 1
-        multi_count = multi_condition.sum()
-        if multi_count > 0:
-            data.loc[multi_condition, allele_col] = np.nan
+        indel_condition = data[allele_col].str.len() > 1
+        indel_count = indel_condition.sum()
+        if indel_count > 0:
+            data.loc[indel_condition, allele_col] = np.nan
             print(
-                f"{multi_count}({multi_count/nrows*100:.3f}%) rows containing multiallelic values in the {allele_col} column are set to nan. Use keep_multi=True to keep them."
+                f"{indel_count}({indel_count/nrows*100:.3f}%) rows containing insertions/deletions in the {allele_col} column are set to NA. Use keep_indel=True to keep them."
             )
     return
 
@@ -189,22 +190,58 @@ def fill_coordinates_func(data, reference_panel_df):
     return data
 
 
-def fill_snpids_func(data, reference_panel_df):
+def fill_snpids_func(data, reference_panel_df, keep_indel):
     """
     Fill in the SNP column based on reference data.
-    If some SNPids are still missing, they will be replaced by a standard name: CHR:POS:EA
+    If EA and NEA are present, uses allele matching for more accurate SNP assignment.
+    If some SNPids are still missing, they will be replaced by a standard name: CHR:POS:NEA:EA
     """
     for column in ["CHR", "POS"]:
         if not (column in data.columns):
             raise ValueError(
                 f"The column {column} is not found in the data and is mandatory to fill snpID!"
             )
+            
     data.drop(columns=["SNP"], inplace=True, errors="ignore")
-    data = data.merge(
-        reference_panel_df[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left"
-    )
-    n_missing = data["SNP"].isna().sum()
+    
+    # If both EA and NEA are present, use allele matching
+    if "EA" in data.columns and "NEA" in data.columns:
+        # First preprocess the allele columns
+        check_allele_column(data, "EA", keep_indel=keep_indel)
+        check_allele_column(data, "NEA", keep_indel=keep_indel)
+        
+        # Create allele_min and allele_max columns for data
+        data['allele_min'] = np.minimum(data['EA'].fillna(""), data['NEA'].fillna(""))
+        data['allele_max'] = np.maximum(data['EA'].fillna(""), data['NEA'].fillna(""))
+        
+        # Create or use allele_min and allele_max columns for reference panel
+        if not ('allele_min' in reference_panel_df.columns and 'allele_max' in reference_panel_df.columns):
+            reference_panel_df['allele_min'] = np.minimum(reference_panel_df['A1'].fillna(""), reference_panel_df['A2'].fillna(""))
+            reference_panel_df['allele_max'] = np.maximum(reference_panel_df['A1'].fillna(""), reference_panel_df['A2'].fillna(""))
+        
+        # Merge using position and alleles
+        data = pd.merge(
+            data,
+            reference_panel_df[["CHR", "POS", "SNP", "allele_min", "allele_max"]],
+            on=["CHR", "POS", "allele_min", "allele_max"],
+            how="left"
+        )
+        
+        # Clean up temporary columns
+        data.drop(columns=["allele_min", "allele_max"], inplace=True)
+        
+    else:
+        # Default behavior - merge only on position
+        data = pd.merge(
+            data,
+            reference_panel_df[["CHR", "POS", "SNP"]],
+            on=["CHR", "POS"],
+            how="left"
+        )
 
+    n_missing = data["SNP"].isna().sum()
+    
+    # Create standard names for missing SNPs if possible
     standard_name_condition = "EA" in data.columns and "NEA" in data.columns and n_missing > 0
     if standard_name_condition:
         missing_snp_condition = data["SNP"].isna()
@@ -218,13 +255,13 @@ def fill_snpids_func(data, reference_panel_df):
             + data.loc[missing_snp_condition, "EA"].astype(str)
         )
         print_statement = f" and their ID set to CHR:POS:NEA:EA"
-
+    
     perc_missing = n_missing / data.shape[0] * 100
     
     if n_missing == 0:
         print(
-        f"The SNP column (rsID) has been created. All SNPs were found in the reference data."
-    )
+            f"The SNP column (rsID) has been created. All SNPs were found in the reference data."
+        )
     else:
         print(
             f"The SNP column (rsID) has been created. {n_missing}({perc_missing:.3f}%) SNPs were not found in the reference data{print_statement if standard_name_condition else ''}."
@@ -232,7 +269,8 @@ def fill_snpids_func(data, reference_panel_df):
         
     if perc_missing > 50:
         warnings.warn(
-            f"The SNPid for many SNPs could not been found. Make sure the CHR/POS coordinates are in the same build as the reference panel (GRCh37 (hg19) for the default one). If not, you can first use the .lift() method to lift them. For instance: .lift(start='hg38', end='hg19', replace=True) if they are in build GRCh38 (hg38)."
+            f"The SNPid for many SNPs could not been found. Make sure you are using a reference panel in the same genome build as your data. The one used by default is GRCh37 (hg19). \n"
+            f"You can use the GRCh38 (hg38) reference panel by setting reference_panel = 38."
         )
 
     return data
@@ -307,14 +345,14 @@ def check_arguments(
     effect_column,
     fill_snpids,
     fill_coordinates,
-    keep_multi,
+    keep_indel,
     keep_dups,
 ):
     """
     Verify the arguments passed for the Geno initialization and apply logic based on the preprocessing value. See :class:`Geno` for more details.
 
     Returns:
-        tuple: Tuple containing updated values for (keep_columns, keep_multi, keep_dups, fill_snpids, fill_coordinates)
+        tuple: Tuple containing updated values for (keep_columns, keep_indel, keep_dups, fill_snpids, fill_coordinates)
 
     Raises:
         TypeError: For invalid data types or incompatible argument values.
@@ -334,7 +372,7 @@ def check_arguments(
     variables = {
         "fill_snpids": fill_snpids,
         "fill_coordinates": fill_coordinates,
-        "keep_multi": keep_multi,
+        "keep_indel": keep_indel,
         "keep_dups": keep_dups,
     }
     for name, value in variables.items():
@@ -343,7 +381,7 @@ def check_arguments(
 
     # Helper functions for preprocessing logic
     def keeptype_column(arg):
-        """Helper function to decide whether to keep multi-values/duplicates."""
+        """Helper function to decide whether to keep indels/duplicates."""
         return True if arg is None and preprocessing in ['None', 'Fill'] else arg
 
     def filltype_column(arg):
@@ -351,12 +389,12 @@ def check_arguments(
         return False if arg is None and preprocessing == 'None' else arg
 
     # Apply preprocessing logic
-    keep_multi = keeptype_column(keep_multi)
+    keep_indel = keeptype_column(keep_indel)
     keep_dups = keeptype_column(keep_dups)
     fill_snpids = filltype_column(fill_snpids)
     fill_coordinates = filltype_column(fill_coordinates)
 
-    return keep_multi, keep_dups, fill_snpids, fill_coordinates
+    return keep_indel, keep_dups, fill_snpids, fill_coordinates
 
 
 def save_data(data, name, path="", fmt="h5", sep="\t", header=True):

@@ -1,9 +1,12 @@
 import os
 
 STANDARD_COLUMNS = ["CHR", "POS", "SNP", "EA", "NEA", "BETA", "SE", "P"]
-REF_PANELS = ["eur", "sas", "eas", "amr", "afr"]
+BUILDS = ["37", "38"]
+POPULATIONS = ["EUR", "AFR", "EAS", "AMR", "SAS"]
+REF_PANELS = [f"{pop}_{build}" for pop in POPULATIONS for build in BUILDS]
 REF_PANEL_COLUMNS = ["CHR", "SNP", "POS", "A1", "A2"]
-REF_PANELS_URL = "https://storage.googleapis.com/genal_files/1kg.v3.tgz"
+REF_PANELS_URL = "https://storage.googleapis.com/genal_files/{panel}.tar.gz"
+REF_PARQUET_URL = "https://storage.googleapis.com/genal_files/reference_variants_{build}.parquet"
 CONFIG_DIR = os.path.expanduser("~/.genal/")
 CHECKS_DICT = {
     "CHR": False,

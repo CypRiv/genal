@@ -518,6 +518,7 @@ def query_outcome_func(
             outcome = query_outcome_proxy(df_outcome, ld, snps_present, outcome_snps)
             exposure = data[data.SNP.isin(outcome.SNP)]
         else:
+            print("No proxies found.")
             exposure = data[data.SNP.isin(snps_present)]
             outcome = df_outcome[df_outcome.SNP.isin(snps_present)]
     else:

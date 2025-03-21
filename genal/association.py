@@ -5,7 +5,7 @@ import scipy.stats as st
 import os, subprocess
 
 from .extract_prs import check_pfiles
-from .tools import get_plink_path
+from .tools import get_plink_path, run_plink_command
 
 
 def association_test_func_plink2(data, covar_list, standardize, name, data_pheno, pheno_type):
@@ -97,13 +97,7 @@ def _run_plink2_assoc_test(
         if "scales vary too widely" in str(e):
             print("The association test failed because of numerical instability in the covariates. Rescaling the covariates.")
             command.extend(["--covar-variance-standardize"])
-            try:
-                subprocess.run(command, capture_output=True, text=True, check=True)
-            except Exception as e:
-                print(f"Error running PLINK command: {e}")
-                print(f"PLINK stdout: {e.stdout}")
-                print(f"PLINK stderr: {e.stderr}")
-                raise ValueError("PLINK command failed. Check the error messages above for details.")
+            run_plink_command(command)
             
         else:
             print(f"Error running PLINK command: {e}")

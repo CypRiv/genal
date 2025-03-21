@@ -24,11 +24,34 @@
 
 
 ## Introduction <a name="introduction"></a>
-Genal is a python module designed to make it easy to run genetic risk scores and mendelian randomization analyses. It integrates a collection of tools that facilitate the cleaning of single nucleotide polymorphism data (usually derived from Genome-Wide Association Studies) and enable the execution of clinical population genetic workflows. The functionalities provided by genal include clumping, lifting, association testing, polygenic risk scoring, and Mendelian randomization analyses, all within a single Python module.
+Genal is a python module designed to make it easy and intuitive to run genetic risk scores and Mendelian Randomization analyses. The functionalities provided by genal include:
 
-The module prioritizes user-friendliness and intuitive operation, aiming to reduce the complexity of data analysis for researchers. Despite its focus on simplicity, Genal does not sacrifice the depth of customization or the precision of analysis. Researchers can expect to maintain analytical rigour while benefiting from the streamlined experience.
+- Data preprocessing and cleaning of variant data (usually from GWAS summary statistics)
+- Selection of independent genetic instruments through clumping
+- Polygenic risk score calculations (currently C+T only, soon LDPRED2 and PRScs)
+- More than 10 Mendelian Randomization methods, including heterogeneity and pleiotropy tests, with parallel processing support:
+  - Inverse Variance Weighted (IVW) methods
+  - MR-Egger methods
+  - Weighted Median methods
+  - Mode methods
+  - MR-PRESSO in parallel
+  - More to come...
+- SNP-trait association testing
+- Lifting of genetic data to another genomic build
+- Variant-phenotype querying with the GWAS Catalog
 
-Genal draws on concepts from well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, adapting their proven methodologies to the Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
+### Key Features
+
+- **Efficient Parallel Processing**: Parallel computation for bootstrapping-based MR methods and MR-PRESSO significantly reduces computation time compared to the original R packages (up to 85% faster for MR-PRESSO)
+- **Flexible Data Handling**: Automatic formatting of variant data and summary statistics
+- **Comprehensive MR Pipeline**: From data preprocessing to sensitivity analyses and plotting in a single package
+- **Reference Panel Support**: Automatically download and use the latest 1000 Genomes reference panels in builds 37 and 38 with the option to use custom reference panels
+- **Customizable**: Ability to choose all the parameters, but defaults are set to the most common values
+- **Proxy SNP Support**: Includes functionality for finding and using proxy SNPs when instruments are missing (for polygenic risk scores, Mendelian Randomization, and association testing)
+
+The objective of genal is to bring the functionalities of well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, in a more user-friendly Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
+
+This package is still under development, feel free to report any issues or suggest improvements!
 
 <img src="/Genal_flowchart.png" data-canonical-src="/Genal_flowchart.png" style="max-width:100%;" />
 
@@ -40,6 +63,8 @@ If you're using genal, please cite the following paper:
 Cyprien A. Rivier, Santiago Clocchiatti-Tuozzo, Shufan Huo, Victor Torres-Lopez, Daniela Renedo, Kevin N. Sheth, Guido J. Falcone, Julian N. Acosta.  
 Bioinformatics Advances 2024.  
 doi: https://doi.org/10.1093/bioadv/vbae207
+
+If you're using methods derived from R packages, such as MR-PRESSO, please also cite the original papers.
 
 ## Requirements for the genal module <a name="paragraph1"></a> 
 ***Python 3.8 or later***. https://www.python.org/ <br> 
@@ -121,16 +146,7 @@ import pandas as pd
 sbp_gwas = pd.read_csv("Evangelou_30224653_SBP.txt", sep=" ")
 sbp_gwas.head(5)
 ```
-
-| MarkerName        | Allele1 | Allele2 | Freq1 | Effect | StdErr | P       | TotalSampleSize | N_effective |
-|-------------------|---------|---------|-------|--------|--------|---------|-----------------|-------------|
-| 10:100000625:SNP  | a       | g       | 0.5660| 0.0523 | 0.0303 | 0.083940| 738170          | 736847      |
-| 10:100000645:SNP  | a       | c       | 0.7936| 0.0200 | 0.0372 | 0.591100| 738168          | 735018      |
-| 10:100003242:SNP  | t       | g       | 0.8831| 0.1417 | 0.0469 | 0.002526| 738168          | 733070      |
-| 10:100003304:SNP  | a       | g       | 0.9609| 0.0245 | 0.0838 | 0.769800| 737054          | 663809      |
-| 10:100003785:SNP  | t       | c       | 0.6406| -0.0680| 0.0313 | 0.029870| 738169          | 735681      |
-
-We can now load this data into a `genal.Geno` instance. The `genal.Geno` class is the central piece of the package. It is designed to store Single Nucleotide Polymorphisms (SNP) data and make it easy to preprocess and clean. 
+We can now load this data into a `genal.Geno` instance. The `genal.Geno` class is the central piece of the package. It is designed to store Single Nucleotide Polymorphisms (SNP) data and make it easy to preprocess and clean it.
 
 The `genal.Geno` takes as input a pandas dataframe where each row corresponds to a SNP, with columns describing the position and possibly the effect of the SNP for the given trait (SBP in our case). To indicate the names of the columns, the following arguments can be passed:
 - **CHR**: Column name for chromosome. Defaults to `'CHR'`.
@@ -151,15 +167,12 @@ After inspecting the dataframe, we first need to extract the chromosome and posi
 
 ```python
 sbp_gwas[["CHR", "POS", "Filler"]] = sbp_gwas["MarkerName"].str.split(":", expand=True)
-sbp_gwas.head(5)
+sbp_gwas.head(2)
 ```
 | MarkerName        | Allele1 | Allele2 | Freq1 | Effect | StdErr | P        | TotalSampleSize | N_effective | CHR | POS       | Filler |
 |-------------------|---------|---------|-------|--------|--------|----------|-----------------|-------------|-----|-----------|--------|
 | 10:100000625:SNP  | a       | g       | 0.5660| 0.0523 | 0.0303 | 0.083940 | 738170          | 736847      | 10  | 100000625 | SNP    |
 | 10:100000645:SNP  | a       | c       | 0.7936| 0.0200 | 0.0372 | 0.591100 | 738168          | 735018      | 10  | 100000645 | SNP    |
-| 10:100003242:SNP  | t       | g       | 0.8831| 0.1417 | 0.0469 | 0.002526 | 738168          | 733070      | 10  | 100003242 | SNP    |
-| 10:100003304:SNP  | a       | g       | 0.9609| 0.0245 | 0.0838 | 0.769800 | 737054          | 663809      | 10  | 100003304 | SNP    |
-| 10:100003785:SNP  | t       | c       | 0.6406| -0.0680| 0.0313 | 0.029870 | 738169          | 735681      | 10  | 100003785 | SNP    |
 
 And it can now be loaded into a `genal.Geno` instance:
 
@@ -196,7 +209,7 @@ By default, and depending on the global preprocessing level (`'None'`, `'Fill'`,
 - Validate the `P` (p-value) column for proper values.
 - Check for no duplicated SNPs based on rsid.
 - Determine if the `BETA` (effect) column contains beta estimates or odds ratios, and log-transform odds ratios if necessary.
-- Create `SNP` column using a reference panel if CHR and POS columns are present.
+- Create `SNP` column (containing rsids) using a reference panel if CHR and POS columns are present.
 - Create `CHR` and/or `POS` column using a reference panel if `SNP` column is present.
 - Create `NEA` (non-effect allele) column using a reference panel if `EA` (effect allele) column is present.
 - Create the `SE` (standard-error) column if the `BETA` and `P` (p-value) columns are present.
@@ -219,17 +232,17 @@ SBP_Geno.data
 |---------|----|-----|-------|--------|--------|----------|-----|---------|-----------|
 | 0       |  A |   G | 0.5660|  0.0523| 0.0303 | 0.083940 |  10 | 100000625 | rs7899632 |
 | 1       |  A |   C | 0.7936|  0.0200| 0.0372 | 0.591100 |  10 | 100000645 | rs61875309 |
-| 2       |  T |   G | 0.8831|  0.1417| 0.0469 | 0.002526 |  10 | 100003242 | rs12258651 |
-| 3       |  A |   G | 0.9609|  0.0245| 0.0838 | 0.769800 |  10 | 100003304 | rs72828461 |
-| 4       |  T |   C | 0.6406| -0.0680| 0.0313 | 0.029870 |  10 | 100003785 | rs1359508 |
-| ...     | .. |  .. |   ... |    ... |    ... |      ... | ... |       ... |        ... |
-| 7088120 |  A |   G | 0.9028| -0.0184| 0.0517 | 0.722300 |   9 |  99999468 | rs10981301 |
 
-And we see that the `SNP` column with the rsids has been added based on the reference data.
-You do not need to obtain the 1000 genome reference panel yourself, genal will download it the first time you use it. By default, the reference panel used is the european (eur) one. You can specify another valid reference panel (afr, eas, sas, amr) with the reference_panel argument:
+
+The `SNP` column with the rsids has been added based on the reference data.
+You do not need to obtain the 1000 genome reference panel yourself, genal will download it the first time you use it. 
+
+> **Note:**
+> 
+> By default, the reference panel used is the european (eur) one in build 37. You can specify another valid reference panel (afr, eas, sas, amr) with the reference_panel argument. For instance "AFR_38" for the african reference panel in build 38:
 
 ```python
-SBP_Geno.preprocess_data(preprocessing = 'Fill_delete', reference_panel = "afr")
+SBP_Geno.preprocess_data(preprocessing = 'Fill_delete', reference_panel = "AFR_37")
 ```
 
 You can also use a custom reference panel by specifying to the reference_panel argument a path to bed/bim/fam (plink v1.9 format) or pgen/pvar/psam files (plink v2.0 format), without the extension.
@@ -240,22 +253,15 @@ Clumping, or C+T: Clumping + Thresholding, is the step at which we select the SN
 
 The SNP-data loaded in a `genal.Geno` instance can be clumped using the `genal.Geno.clump` method. It will return another `genal.Geno` instance containing only the clumped data:
 
-
 ```python
-SBP_clumped = SBP_Geno.clump(p1 = 5e-8, r2 = 0.1, kb = 250, reference_panel = "eur")
+SBP_clumped = SBP_Geno.clump(p1 = 5e-8, r2 = 0.01, kb = 10000, reference_panel = "EUR_37")
 ```
-
-It will output the number of instruments obtained::
-
-    Using the EUR reference panel.
-    Warning: 760  top variant IDs missing
-    1545 clumps formed from 73594 top variants.
 
 You can specify the thresholds you want to use for the clumping with the following arguments:
 - `p1`: P-value threshold during clumping. SNPs with a P-value higher than this value are excluded. Defaults to `5e-8`.
-- `r2`: Linkage disequilibrium threshold for the independence check. Takes values between 0 and 1. Defaults to `0.1`.
-- `kb`: Genomic window used for the independence check (the unit is thousands of base-pair positions). Defaults to `250`.
-- `reference_panel`: The reference population used to derive linkage disequilibrium values and select independent SNPs. Defaults to `eur`.
+- `r2`: Linkage disequilibrium threshold for the independence check. Takes values between 0 and 1. Defaults to `0.01`.
+- `kb`: Genomic window used for the independence check (the unit is thousands of base-pair positions). Defaults to `10000`.
+- `reference_panel`: The reference population used to derive linkage disequilibrium values and select independent SNPs. Defaults to `EUR_37`.
 
 ### Polygenic Risk Scoring <a name="paragraph3.4"></a>
 
@@ -278,25 +284,7 @@ The output of the `genal.Geno.prs` method will include how many SNPs were used t
     Extracting SNPs for each chromosome...
     SNPs extracted for chr1.
     SNPs extracted for chr2.
-    SNPs extracted for chr3.
-    SNPs extracted for chr4.
-    SNPs extracted for chr5.
-    SNPs extracted for chr6.
-    SNPs extracted for chr7.
-    SNPs extracted for chr8.
-    SNPs extracted for chr9.
-    SNPs extracted for chr10.
-    SNPs extracted for chr11.
-    SNPs extracted for chr12.
-    SNPs extracted for chr13.
-    SNPs extracted for chr14.
-    SNPs extracted for chr15.
-    SNPs extracted for chr16.
-    SNPs extracted for chr17.
-    SNPs extracted for chr18.
-    SNPs extracted for chr19.
-    SNPs extracted for chr20.
-    SNPs extracted for chr21.
+    ...
     SNPs extracted for chr22.
     Merging SNPs extracted from each chromosome...
     Created bed/bim/fam fileset with extracted SNPs: tmp_GENAL/4f4ce6a7_allchr
@@ -355,16 +343,6 @@ To get their association with the outcome trait (instrument-stroke estimates), w
 stroke_gwas = pd.read_csv("GCST90104539_buildGRCh37.tsv",sep="\t")
 ```
 
-We inspect it to determine the column names:
-
-| chromosome | base_pair_location | effect_allele_frequency |  beta  | standard_error | p_value | odds_ratio | ci_lower | ci_upper | effect_allele | other_allele |
-|------------|--------------------|-------------------------|--------|----------------|---------|------------|----------|----------|---------------|--------------|
-|          5 |           29439275 |                  0.3569 | 0.0030 |         0.0070 |  0.6658 |   1.003005 | 0.989337 | 1.016861 |             T |            C |
-|          5 |           85928892 |                  0.0639 | -0.0152|         0.0137 |  0.2686 |   0.984915 | 0.958820 | 1.011720 |             T |            C |
-|         10 |          128341232 |                  0.4613 | 0.0025 |         0.0065 |  0.6998 |   1.002503 | 0.989812 | 1.015357 |             T |            C |
-|          3 |           62707519 |                  0.0536 | 0.0152 |         0.0152 |  0.3177 |   1.015316 | 0.985514 | 1.046019 |             T |            C |
-|          2 |           80464120 |                  0.9789 | 0.0057 |         0.0254 |  0.8223 |   1.005716 | 0.956874 | 1.057052 |             T |            G |
-
 We load it in a `genal.Geno` instance:
 
 ```python
@@ -396,7 +374,7 @@ Genal will print how many SNPs were successfully found and extracted from the ou
 > Here as well you have the option to use proxies for the instruments that are not present in the outcome data:
 >
 > ```python
-> SBP_clumped.query_outcome(Stroke_geno, proxy = True, reference_panel = "eur", kb = 5000, r2 = 0.6, window_snps = 5000)
+> SBP_clumped.query_outcome(Stroke_geno, proxy = True, reference_panel = "EUR_37", kb = 5000, r2 = 0.8, window_snps = 5000)
 > ```
 > 
 > And genal will print the number of missing instruments that have been proxied:

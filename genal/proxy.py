@@ -4,7 +4,7 @@ import os
 import subprocess
 import re
 
-from .tools import get_reference_panel_path, get_plink_path
+from .tools import get_reference_panel_path, get_plink_path, run_plink_command
 
 ## TO DO: accept lists of CHR/POS instead of SNP names for these functions
 
@@ -13,13 +13,13 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     """
     Extract the best proxies from a dataframe, as well as specific SNPs.
 
-    Given a dataframe `df` (originating from GENO.data) and a dataframe of potential proxies
+    Given a dataframe `df` (originating from Geno.data) and a dataframe of potential proxies
     (output from `find_proxies`), this function extracts the best proxies from `df` as well as
     the SNPs specified in `snps_to_extract`.
     This is suited for querying outcome data.
 
     Args:
-        df (pd.DataFrame): Dataframe of SNP information with the usual GENO columns
+        df (pd.DataFrame): Dataframe of SNP information with the usual Geno columns
                            (SNP, BETA, SE, EAF, EA, NEA). EAF is not necessary.
         ld (pd.DataFrame): Dataframe of proxies (output from `find_proxies`).
         snps_to_extract (list): List of SNPs to extract in addition to the proxies.
@@ -192,10 +192,10 @@ def apply_proxies(df, ld, searchspace=None):
 def find_proxies(
     snp_list,
     searchspace=None,
-    reference_panel="eur",
-    kb=10000,
-    r2=0.6,
-    window_snps=10000,
+    reference_panel="EUR_37",
+    kb=5000,
+    r2=0.8,
+    window_snps=1000000,
     threads=1
 ):
     """
@@ -205,11 +205,12 @@ def find_proxies(
         snp_list (list): List of rsids.
         searchspace (list, optional): List of SNPs to include in the search. By default, includes the whole reference panel.
         reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies.
-                                         Accepts values: "EUR", "SAS", "AFR", "EAS", "AMR".
-                                         Alternatively, provide a path leading to a specific bed/bim/fam or pgen/pvar/psam reference panel.
+            Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
+            Also accepts or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
+            Default is "EUR_37".
         kb (int, optional): Width of the genomic window to look for proxies. Defaults to 5000.
-        r2 (float, optional): Minimum linkage disequilibrium value with the main SNP for a proxy to be included. Defaults to 0.6.
-        window_snps (int, optional): Compute the LD value for SNPs that are not more than x SNPs apart from the main SNP. Defaults to 5000.
+        r2 (float, optional): Minimum linkage disequilibrium value with the main SNP for a proxy to be included. Defaults to 0.8.
+        window_snps (int, optional): Compute the LD value for SNPs that are not more than x SNPs apart from the main SNP. Defaults to 1000000 (equivalent to infinity).
         threads (int, optional): Number of threads to use. Defaults to 1.
 
     Returns:
@@ -263,13 +264,7 @@ def find_proxies(
         f"--out tmp_GENAL/proxy.targets"
     )
     
-    try:
-        subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running PLINK command: {e}")
-        print(f"PLINK stdout: {e.stdout}")
-        print(f"PLINK stderr: {e.stderr}")
-        raise ValueError("PLINK command failed. Check the error messages above for details.")
+    run_plink_command(command)
 
     # Read log file to return amount of SNPs to be proxied present in the ref panel
     log_path = os.path.join("tmp_GENAL", "proxy.targets.log")
