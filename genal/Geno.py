@@ -42,8 +42,10 @@ from .colocalization import coloc_abf_func
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
 # Get proxies (simply return a list of proxies)
 # Include proxying option to association_test
-# Multi-MR
+# Multivariable-MR
 # Check stability with variants on sexual chromosomes
+# Check the build of user data (potentially with a list of SNPs with different positions)
+# update_snpids function: take alleles into account during the merge if they are present in the user data
 
 
 class Geno:
@@ -154,7 +156,7 @@ class Geno:
     def preprocess_data(
         self,
         preprocessing='Fill',
-        reference_panel="38",
+        reference_panel="37",
         effect_column=None,
         keep_indel=None,
         keep_dups=None,
@@ -290,7 +292,7 @@ class Geno:
 
         self.data = data
 
-    def get_reference_panel(self, reference_panel="38"):
+    def get_reference_panel(self, reference_panel="37"):
         """
         Retrieve or set the reference panel for the Geno object.
 

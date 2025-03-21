@@ -47,7 +47,7 @@ Genal is a python module designed to make it easy and intuitive to run genetic r
 - **Comprehensive MR Pipeline**: From data preprocessing to sensitivity analyses and plotting in a single package
 - **Reference Panel Support**: Automatically download and use the latest 1000 Genomes reference panels in builds 37 and 38 with the option to use custom reference panels
 - **Customizable**: Ability to choose all the parameters, but defaults are set to the most common values
-- **Proxy SNP Support**: Includes functionality for finding and using proxy SNPs when instruments are missing (for polygenic risk scores, Mendelian Randomization, and association testing)
+- **Proxy SNP Support**: Includes functionality for finding and using proxy SNPs when instruments are missing (for polygenic risk scores, Mendelian Randomization)
 
 The objective of genal is to bring the functionalities of well-established R packages such as TwoSampleMR, MR-Presso, MendelianRandomization, and gwasvcf, in a more user-friendly Python environment. This approach ensures that users have access to tried and tested techniques with the versatility of Python's data science tools. 
 
