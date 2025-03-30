@@ -5,8 +5,9 @@ BUILDS = ["37", "38"]
 POPULATIONS = ["EUR", "AFR", "EAS", "AMR", "SAS"]
 REF_PANELS = [f"{pop}_{build}" for pop in POPULATIONS for build in BUILDS]
 REF_PANEL_COLUMNS = ["CHR", "SNP", "POS", "A1", "A2"]
-REF_PANELS_URL = "https://storage.googleapis.com/genal_files/{panel}.tar.gz"
-REF_PARQUET_URL = "https://storage.googleapis.com/genal_files/reference_variants_{build}.parquet"
+BUCKET_URL = "https://storage.googleapis.com/genal_files/"
+REF_PANELS_URL = BUCKET_URL + "{panel}.tar.gz"
+REF_PARQUET_URL = BUCKET_URL + "reference_variants_{build}.parquet"
 CONFIG_DIR = os.path.expanduser("~/.genal/")
 CHECKS_DICT = {
     "CHR": False,

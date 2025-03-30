@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import warnings
-import os, subprocess
+import os
 import copy
 import psutil
 import uuid
@@ -30,7 +30,8 @@ from .geno_tools import (
     fill_se_p,
     check_allele_column,
     check_snp_column,
-    remove_na
+    remove_na,
+    filter_by_gene_func
 )
 from .association import set_phenotype_func, association_test_func_plink2
 from .extract_prs import extract_snps_func, prs_func
@@ -117,9 +118,22 @@ class Geno:
 
         Attributes:
             name (str): Randomly generated ID for the Geno object.
-            outcome (list): List of outcomes (initialized as empty).
             cpus (int): Number of CPUs to be used.
             ram (int): Amount of RAM to be used in MBs.
+            checks (dict): Dictionary of checks performed on the main DataFrame.
+            reference_panel (pd.DataFrame): Reference population SNP data used for SNP info
+                adjustments. Initialized when first needed.
+            reference_panel_name (str): string to identify the reference_panel (path or population string)
+            phenotype (pd.DataFrame, str): Tuple with a DataFrame of individual-level phenotype
+                data and a string representing the phenotype trait column. Initialized after
+                running the 'set_phenotype' method.
+            MR_data (pd.DataFrame, pd.DataFrame, str): Tuple containing DataFrames for associations
+                with exposure and outcome, and a string for the outcome name. Initialized after
+                running the 'query_outcome' method.
+            MR_results (pd.DataFrame, pd.DataFrame, str, str): Contains an MR results dataframe, a dataframe of harmonized SNPs, an exposure name, an outcome name. 
+                Assigned after calling the MR method and used for plotting with the MR_plot method.
+            MRpresso_subset_data (pd.DataFrame, pd.DataFrame, str, str): Contains a dataframe of subsetted harmonized SNPs without outliers. 
+                Assigned after calling the MRpresso method.
         """
 
         # Validate df type
@@ -399,10 +413,7 @@ class Geno:
 
         # If clumped data is successfully generated, assign it to the object's attribute
         if clumped_data is not None:
-            Clumped = Geno(clumped_data, keep_columns=True)
-            Clumped.checks = self.checks.copy()
-            if hasattr(self, "phenotype"):
-                Clumped.phenotype = self.phenotype
+            Clumped = self.copy(clumped_data)
             return Clumped
         return None
 
@@ -699,6 +710,8 @@ class Geno:
 
         # Assign the processed data and inferred phenotype type to the .phenotype attribute
         self.phenotype = (processed_data, inferred_pheno_type, PHENO)
+
+        return
 
     def association_test(self, path=None, covar=[], standardize=True):
         """
@@ -1201,23 +1214,77 @@ class Geno:
 
         return mod_table, GlobalTest, OutlierTest, BiasTest
 
+    def filter_by_gene(self, gene_id, id_type="symbol", window_size=1000000, build="37", replace=False):
+        """
+        Filter the data to include only variants that are within a specified distance of a specific gene.
+
+        Args:
+            gene_id (str): Identifier for the gene/protein to filter variants around.
+            id_type (str, optional): Type of identifier provided. Options are:
+                - "symbol": Gene symbol (e.g., "APOE")
+                - "HGNC": HGNC ID (e.g., "HGNC:613")
+                - "name": Full gene name (e.g., "apolipoprotein E")
+                - "Ensembl": Ensembl gene ID (e.g., "ENSG00000130203")
+                - "NCBI": NCBI gene ID (e.g., "348")
+                - "UCSC": UCSC gene ID (e.g., "uc001hbu.2")
+                - "Vega": Vega gene ID (e.g., "OTTHUMG00000019505")
+                Default is "symbol".
+            window_size (int, optional): Size of the window around the gene in base pairs. Default is 1,000,000 (1Mb).
+            build (str, optional): Genome build of the data. Default is "37".
+            replace (bool, optional): If True, replace the existing data attribute with the filtered data. Default is True.
+        Returns:
+            if replace is True:
+                pd.DataFrame: Filtered DataFrame containing only variants within the specified window 
+                    around the gene, with additional column 'Distance'.
+            if replace is False:
+                genal.Geno: A new Geno object with the filtered data.
+
+        Raises:
+            ValueError: If required columns are missing, gene information cannot be found, or invalid id_type is provided.
+            
+        Notes:
+            - Distance is calculated from the nearest gene boundary (start or end position)
+            - Null distances indicate the variant is within the gene
+        """
+        # Check required columns
+        for col in ["CHR", "POS"]:
+            if col not in self.data.columns:
+                raise ValueError(f"Column {col} must be present in the input data!")
+            
+        # Do the appropriate preprocessing on CHR and POS columns if not already done
+        if not self.checks.get("CHR"):
+            check_int_column(self.data, "CHR")
+            self.checks["CHR"] = True
+        if not self.checks.get("POS"):
+            check_int_column(self.data, "POS")
+            self.checks["POS"] = True
+
+        filtered = filter_by_gene_func(self.data, gene_id, id_type, window_size, build)
+        
+        if replace:
+            self.data = filtered
+        else:
+            Geno_filtered = self.copy(filtered)
+            return Geno_filtered
+
     def colocalize(self, outcome, method="abf", trait1_type=None, trait2_type=None,
-                   sdY1=None, sdY2=None, n1=None, n2=None, p1=1e-4, p2=1e-4, p12=1e-5):
+                   sdY1=None, sdY2=None, n1=None, n2=None, p1=1e-4, p2=1e-4, p12=1e-5, merge_on_snp=False):
         """
         Perform colocalization analysis between two GWAS datasets.
         
         Args:
             outcome: Another Geno object containing the outcome dataset
             method: Method to use for colocalization (default: "abf")
-            trait1_type: Type of exposure trait ("quant" or "cc")
-            trait2_type: Type of outcome trait ("quant" or "cc")
-            sdY1: Standard deviation of exposure trait (required for quantitative traits)
-            sdY2: Standard deviation of outcome trait (required for quantitative traits)
-            n1: Sample size for exposure (used to estimate sdY1 if not provided)
-            n2: Sample size for outcome (used to estimate sdY2 if not provided)
+            trait1_type: Type of exposure trait ("quant" for quantitative traits or "cc" for case-control traits)
+            trait2_type: Type of outcome trait ("quant" for quantitative traits or "cc" for case-control traits)
+            sdY1: Standard deviation of exposure trait (required for quantitative traits, but can be estimated from EAF and sample size)
+            sdY2: Standard deviation of outcome trait (required for quantitative traits, but can be estimated from EAF and sample size)
+            n1: Sample size for exposure (used to estimate sdY1 if sdY1 is not provided)
+            n2: Sample size for outcome (used to estimate sdY2 if sdY2 is not provided)
             p1: Prior probability SNP associated with exposure
             p2: Prior probability SNP associated with outcome
             p12: Prior probability SNP associated with both traits
+            merge_on_snp: If True, merge the datasets on SNP column. If False, first attempt to merge on CHR and POS columns.
         """
         # Ensure required columns exist in both datasets
         required_cols = ['BETA', 'SE']
@@ -1237,56 +1304,10 @@ class Geno:
         # Make copies of the data to avoid modifying the original data
         data1 = self.data.copy()
         data2 = outcome.data.copy()
-        
-        # Ensure that the BETA columns are preprocessed
-        check_beta_column(data1, 'BETA', 'Fill')
-        check_beta_column(data2, 'BETA', 'Fill')
-
-        # Adjust EAF column names before merging in case one of the datasets does not have it
-        if 'EAF' in data1.columns:
-            data1.rename(columns={'EAF': 'EAF_1'}, inplace=True)
-        if 'EAF' in data2.columns:
-            data2.rename(columns={'EAF': 'EAF_2'}, inplace=True)
-        
-        # Determine merge strategy based on available columns
-        if all(col in self.data.columns for col in ['CHR', 'POS']) and \
-           all(col in outcome.data.columns for col in ['CHR', 'POS']):
-            print("Merging datasets using CHR and POS")
-
-            #Ensure that the CHR, POS columns are preprocessed
-            check_int_column(data1, "CHR")
-            check_int_column(data1, "POS")
-            check_int_column(data2, "CHR")
-            check_int_column(data2, "POS")
-
-            # Merge the datasets
-            merged_data = pd.merge(data1, data2,
-                                 on=['CHR', 'POS'],
-                                 suffixes=('_1', '_2'))
-            
-        elif 'SNP' in self.data.columns and 'SNP' in outcome.data.columns:
-            print("Merging datasets using SNP IDs")
-
-            # Ensure that the SNP column is preprocessed
-            check_snp_column(data1)
-            check_snp_column(data2)
-
-            # Merge the datasets
-            merged_data = pd.merge(data1, data2,
-                                   on='SNP',
-                                   suffixes=('_1', '_2'))
-        else:
-            raise ValueError("Either CHR/POS or SNP columns must be present in both datasets for merging")
-        
-        # Drop any rows with missing values
-        merged_data = merged_data.dropna()
-        if merged_data.empty:
-            raise ValueError("No overlapping variants found between the datasets")
-        
-        print(f"Using {len(merged_data)} overlapping variants for colocalization analysis")
             
         # Call the implementation function
-        return coloc_abf_func(merged_data, 
+        return coloc_abf_func(data1, 
+                             data2,
                              trait1_type=trait1_type,
                              trait2_type=trait2_type,
                              sdY1=sdY1, 
@@ -1295,7 +1316,8 @@ class Geno:
                              n2=n2,
                              p1=p1,
                              p2=p2,
-                             p12=p12)
+                             p12=p12,
+                             merge_on_snp=merge_on_snp)
 
 
     def lift(
@@ -1480,14 +1502,24 @@ class Geno:
             self.data = self.data.groupby(by=["SNP"]).first().reset_index(drop=False)
         return
 
-    def copy(self):
+    def copy(self, data):
         """
-        Create a deep copy of the Geno instance.
+        Create another Geno instance with the updated data attribute.
+        The relevant attributes are copied as well (checks, phenotype, reference_panel, reference_panel_name).
+        Attributes that are not copied are MR_data, MR_results, MRpresso_subset_data, MRpresso_results.
 
         Returns:
             Geno: A deep copy of the instance.
         """
-        return copy.deepcopy(self)
+        Geno_copy = Geno(data, keep_columns=True)
+        Geno_copy.checks = self.checks.copy()
+        if hasattr(self, "phenotype"):
+            Geno_copy.phenotype = self.phenotype
+            if hasattr(self, "reference_panel"):
+                Geno_copy.reference_panel = self.reference_panel
+        if hasattr(self, "reference_panel_name"):
+            Geno_copy.reference_panel_name = self.reference_panel_name
+        return Geno_copy
 
     def save(self, path="", fmt="h5", sep="\t", header=True):
         """
