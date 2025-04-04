@@ -1,5 +1,4 @@
 import os
-import subprocess
 import pandas as pd
 import uuid
 import re
@@ -13,7 +12,7 @@ def clump_data_plink2(
     r2=0.01,
     p1=5e-8,
     p2=0.01,
-    name="",
+    name=None,
     ram=10000,
 ):
     """
@@ -37,7 +36,7 @@ def clump_data_plink2(
     """
 
     # Create unique ID for the name if none is passed
-    if not name:
+    if name is None:
         name = str(uuid.uuid4())[:8]
 
     # Save the relevant data columns to a temporary file

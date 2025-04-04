@@ -1,5 +1,5 @@
 import pandas as pd
-import os, subprocess, re
+import os, subprocess, re, uuid
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 
@@ -10,12 +10,16 @@ from .tools import check_bfiles, check_pfiles, setup_genetic_path, get_plink_pat
 ### PRS functions
 ### ____________________
 
-def prs_func(data, weighted=True, path=None, ram=10000, name=""):
+def prs_func(data, weighted=True, path=None, ram=10000, name=None):
     """
     Compute a PRS (Polygenic Risk Score) using provided SNP-level data. Corresponds to the :meth:`Geno.prs` method
     """
     # Get path and filetype
     path, filetype = setup_genetic_path(path)
+
+    # Generate a default name if none is provided
+    if name is None:
+        name = str(uuid.uuid4())[:8]
 
     # Call extract_snps
     extracted_path = extract_snps_func(data.SNP, name, path)
@@ -94,7 +98,7 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=""):
 
 # We are currently excluding all multiallelic variants by forcing first on all duplicates. 
 # Could be improved by keeping the relevant version of the multiallelic SNPs based on allele matching
-def extract_snps_func(snp_list, name, path=None):
+def extract_snps_func(snp_list, name=None, path=None):
     """
     Extracts a list of SNPs from the given path. This function corresponds to the following Geno method: :meth:`Geno.extract_snps`.
 
@@ -114,6 +118,10 @@ def extract_snps_func(snp_list, name, path=None):
         print("The provided SNP list is empty.")
         return "FAILED"
     
+    # Generate a default name if none is provided
+    if name is None:
+        name = str(uuid.uuid4())[:8]
+
     # Get path and filetype
     path, filetype = setup_genetic_path(path)
 

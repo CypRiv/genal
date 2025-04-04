@@ -3,6 +3,7 @@ import numpy as np
 import os
 import subprocess
 import re
+import uuid
 
 from .tools import get_reference_panel_path, get_plink_path, run_plink_command
 
@@ -219,6 +220,10 @@ def find_proxies(
     """
     # Ensure tmp_GENAL directory exists
     os.makedirs(f"tmp_GENAL/", exist_ok=True)
+
+    # Generate a default name if none is provided
+    if name is None:
+        name = str(uuid.uuid4())[:8]
 
     # Convert snp_list to numpy array
     snp_list = np.array(list(snp_list))

@@ -406,7 +406,7 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     - data (pd.DataFrame): The data to be saved.
     - name (str): The name of the file without extension.
     - path (str, optional): Directory path for saving. Default is the current directory.
-    - fmt (str, optional): Format for the file, e.g., "h5", "csv", "txt", "vcf", "vcf.gz". Default is "h5".
+    - fmt (str, optional): Format for the file, e.g., "h5", "csv", "txt". Default is "h5".
     - sep (str, optional): Delimiter for csv or txt files. Default is tab.
     - header (bool, optional): Whether to include header in csv or txt files. Default is True.
 
@@ -417,7 +417,7 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     - ValueError: If the provided format is not recognized.
     """
     if path:
-        path_name = f"{path}/{name}.{fmt}"
+        path_name = os.path.join(path, f"{name}.{fmt}")
     else:
         path_name = f"{name}.{fmt}"
 
@@ -430,13 +430,9 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     elif fmt in ["csv", "txt"]:
         data.to_csv(path_name, sep=sep, header=header, index=False)
 
-    elif fmt in ["vcf", "vcf.gz"]:
-        # to do
-        return
-
     else:
         raise ValueError(
-            "The fmt argument takes value in (h5 (default), csv, txt, vcf, vcf.gz)."
+            "The fmt argument takes value in (h5 (default), csv, txt)."
         )
 
     print(f"Data saved to {path_name}")
