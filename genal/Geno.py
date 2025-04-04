@@ -655,7 +655,8 @@ class Geno:
                     kb=kb,
                     r2=r2,
                     window_snps=window_snps,
-                    threads=self.cpus
+                    threads=self.cpus,
+                    name=self.name
                 )
                 # Apply proxies if found
                 if isinstance(ld, pd.DataFrame) and not ld.empty:

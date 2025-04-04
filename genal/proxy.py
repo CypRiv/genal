@@ -196,7 +196,8 @@ def find_proxies(
     kb=5000,
     r2=0.8,
     window_snps=1000000,
-    threads=1
+    threads=1,
+    name=None
 ):
     """
     Given a list of SNPs, return a table of proxies using PLINK 2.0.
@@ -227,13 +228,13 @@ def find_proxies(
         extract_arg = ""
     else:
         print("Searching proxies in the provided searchspace.")
-        with open("tmp_GENAL/searchspace.txt", "w") as file:
+        with open(f"tmp_GENAL/{name}_searchspace.txt", "w") as file:
             for s in searchspace + snp_list:
                 file.write(str(s) + "\n")
-        extract_arg = "--extract tmp_GENAL/searchspace.txt"
+        extract_arg = "--extract tmp_GENAL/{name}_searchspace.txt"
 
     # Save snp_list to a file
-    np.savetxt("tmp_GENAL/snps_to_proxy.txt", snp_list, fmt="%s", delimiter=" ")
+    np.savetxt(f"tmp_GENAL/{name}_snps_to_proxy.txt", snp_list, fmt="%s", delimiter=" ")
 
     # Get reference panel path and type
     ref_path, filetype = get_reference_panel_path(reference_panel)
@@ -256,18 +257,18 @@ def find_proxies(
     command = (
         f"{base_cmd} {extract_arg} "
         f"--r-unphased 'cols=chrom,pos,id,maj,nonmaj,freq' "
-        f"--ld-snp-list tmp_GENAL/snps_to_proxy.txt "
+        f"--ld-snp-list tmp_GENAL/{name}_snps_to_proxy.txt "
         f"--ld-window-kb {kb} "
         f"--ld-window-r2 {r2} "
         f"--ld-window {window_snps} "
         f"--threads {threads} "
-        f"--out tmp_GENAL/proxy.targets"
+        f"--out tmp_GENAL/{name}_proxy.targets"
     )
     
     run_plink_command(command)
 
     # Read log file to return amount of SNPs to be proxied present in the ref panel
-    log_path = os.path.join("tmp_GENAL", "proxy.targets.log")
+    log_path = os.path.join("tmp_GENAL", f"{name}_proxy.targets.log")
     log_content = open(log_path).read()
     match = re.search(r'(\d+) variant[s] remaining', log_content)
     if match:
@@ -280,7 +281,7 @@ def find_proxies(
 
     # Read and process the output
     try:
-        ld = pd.read_csv("tmp_GENAL/proxy.targets.vcor", sep="\s+")
+        ld = pd.read_csv(f"tmp_GENAL/{name}_proxy.targets.vcor", sep="\s+")
     except FileNotFoundError:
         print("No proxies found that meet the specified criteria.")
         return None

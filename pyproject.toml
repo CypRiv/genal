@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "genal-python"  # Updated name for PyPI
-version = "1.3.2"
+version = "1.3.3"
 authors = [{name = "Cyprien Rivier", email = "riviercyprien@gmail.com"}]
 description = "A python toolkit for polygenic risk scoring and mendelian randomization."
 readme = "README.md"
