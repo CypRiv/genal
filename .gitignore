@@ -4,3 +4,6 @@ dist/
 ipynb_checkpoints/
 genal/.ipynb_checkpoints/
 test_data/
+cursor/
+tests/
+tmp_GENAL/

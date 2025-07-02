@@ -156,6 +156,12 @@ def _prepare_psam_file(genetic_path, data_pheno, pheno_type, standardize):
     # Read the PSAM file
     psam = pd.read_csv(genetic_path + ".psam", delimiter="\t")
     
+    # Ensure IID column types match before merging to prevent errors
+    if '#IID' in psam.columns and 'IID' in data_pheno.columns:
+        psam['#IID'] = psam['#IID'].astype(data_pheno['IID'].dtype)
+    elif 'IID' in psam.columns and 'IID' in data_pheno.columns:
+         psam['IID'] = psam['IID'].astype(data_pheno['IID'].dtype)
+
     # Merge phenotype data with the PSAM dataframe depending on column present
     if "#FID" in psam.columns:
         data_pheno_trait = data_pheno[["FID", "IID", "PHENO"]].rename(columns={"FID": "#FID", "PHENO": "PHENO1"}).copy()

@@ -15,15 +15,15 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
     Args:
         data1: DataFrame containing GWAS results for trait 1
         data2: DataFrame containing GWAS results for trait 2
-        trait1_type: Type of trait 1 ("quant" for quantitative traits or "cc" for case-control traits)
-        trait2_type: Type of trait 2 ("quant" for quantitative traits or "cc" for case-control traits)
+        trait1_type: Type of trait 1 ("quant" for quantitative traits or "cc" for case-control traits), default is "quant"
+        trait2_type: Type of trait 2 ("quant" for quantitative traits or "cc" for case-control traits), default is "quant"
         sdY1: Standard deviation of trait 1 (required for quantitative traits)
         sdY2: Standard deviation of trait 2 (required for quantitative traits)
         n1: Sample size for trait 1 (used to estimate sdY if not provided)
         n2: Sample size for trait 2 (used to estimate sdY if not provided)
-        p1: Prior probability SNP associated with trait 1
-        p2: Prior probability SNP associated with trait 2
-        p12: Prior probability SNP associated with both traits
+        p1: Prior probability SNP associated with trait 1, default is 1e-4
+        p2: Prior probability SNP associated with trait 2, default is 1e-4
+        p12: Prior probability SNP associated with both traits, default is 1e-5
         merge_on_snp: If True, merge the datasets on SNP column. If False, first attempt to merge on CHR and POS columns.
 
     """

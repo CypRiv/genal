@@ -221,12 +221,14 @@ def lift_coordinates_python(data, chain_path):
     if nrows > 500000:
         print("Your data is large, this can take a few minutes...")
 
+    # Create a list of tuples and lift
+    coordinates = list(zip(data["CHR"], data["POS"]))
+
     # Perform the lift
     def convert_coordinate(args):
         return lo.convert_coordinate(f"chr{args[0]}", args[1], "-")
 
-    args = data[["CHR", "POS"]].to_records(index=False)
-    results = list(ThreadPoolExecutor().map(convert_coordinate, args))
+    results = list(ThreadPoolExecutor().map(convert_coordinate, coordinates))
 
     data["POS"] = [res[0][1] if res else np.nan for res in results]
     data["CHR"] = [res[0][0].split("chr")[1] if res else np.nan for res in results]

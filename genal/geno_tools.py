@@ -108,7 +108,10 @@ def check_beta_column(data, effect_column, preprocessing):
         if preprocessing == 'None':
             return data
         median = np.median(data.BETA)
-        if 0.5 < median < 1.5:
+        has_negative = (data.BETA < 0).any()
+        
+        # Odds Ratios cannot be negative. If they are, it's a Beta.
+        if 0.5 < median < 1.5 and not has_negative:
             effect_column = "OR"
             print(
                 "The BETA column looks like Odds Ratios. Use effect_column='BETA' if it is a column of Beta estimates."

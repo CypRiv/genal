@@ -37,18 +37,18 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=None):
     data_path = os.path.join("tmp_GENAL", f"{name}_to_prs.txt")
     output_path = os.path.join("tmp_GENAL", f"{name}_prs")
 
-    data.to_csv(data_path, sep="\t", index=False, header=True)
-    
-    # We can use --pfile since extract_snps now creates pgen files
-    plink_command = f"{get_plink_path()} --memory {ram} --pfile {extracted_path} \
-                     --score {data_path} 1 2 3 header --out {output_path} --allow-no-sex"
-
     # Set BETA values to 1 if unweighted PRS is required
     if not weighted:
         data["BETA"] = 1
         print(f"Computing an unweighted PRS using {extracted_path} data.")
     else:
         print(f"Computing a weighted PRS using {extracted_path} data.")
+
+    data.to_csv(data_path, sep="\t", index=False, header=True)
+    
+    # We can use --pfile since extract_snps now creates pgen files
+    plink_command = f"{get_plink_path()} --memory {ram} --pfile {extracted_path} \
+                     --score {data_path} 1 2 3 header --out {output_path} --allow-no-sex"
 
     # Check for empty dataframe
     n_snps = data.shape[0]

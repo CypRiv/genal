@@ -371,6 +371,19 @@ class Geno:
         Returns:
             genal.Geno: A new Geno object based on the clumped data.
         """
+        # Validate parameter types
+        if not isinstance(kb, int):
+            raise TypeError("The 'kb' parameter must be an integer.")
+        if not isinstance(r2, (int, float)):
+            raise TypeError("The 'r2' parameter must be a float or an integer.")
+        if not isinstance(p1, (int, float)):
+            raise TypeError("The 'p1' parameter must be a float or an integer.")
+        if not isinstance(p2, (int, float)):
+            raise TypeError("The 'p2' parameter must be a float or an integer.")
+
+        # Validate parameter values
+        if not 0 <= r2 <= 1:
+            raise ValueError("The 'r2' parameter must be between 0 and 1.")
         
         # Ensure required columns exist in the data
         for column in ["SNP", "P"]:
@@ -420,13 +433,13 @@ class Geno:
     def update_snpids(self, path=None, replace=False):
         """
         Update or create the column of SNP name based on genetic data and genomic position.
-        
+
         Args:
             path (str, optional): Path to a bed/bim/fam or pgen/pvar/psam set of genetic files.
                 If files are split by chromosomes, replace the chromosome number with '$'.
                 For instance: path = "ukb_chr$_file". Defaults to the path from the configuration.
             replace (bool, optional): To update the .data attribute with the updated SNP column or not.
-                
+
         Returns:
             None: It updates the dataframe in the .data attribute.
             
@@ -466,8 +479,9 @@ class Geno:
             variant_info.drop_duplicates(subset=["CHR", "POS"], keep="first", inplace=True)
             variant_info.drop_duplicates(subset=["SNP"], keep="first", inplace=True)
 
+            variant_info_to_merge = variant_info[["CHR", "POS", "SNP"]].rename(columns={'SNP': 'SNP_new'})
             data = data.merge(
-                variant_info[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
+                variant_info_to_merge, on=["CHR", "POS"], how="left"
             )
         else:
             chr_dict = {k: v for k, v in data.groupby('CHR')} #Split the dataframe by chromosome
@@ -479,9 +493,13 @@ class Geno:
                 data = pd.concat(results, ignore_index=True, axis=0) #And combine them again
                 
         # Update the SNP column
-        data['SNP'] = data['SNP_new'].fillna(data['SNP'])
-        data.drop(columns = ['SNP_new'], inplace=True)
-        
+        if 'SNP' in data.columns:
+            data['SNP'] = data['SNP_new'].fillna(data['SNP'])
+            data.drop(columns = ['SNP_new'], inplace=True)
+        else:
+            # If SNP column doesn't exist, SNP_new is renamed to SNP
+            data.rename(columns = {'SNP_new': 'SNP'}, inplace=True)
+
         if replace: self.data = data #Update attribute if replace argument
         return data
     
@@ -593,7 +611,7 @@ class Geno:
         if proxy:
             print("Identifying the SNPs present in the genetic data...")
             # Obtain the list of SNPs present in the genetic data
-            if path.count("$") == 1: #If split: merge all SNP columns of the variant files in parallel
+            if path.count("$") == 1: #If split: merge all SNP columns of the variant files
                 genetic_snp_list = []
                 for i in range(1,23):
                     path_i = path.replace("$", str(i))
@@ -1276,15 +1294,15 @@ class Geno:
         Args:
             outcome: Another Geno object containing the outcome dataset
             method: Method to use for colocalization (default: "abf")
-            trait1_type: Type of exposure trait ("quant" for quantitative traits or "cc" for case-control traits)
-            trait2_type: Type of outcome trait ("quant" for quantitative traits or "cc" for case-control traits)
+            trait1_type: Type of exposure trait ("quant" for quantitative traits or "cc" for case-control traits), default is "quant"
+            trait2_type: Type of outcome trait ("quant" for quantitative traits or "cc" for case-control traits), default is "quant"
             sdY1: Standard deviation of exposure trait (required for quantitative traits, but can be estimated from EAF and sample size)
             sdY2: Standard deviation of outcome trait (required for quantitative traits, but can be estimated from EAF and sample size)
             n1: Sample size for exposure (used to estimate sdY1 if sdY1 is not provided)
             n2: Sample size for outcome (used to estimate sdY2 if sdY2 is not provided)
-            p1: Prior probability SNP associated with exposure
-            p2: Prior probability SNP associated with outcome
-            p12: Prior probability SNP associated with both traits
+            p1: Prior probability SNP associated with exposure, default is 1e-4
+            p2: Prior probability SNP associated with outcome, default is 1e-4
+            p12: Prior probability SNP associated with both traits, default is 1e-5
             merge_on_snp: If True, merge the datasets on SNP column. If False, first attempt to merge on CHR and POS columns.
         """
         # Ensure required columns exist in both datasets
@@ -1466,27 +1484,6 @@ class Geno:
             
         return data
         
-
-    def standardize(self):
-        """
-        Standardize the Betas and adjust the SE column accordingly.
-
-        Raises:
-            ValueError: If the required columns are not found in the data.
-        """
-        required_columns = ["BETA", "SE"]
-        for column in required_columns:
-            if column not in self.data.columns:
-                raise ValueError(f"The column {column} is not found in the data!")
-
-        self.data["BETA"] = (self.data.BETA - np.mean(self.data.BETA)) / np.std(
-            self.data.BETA
-        )
-        self.data["SE"] = np.abs(self.data.BETA / st.norm.ppf(self.data.P / 2))
-        print(
-            "The Beta column has been standardized and the SE column has been adjusted."
-        )
-
     def sort_group(self, method="lowest_p"):
         """
         Handle duplicate SNPs. Useful if the instance combines different Genos.
@@ -1534,6 +1531,74 @@ class Geno:
         """
         save_data(self.data, name=self.name, path=path, fmt=fmt, sep=sep, header=header)
         return
+    
+    def standardize_betas(self, outcome_sd=None, n_samples=None, replace=False):
+        """
+        Standardizes the BETA and SE columns of the Geno object's data.
+
+        This method standardizes the effect sizes (BETA) and their standard errors (SE)
+        using either a provided standard deviation of the outcome trait or by estimating
+        it from the summary statistics using the total sample size.
+
+        Args:
+            outcome_sd (float, optional): The standard deviation of the outcome trait.
+                If provided, this value is used to standardize BETA and SE.
+                Defaults to None.
+            n_samples (int, optional): The total number of samples in the GWAS.
+                This is used to estimate the outcome's standard deviation if `outcome_sd`
+                is not provided. `EAF` and `SE` columns must be present in the data.
+                Defaults to None.
+            replace (bool, optional): If True, updates the data attribute in place. Default is False.
+
+        Returns:
+            pd.DataFrame: Data after being standardized.
+
+        Raises:
+            Warning: Valid only for quantitative traits.
+            ValueError: If neither `outcome_sd` nor `n_samples` is provided.
+            ValueError: If `n_samples` is provided, but 'EAF' or 'SE' columns
+                are missing from the data.
+        """
+        print("Warning: Standardization is valid only for quantitative phenotypes.")
+        if outcome_sd is not None:
+            sd = outcome_sd
+        elif n_samples is not None:
+            required_cols = ['EAF', 'SE']
+            if not all(col in self.data.columns for col in required_cols):
+                raise ValueError("When `n_samples` is provided, 'EAF' and 'SE' columns are required.")
+
+            temp_df = self.data[['EAF', 'SE']].dropna()
+
+            if temp_df.empty:
+                warnings.warn("No valid EAF and SE values to estimate outcome_sd, standardization skipped.")
+                return
+
+            var_snp = 2 * temp_df['EAF'] * (1 - temp_df['EAF'])
+            var_outcome_estimates = temp_df['SE']**2 * n_samples * var_snp
+            
+            sd_outcome_estimates = np.sqrt(var_outcome_estimates)
+            sd = np.median(sd_outcome_estimates)
+
+        else:
+            raise ValueError("Either `outcome_sd` or `n_samples` must be provided to standardize betas.")
+
+        if sd == 0:
+            warnings.warn("Outcome standard deviation is zero, standardization cannot be performed.")
+            return
+            
+        if replace:
+            self.data['BETA'] = self.data['BETA'] / sd
+            self.data['SE'] = self.data['SE'] / sd
+            return self.data
+        else:
+            data = self.data.copy()
+            data['BETA'] = data['BETA'] / sd
+            data['SE'] = data['SE'] / sd
+            return data
+
+
+
+
 
 def merge_command_parallel(df_subset, path, filetype):
     """Helper function of the update_snpids method to update SNP in parallel when genetic data is split by chromosome."""
@@ -1565,6 +1630,8 @@ def merge_command_parallel(df_subset, path, filetype):
     variants.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
     variants.drop_duplicates(subset=["SNP"], keep='first', inplace=True)
 
-    return df_subset.merge(
-        variants[["CHR", "POS", "SNP"]], on=["CHR", "POS"], how="left", suffixes=('', '_new')
+    variant_info_to_merge = variants[["CHR", "POS", "SNP"]].rename(columns={'SNP': 'SNP_new'})
+    merged_df = df_subset.merge(
+        variant_info_to_merge, on=["CHR", "POS"], how="left"
     )
+    return merged_df
