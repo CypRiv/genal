@@ -1,10 +1,11 @@
 import os
 import json
 from .tools import default_config, write_config, set_plink, install_plink, delete_tmp, get_reference_panel_path, get_plink_path
-from .geno_tools import Combine_Geno, filter_by_gene_func
+from .geno_tools import Combine_Geno
+from .genes import filter_by_gene_func
 from .constants import CONFIG_DIR
 
-__version__ = "1.4.1"
+__version__ = "1.4.2"
 
 config_path = os.path.join(CONFIG_DIR, "config.json")
 
