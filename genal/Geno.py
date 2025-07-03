@@ -15,7 +15,13 @@ from .proxy import find_proxies, apply_proxies
 from .MR_tools import query_outcome_func, MR_func, mrpresso_func
 from .clump import clump_data_plink2
 from .lift import lift_data
-from .tools import create_tmp, load_reference_panel, setup_genetic_path, check_reference_panel
+from .genes import filter_by_gene_func
+from .tools import (
+    create_tmp,
+    load_reference_panel,
+    setup_genetic_path,
+    check_reference_panel
+)
 from .geno_tools import (
     save_data,
     check_arguments,
@@ -31,7 +37,7 @@ from .geno_tools import (
     check_allele_column,
     check_snp_column,
     remove_na,
-    filter_by_gene_func
+    update_eaf_func,
 )
 from .association import set_phenotype_func, association_test_func_plink2
 from .extract_prs import extract_snps_func, prs_func
@@ -47,6 +53,7 @@ from .colocalization import coloc_abf_func
 # Check stability with variants on sexual chromosomes
 # Check the build of user data (potentially with a list of SNPs with different positions)
 # update_snpids function: take alleles into account during the merge if they are present in the user data
+# Consider how update_snpids could be replaced by the extract range function in plink2 (to gain speed)
 
 
 class Geno:
@@ -1596,7 +1603,51 @@ class Geno:
             data['SE'] = data['SE'] / sd
             return data
 
+    def update_eaf(self, reference_panel="EUR_37", replace=False, fill=True):
+        """
+        Update or create the EAF (Effect Allele Frequency) column using a reference panel.
 
+        This method calculates allele frequencies from a specified reference panel using PLINK
+        and updates the 'EAF' column for SNPs in the dataset. It match SNPs based on
+        CHR/POS or SNP ID and considers the effect allele ('EA') to assign the correct EAF.
+
+        Args:
+            reference_panel (str, optional): The reference panel to use for deriving EAF.
+                Can be a standard name (e.g., "EUR_37", "AFR_38") or a path to a
+                custom PLINK fileset (bed/bim/fam or pgen/pvar/psam).
+                Defaults to "EUR_37".
+            replace (bool, optional): If True, modifies the instance's `data` attribute
+                in place. If False (default), operates on a copy.
+            fill (bool, optional): If `True` (default), existing `EAF` values for SNPs not
+                found in the reference panel will be preserved. If `False`, `EAF` values
+                for unmatched SNPs will be set to `NaN`.
+
+        Returns:
+            pd.DataFrame or None: A new DataFrame with the updated 'EAF' column.
+
+        Raises:
+            ValueError: If the required columns ('EA' and either 'SNP' or 'CHR'/'POS')
+                are not present in the data.
+        """
+
+        if 'EA' not in self.data.columns:
+            raise ValueError("The 'EA' column is required to update EAF.")
+        if not ('SNP' in self.data.columns or ('CHR' in self.data.columns and 'POS' in self.data.columns)):
+            raise ValueError("Either 'SNP' or both 'CHR' and 'POS' columns are required.")
+
+        data = self.data if replace else self.data.copy()
+
+        data_updated = update_eaf_func(
+            data=data,
+            reference_panel=reference_panel,
+            object_name=self.name,
+            ram=self.ram,
+            fill=fill
+        )
+
+        if replace:
+            self.data = data_updated
+        return data_updated
 
 
 
