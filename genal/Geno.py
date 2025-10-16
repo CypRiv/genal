@@ -791,7 +791,7 @@ class Geno:
         # Renaming to avoid conflicts with previous extraction
         self.name = str(uuid.uuid4())[:8]
         # Extract SNPs using the provided path and SNP list
-        path = extract_snps_func(snp_list, self.name, path)
+        path = extract_snps_func(snp_list, self.name, path, self.ram, self.cpus)
         if path == "FAILED":
             raise ValueError("No SNPs were extracted from the genetic data and the association test can't be run.")
         
