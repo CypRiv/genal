@@ -696,7 +696,7 @@ class Geno:
         # Renaming to avoid conflicts with previous extraction
         self.name = str(uuid.uuid4())[:8]
         # Compute PRS
-        prs_data = prs_func(data_prs, weighted, path, ram=self.ram, name=self.name)
+        prs_data = prs_func(data_prs, weighted, path, ram=self.ram, cpus=self.cpus, name=self.name)
 
         # Save the computed PRS data as a CSV file
         name = self.name if not name else name
@@ -1240,7 +1240,7 @@ class Geno:
 
         return mod_table, GlobalTest, OutlierTest, BiasTest
 
-    def filter_by_gene(self, gene_id, id_type="symbol", window_size=1000000, build="37", replace=False):
+    def filter_by_gene(self, gene, id_type="symbol", window_size=1000000, build="37", replace=False):
         """
         Filter the data to include only variants that are within a specified distance of a specific gene.
 
@@ -1255,7 +1255,7 @@ class Geno:
                 - "UCSC": UCSC gene ID (e.g., "uc001hbu.2")
                 - "Vega": Vega gene ID (e.g., "OTTHUMG00000019505")
                 Default is "symbol".
-            window_size (int, optional): Size of the window around the gene in base pairs. Default is 1,000,000 (1Mb).
+            window_size (int, optional): Size of the window around the gene in base pairs. Default is 1,000,000 (1Mb), meaning that the window will include variants within 500kb on each side of the gene.
             build (str, optional): Genome build of the data. Default is "37".
             replace (bool, optional): If True, replace the existing data attribute with the filtered data. Default is True.
         Returns:
@@ -1285,7 +1285,7 @@ class Geno:
             check_int_column(self.data, "POS")
             self.checks["POS"] = True
 
-        filtered = filter_by_gene_func(self.data, gene_id, id_type, window_size, build)
+        filtered = filter_by_gene_func(self.data, gene, id_type, window_size, build)
         
         if replace:
             self.data = filtered
@@ -1507,7 +1507,7 @@ class Geno:
             self.data = self.data.groupby(by=["SNP"]).first().reset_index(drop=False)
         return
 
-    def copy(self, data):
+    def copy(self, data=None):
         """
         Create another Geno instance with the updated data attribute.
         The relevant attributes are copied as well (checks, phenotype, reference_panel, reference_panel_name).
@@ -1516,6 +1516,8 @@ class Geno:
         Returns:
             Geno: A deep copy of the instance.
         """
+        if data is None:
+            data = self.data
         Geno_copy = Geno(data, keep_columns=True)
         Geno_copy.checks = self.checks.copy()
         if hasattr(self, "phenotype"):
@@ -1539,7 +1541,7 @@ class Geno:
         save_data(self.data, name=self.name, path=path, fmt=fmt, sep=sep, header=header)
         return
     
-    def standardize_betas(self, outcome_sd=None, n_samples=None, replace=False):
+    def standardize_betas(self, outcome_sd=None, n_samples=None, replace=True):
         """
         Standardizes the BETA and SE columns of the Geno object's data.
 
@@ -1555,7 +1557,7 @@ class Geno:
                 This is used to estimate the outcome's standard deviation if `outcome_sd`
                 is not provided. `EAF` and `SE` columns must be present in the data.
                 Defaults to None.
-            replace (bool, optional): If True, updates the data attribute in place. Default is False.
+            replace (bool, optional): If True (default), updates the data attribute in place. If False, operates on a copy.
 
         Returns:
             pd.DataFrame: Data after being standardized.
@@ -1566,7 +1568,7 @@ class Geno:
             ValueError: If `n_samples` is provided, but 'EAF' or 'SE' columns
                 are missing from the data.
         """
-        print("Warning: Standardization is valid only for quantitative phenotypes.")
+        print("Warning: Standardizing estimates for binary traits will make the MR results not interpretable as odds ratios.")
         if outcome_sd is not None:
             sd = outcome_sd
         elif n_samples is not None:
@@ -1585,6 +1587,7 @@ class Geno:
             
             sd_outcome_estimates = np.sqrt(var_outcome_estimates)
             sd = np.median(sd_outcome_estimates)
+            print(f"Estimated the trait standard deviation from EAF and SE columns: {sd:.4f}.")
 
         else:
             raise ValueError("Either `outcome_sd` or `n_samples` must be provided to standardize betas.")
@@ -1603,7 +1606,7 @@ class Geno:
             data['SE'] = data['SE'] / sd
             return data
 
-    def update_eaf(self, reference_panel="EUR_37", replace=False, fill=True):
+    def update_eaf(self, reference_panel="EUR_37", replace=True, fill=True):
         """
         Update or create the EAF (Effect Allele Frequency) column using a reference panel.
 
@@ -1616,8 +1619,8 @@ class Geno:
                 Can be a standard name (e.g., "EUR_37", "AFR_38") or a path to a
                 custom PLINK fileset (bed/bim/fam or pgen/pvar/psam).
                 Defaults to "EUR_37".
-            replace (bool, optional): If True, modifies the instance's `data` attribute
-                in place. If False (default), operates on a copy.
+            replace (bool, optional): If True (default), modifies the instance's `data` attribute
+                in place. If False, operates on a copy.
             fill (bool, optional): If `True` (default), existing `EAF` values for SNPs not
                 found in the reference panel will be preserved. If `False`, `EAF` values
                 for unmatched SNPs will be set to `NaN`.

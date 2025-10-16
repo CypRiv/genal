@@ -44,9 +44,6 @@ def lift_data(
     Notes:
         Function for the :meth:`Geno.lift` method.
     """
-    # Generate a default name if none is provided
-    if name is None:
-        name = str(uuid.uuid4())[:8]
 
     # Prepare chain file and get its path
     chain_path = prepare_chain_file(chain_file, start, end)

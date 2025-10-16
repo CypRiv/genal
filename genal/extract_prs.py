@@ -10,7 +10,7 @@ from .tools import check_bfiles, check_pfiles, setup_genetic_path, get_plink_pat
 ### PRS functions
 ### ____________________
 
-def prs_func(data, weighted=True, path=None, ram=10000, name=None):
+def prs_func(data, weighted=True, path=None, ram=20000, cpus=4, name=None):
     """
     Compute a PRS (Polygenic Risk Score) using provided SNP-level data. Corresponds to the :meth:`Geno.prs` method
     """
@@ -22,7 +22,7 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=None):
         name = str(uuid.uuid4())[:8]
 
     # Call extract_snps
-    extracted_path = extract_snps_func(data.SNP, name, path)
+    extracted_path = extract_snps_func(data.SNP, name, path, ram=ram, cpus=cpus)
 
     if extracted_path == "FAILED":
         raise ValueError("No SNPs were extracted from the genetic data and the PRS can't be computed.")
@@ -47,7 +47,7 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=None):
     data.to_csv(data_path, sep="\t", index=False, header=True)
     
     # We can use --pfile since extract_snps now creates pgen files
-    plink_command = f"{get_plink_path()} --memory {ram} --pfile {extracted_path} \
+    plink_command = f"{get_plink_path()} --memory {ram} --pfile {extracted_path} --threads {cpus} \
                      --score {data_path} 1 2 3 header --out {output_path} --allow-no-sex"
 
     # Check for empty dataframe
@@ -98,7 +98,7 @@ def prs_func(data, weighted=True, path=None, ram=10000, name=None):
 
 # We are currently excluding all multiallelic variants by forcing first on all duplicates. 
 # Could be improved by keeping the relevant version of the multiallelic SNPs based on allele matching
-def extract_snps_func(snp_list, name=None, path=None):
+def extract_snps_func(snp_list, name=None, path=None, ram=20000, cpus=4):
     """
     Extracts a list of SNPs from the given path. This function corresponds to the following Geno method: :meth:`Geno.extract_snps`.
 
@@ -137,8 +137,11 @@ def extract_snps_func(snp_list, name=None, path=None):
 
     output_path = os.path.join("tmp_GENAL", f"{name}_allchr")
     if filetype_split == "split":
+        ram_estimate_per_cpu = nrow//(2*10**3)
+        n_cpus = max(1, int(ram // ram_estimate_per_cpu))
+        workers = min(n_cpus, cpus)
         merge_command, bedlist_path = extract_snps_from_split_data(
-            name, path, output_path, snp_list_path, filetype
+            name, path, output_path, snp_list_path, filetype, workers=workers
         )
         handle_multiallelic_variants(name, merge_command, bedlist_path)
     else:
@@ -219,7 +222,7 @@ def create_bedlist(bedlist_path, output_name, not_found):
     return found
 
 
-def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetype):
+def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetype, workers=4):
     """Extract SNPs from data split by chromosome."""
     print("Extracting SNPs for each chromosome...")
     num_tasks = 22
@@ -230,7 +233,7 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
         snp_list_path=snp_list_path,
         filetype=filetype
     )  # Wrapper function
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(max_workers=workers) as executor:
         not_found = list(
             executor.map(partial_extract_command_parallel, range(1, num_tasks + 1))
         )

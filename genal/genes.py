@@ -77,7 +77,7 @@ def filter_by_gene_func(data, gene_identifier, id_type="symbol", window_size=100
         print(f"Warning: Multiple entries found for {id_type}='{gene_identifier}'. Using the first entry.")
     gene_data = gene_data.iloc[0,:]
 
-    print(f"Filtering variants within {window_size}bp window based on genome build {build} around gene: {', '.join(f'{col}: {gene_data[col]}' for col in valid_id_types)}")
+    print(f"Filtering variants within {window_size}bp window (+/- {window_size/2}bp on each side) based on genome build {build} around gene: {', '.join(f'{col}: {gene_data[col]}' for col in valid_id_types)}")
     
     # Extract gene location information
     chrom = gene_data['CHR']
