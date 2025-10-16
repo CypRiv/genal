@@ -536,7 +536,7 @@ class Geno:
         # Renaming to avoid conflicts with previous extraction
         self.name = str(uuid.uuid4())[:8]
         # Extract SNPs using the provided path and SNP list
-        _ = extract_snps_func(snp_list, self.name, path)
+        _ = extract_snps_func(snp_list, self.name, path, self.ram, self.cpus)
 
         return
 
