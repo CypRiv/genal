@@ -139,7 +139,7 @@ def extract_snps_func(snp_list, name=None, path=None, ram=20000, cpus=4):
     if filetype_split == "split":
         ram_estimate_per_cpu = nrow/(1.5*10**2)
         n_cpus = max(1, int(ram // ram_estimate_per_cpu))
-        workers = max(n_cpus, 1)
+        workers = max(n_cpus, cpus)
         merge_command, bedlist_path = extract_snps_from_split_data(
             name, path, output_path, snp_list_path, filetype, workers=workers
         )
