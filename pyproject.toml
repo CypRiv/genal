@@ -24,13 +24,15 @@ dependencies = [
 "pandas>=1.0",
 "plotnine>=0.9",
 "psutil>=5.0",
+"requests>=2.0",
 "pyliftover>=0.4",
 "scikit_learn>=0.24",
 "scipy>=1.7",
 "statsmodels>=0.12",
 "tqdm>=4.38",
 "wget>=3.0",
-"fastparquet>=0.4"
+"fastparquet>=0.4",
+"pyarrow>=3.0"
 ]
 
 [tool.setuptools.package-dir]

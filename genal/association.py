@@ -308,6 +308,12 @@ def _validate_columns_existence(data, PHENO, IID, FID):
     # Handle FID column
     if FID is not None and FID not in data.columns:
         raise ValueError(f"The column '{FID}' is not present in the provided dataset.")
+
+    # If IID or FID is numerical, convert to integer
+    if is_numeric_dtype(data[IID]):
+        data[IID] = data[IID].astype("Int64")
+    if FID is not None and is_numeric_dtype(data[FID]):
+        data[FID] = data[FID].astype("Int64")
     
     if data.shape[0] == 0:
         raise ValueError("The phenotype dataframe is empty.")
