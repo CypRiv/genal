@@ -5,7 +5,7 @@ from .geno_tools import Combine_Geno
 from .genes import filter_by_gene_func
 from .constants import CONFIG_DIR
 
-__version__ = "1.4.5"
+__version__ = "1.4.6"
 
 config_path = os.path.join(CONFIG_DIR, "config.json")
 

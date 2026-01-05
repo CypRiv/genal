@@ -169,7 +169,7 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
     unMapped = open(unmapped_filename, "r")
     Lines = unMapped.readlines()
     if len(Lines) > 0:
-        print(f"{int(len(Lines)/2)} SNPs could not be lifted.")
+        print(f"{int(len(Lines)/2)} SNPs could not be lifted and are deleted from the final data.")
     else:
         print(f"All SNPs have been lifted.")
     indices = list()

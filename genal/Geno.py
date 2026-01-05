@@ -161,7 +161,7 @@ class Geno:
         self.checks = CHECKS_DICT.copy()
 
         # Set the maximal amount of ram/cpu to be used by the methods and dask chunksize
-        self.cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", default=os.cpu_count()))
+        self.cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", default=os.cpu_count())) - 1
         non_hpc_ram_per_cpu = psutil.virtual_memory().total  / (
             1024**2 * self.cpus
         )

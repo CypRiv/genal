@@ -104,7 +104,7 @@ def check_beta_column(data, effect_column, preprocessing):
     if effect_column is None:
         if preprocessing == 'None':
             return data
-        median = np.median(data.BETA)
+        median = data.BETA.median()
         has_negative = (data.BETA < 0).any()
         
         # Odds Ratios cannot be negative. If they are, it's a Beta.
