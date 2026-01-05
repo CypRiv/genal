@@ -1,5 +1,6 @@
 sphinx
 sphinx_rtd_theme
+myst-parser
 aiohttp==3.9.5
 nest_asyncio==1.5.5
 numpy>=1.24.4,<2.0

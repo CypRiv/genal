@@ -7,6 +7,8 @@ test_data/
 cursor/
 tests/
 tmp_GENAL/
+docs/build/
+docs/_build/
 REVIEW_REPORT.md
 TASKS.md
 code_concatenated

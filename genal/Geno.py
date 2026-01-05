@@ -63,9 +63,8 @@ class Geno:
 
     Attributes:
         data (pd.DataFrame): Main DataFrame containing SNP data.
-        phenotype (pd.DataFrame, str): Tuple with a DataFrame of individual-level phenotype
-            data and a string representing the phenotype trait column. Initialized after
-            running the 'set_phenotype' method.
+        phenotype (tuple[pd.DataFrame, str, str]): Tuple set by :meth:`Geno.set_phenotype`:
+            (phenotype_dataframe, phenotype_type, original_PHENO_column_name).
         MR_data (pd.DataFrame, pd.DataFrame, str): Tuple containing DataFrames for associations
             with exposure and outcome, and a string for the outcome name. Initialized after
             running the 'query_outcome' method.
@@ -77,20 +76,6 @@ class Geno:
         reference_panel (pd.DataFrame): Reference population SNP data used for SNP info
             adjustments. Initialized when first needed.
         reference_panel_name (str): string to identify the reference_panel (path or population string)
-
-    Methods:
-        preprocess_data: Clean and preprocess the 'data' attribute (the main dataframe of SNP-level data).
-        clump: Clump the main data based on reference panels and return a new Geno object with the clumped data.
-        prs: Computes Polygenic Risk Score on genomic data.
-        set_phenotype: Assigns a DataFrame with individual-level data and a phenotype trait to the 'phenotype' attribute.
-        association_test: Computes SNP-trait effect estimates, standard errors, and p-values.
-        query_outcome: Extracts SNPs from SNP-outcome association data and stores it in the 'MR_data' attribute.
-        MR: Performs Mendelian Randomization between the SNP-exposure and SNP-outcome data stored in the 'MR_data' attribute. Stores the results in the 'MR_results' attribute.
-        MR_plot: Plot the results of the MR analysis stored in the 'MR_results' attribute.
-        MR_forest: Creates and returns a forest plot of MR results, with one row per method.
-        MRpresso: Executes the MR-PRESSO algorithm for horizontal pleiotropy correction between the SNP-exposure and SNP-outcome data stored in the 'MR_data' attribute.
-        lift: Lifts SNP data from one genomic build to another.
-        query_gwas_catalog: Query the GWAS Catalog for SNP-trait associations.
     """
 
     def __init__(
@@ -448,7 +433,8 @@ class Geno:
             replace (bool, optional): To update the .data attribute with the updated SNP column or not.
 
         Returns:
-            None: It updates the dataframe in the .data attribute.
+            pd.DataFrame: A copy of the data with an updated `SNP` column matching the genotype dataset.
+            If `replace=True`, the `.data` attribute is also updated in place.
             
         Note:
             This can be used before extracting SNPs from the genetic data if there is possibility of a mismatch between the SNP name contained in the Geno dataframe (SNP-level data) and the SNP name used in the genetic data (individual-level data). 
@@ -562,9 +548,8 @@ class Geno:
                                   with '$'. For instance: path = "ukb_chr$_file".
                                   If not provided, it will use the genetic path most recently used 
                                   (if any). Default is None.
-            position (bool, optional): Use the genomic positions instead of the SNP names to find the
-                                  SNPs in the genetic data (recommended).
-            proxy (bool, optional): If true, proxies are searched. Default is True.
+            proxy (bool, optional): If True, search proxy SNPs when variants are missing from the
+                target genotype dataset. Default is False.
             reference_panel (str, optional): The reference population used to derive linkage disequilibrium values and find proxies (only if proxy=True). 
                 Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
                 Also accepts or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
@@ -576,7 +561,8 @@ class Geno:
                 more than x SNPs away from the main SNP. Default is 1000000 (equivalent to infinity, plink default).
 
         Returns:
-            pd.DataFrame: The computed PRS data.
+            None: Writes `<name>.csv` (or `<self.name>.csv` if `name=None`) and stores intermediate
+            PLINK outputs under `tmp_GENAL/`.
         """
         
         path, filetype = setup_genetic_path(path) # Check path
@@ -880,7 +866,8 @@ class Geno:
         use_mrpresso_data=False
     ):
         """
-        Executes Mendelian Randomization (MR) using the `data_clumped` attribute as exposure data and `MR_data` attribute as outcome data queried using the `query_outcome` method.
+        Executes Mendelian Randomization (MR) using exposure/outcome data stored in `MR_data`
+        (created by calling :meth:`Geno.query_outcome`).
 
         Args:
             methods (list, optional): List of MR methods to run. Possible options include:
@@ -896,7 +883,7 @@ class Geno:
                 "Egger-boot": egger regression with bootstrapped standard errors
                 "Simple-mode": simple mode method
                 "Weighted-mode": weighted mode method
-                Default is ["IVW","IVW-FE","WM","Simple-mode","Weighted-mode","Egger"].
+                Default is ["IVW","IVW-FE","WM","Simple-mode","Egger"].
             action (int, optional): How to treat palindromes during harmonizing between
                 exposure and outcome data. Accepts:
                 1: Doesn't flip them (Assumes all alleles are on the forward strand)
@@ -904,12 +891,14 @@ class Geno:
                 3: Removes all palindromic SNPs (very conservative)
             eaf_threshold (float, optional): Max effect allele frequency accepted when
                 flipping palindromic SNPs (relevant if action=2). Default is 0.42.
-            heterogeneity (bool, optional): If True, includes heterogeneity tests in the results (Cochran's Q test).Default is False.
+            heterogeneity (bool, optional): If True, includes heterogeneity tests in the results (Cochran's Q test). Default is False.
             nboot (int, optional): Number of bootstrap replications for methods with bootstrapping. Default is 1000.
             penk (int, optional): Penalty value for the WM-pen method. Default is 20.
             phi (int, optional): Factor for the bandwidth parameter used in the kernel density estimation of the mode methods
             exposure_name (str, optional): Name of the exposure data (only for display purposes).
             outcome_name (str, optional): Name of the outcome data (only for display purposes).
+            cpus (int, optional): Number of CPU cores to use for methods that support parallelism.
+                Use -1 to use the default `self.cpus`.
             odds (bool, optional): If True, adds an odds ratio column with 95% confidence intervals. Default is False.
             use_mrpresso_data (bool, optional): If True and MRpresso has been run, uses the subset of instruments after outlier removal. Default is False.
 
@@ -980,10 +969,12 @@ class Geno:
         Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the 'methods' argument is represented as a line in the plot.
 
         Args:
-            methods (list of str, optional): A list of MR methods to be included in the plot. Default methods are "IVW", "WM", "Simple-median", and "Egger".
+            methods (list of str, optional): A list of MR methods to be included in the plot.
+                Default methods are "IVW", "WM", "Simple-mode", and "Egger".
             exposure_name (str, optional): A custom label for the exposure effect axis. If None, uses the label provided in the MR function call or a default label.
             outcome_name (str, optional): A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.
-            filename (str, optional): The filename where the plot will be saved. If None, the plot is not saved.
+            filename (str, optional): The filename prefix where the plot will be saved (a `.png` extension is added).
+                If None, the plot is not saved.
 
         Returns:
             plotnine.ggplot.ggplot: A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.
@@ -1245,7 +1236,7 @@ class Geno:
         Filter the data to include only variants that are within a specified distance of a specific gene.
 
         Args:
-            gene_id (str): Identifier for the gene/protein to filter variants around.
+            gene (str): Identifier for the gene/protein to filter variants around.
             id_type (str, optional): Type of identifier provided. Options are:
                 - "symbol": Gene symbol (e.g., "APOE")
                 - "HGNC": HGNC ID (e.g., "HGNC:613")
@@ -1255,15 +1246,13 @@ class Geno:
                 - "UCSC": UCSC gene ID (e.g., "uc001hbu.2")
                 - "Vega": Vega gene ID (e.g., "OTTHUMG00000019505")
                 Default is "symbol".
-            window_size (int, optional): Size of the window around the gene in base pairs. Default is 1,000,000 (1Mb), meaning that the window will include variants within 500kb on each side of the gene.
+            window_size (int, optional): Total window size in base pairs (±window_size/2 around the gene).
+                Default is 1,000,000 (±500kb).
             build (str, optional): Genome build of the data. Default is "37".
-            replace (bool, optional): If True, replace the existing data attribute with the filtered data. Default is True.
+            replace (bool, optional): If True, filter the current object in place. Default is False.
         Returns:
-            if replace is True:
-                pd.DataFrame: Filtered DataFrame containing only variants within the specified window 
-                    around the gene, with additional column 'Distance'.
-            if replace is False:
-                genal.Geno: A new Geno object with the filtered data.
+            If replace is False (default): a new :class:`~genal.Geno` with filtered data.
+            If replace is True: None (the `.data` attribute is replaced).
 
         Raises:
             ValueError: If required columns are missing, gene information cannot be found, or invalid id_type is provided.

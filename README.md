@@ -58,6 +58,9 @@ genal.set_plink("/path/to/plink2")  # or "/path/to/folder/containing/plink2"
 ```
 `genal` uses reference data in two different ways:
 
+<details>
+<summary>Types of reference data </summary>
+
 ### 1) Build-only reference (for preprocessing)
 
 Used by: `Geno.preprocess_data()`.
@@ -75,9 +78,10 @@ Used by: `Geno.clump()`, proxy search in `Geno.prs()` / `Geno.query_outcome()`, 
 - Argument: `reference_panel="EUR_37"` (or `"AFR_38"`, etc.), or a path to a custom PLINK fileset.
 - `genal` downloads built-in panels automatically the first time you use them.
 
+</details>
+<br>
 
-
-By default, files are stored under `~/.genal/`, and temporary PLINK outputs go to `./tmp_GENAL/` (you can remove it with `genal.delete_tmp()`).
+By default, reference files are stored under `~/.genal/`, and temporary PLINK outputs go to `./tmp_GENAL/` (you can remove it with `genal.delete_tmp()`).
 
 ## Quickstart (GWAS → instruments → PRS → MR)
 ```python
@@ -86,7 +90,7 @@ import genal
 
 # 1) Load exposure GWAS summary statistics into a DataFrame
 exposure_df = pd.read_csv("exposure_gwas.tsv", sep="\t")
-exposure = genal.Geno(
+G_exposure = genal.Geno(
     exposure_df,
     CHR="CHR", POS="POS", SNP="SNP",
     EA="EA", NEA="NEA",
@@ -95,39 +99,40 @@ exposure = genal.Geno(
 )
 
 # 2) Basic cleaning + columns filling (build-only reference for rsID/alleles/coords)
-exposure.preprocess_data(preprocessing="Fill_delete", reference_panel="37")
+G_exposure.preprocess_data(preprocessing="Fill_delete", reference_panel="37")
 
 # 3) LD clumping to select independent instruments
-instruments = exposure.clump(p1=5e-8, r2=0.01, kb=10000, reference_panel="EUR_37")
+G_instruments = G_exposure.clump(p1=5e-8, r2=0.01, kb=10000, reference_panel="EUR_37")
 
 # 4) PRS in a target cohort (PLINK1 bed/bim/fam or PLINK2 pgen/pvar/psam)
 # If genotype files are split by chromosome, use '$' as a placeholder.
-instruments.prs(name="my_prs", path="my_genotypes_chr$")  # writes my_prs.csv
+G_instruments.prs(name="my_prs", path="my_genotypes_chr$")  # writes my_prs.csv
 
 # 5) Two-sample MR 
 # 5.1) Load outcome GWAS summary statistics into a DataFrame
 outcome_df = pd.read_csv("outcome_gwas.tsv", sep="\t")
-outcome = genal.Geno(outcome_df, CHR="CHR", POS="POS", EA="EA", NEA="NEA", BETA="BETA", SE="SE", P="P", EAF="EAF", keep_columns=False)
+G_outcome = genal.Geno(outcome_df, CHR="CHR", POS="POS", EA="EA", NEA="NEA", BETA="BETA", SE="SE", P="P", EAF="EAF", keep_columns=False)
 
 # 5.2) Clean and standardize outcome GWAS summary statistics
-outcome.preprocess_data(preprocessing="Fill_delete", reference_panel="37")
+G_outcome.preprocess_data(preprocessing="Fill_delete", reference_panel="37")
 
 # 5.3) Query outcome GWAS (optionally search for proxies if some SNPs are missing)
-instruments.query_outcome(outcome, proxy=True, reference_panel="EUR_37")
+G_instruments.query_outcome(G_outcome, proxy=True, reference_panel="EUR_37")
 
 # 5.4) Run MR (optionally with heterogeneity test and odds-ratio CIs)
-mr_results = instruments.MR(action=2, heterogeneity=True, odds=False)
+mr_results = G_instruments.MR(action=2, heterogeneity=True, odds=False)
 
-instruments.MR_plot(filename="mr_scatter")
+# 5.5) Plot MR results
+G_instruments.MR_plot(filename="mr_scatter")
 ```
 ## Core concept: the `Geno` object
 
 `genal.Geno` is the central class.
 
 - `G.data`: main table containing SNP-level data (a `pandas.DataFrame`)
-- `G.phenotype`: phenotype table after `G.set_phenotype(...)`
-- `G.MR_data`: stored after `G.query_outcome(...)` (exposure + outcome harmonized inputs)
-- `G.MR_results`: stored after `G.MR(...)`
+- `G.phenotype`: stored after `G.set_phenotype(...)` (phenotype DataFrame + metadata)
+- `G.MR_data`: stored after `G.query_outcome(...)` (exposure/outcome association tables used by MR)
+- `G.MR_results`: stored after `G.MR(...)` (results table + harmonized SNP table; used by plotting)
 
 Most methods either:
 - return a **new `Geno`** object (e.g., `clump()`), or
