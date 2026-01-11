@@ -190,6 +190,7 @@ What preprocessing typically does (depending on options):
 - validates types, formats, and values of CHR/POS/EA/NEA/BETA/SE/P/EAF columns
 - detects OR vs beta columns (and log-transforms OR when needed)
 - fills missing columns (e.g., rsID from CHR/POS, SE from BETA+P, P from BETA+SE)
+- computes **FSTAT** (F-statistic) from BETA and SE when possible, with a fallback method when only P is present
 - handles duplicates and invalid rows under `"Fill_delete"`
 
 You can inspect the standardized dataset at any time:
@@ -351,7 +352,7 @@ G_adj.association_test(
 )
 ```
 
-This updates `SBP_adj.data[["BETA","SE","P"]]` with cohort-specific estimates.
+This updates `G_adj.data[["BETA","SE","P"]]` with cohort-specific estimates and recomputes `FSTAT` to be consistent with the updated values.
 
 ### 8) Lift to a different build
 

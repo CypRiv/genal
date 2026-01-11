@@ -51,6 +51,8 @@ def lift_data(
     # Prepare the data for lifting: handle missing values in CHR, POS columns
     nrows = data.shape[0]
     data.dropna(subset=["CHR", "POS"], inplace=True)
+    # Remove absurd positions
+    data.drop(data[data.POS >= 300_000_000].index, inplace=True)
     data.reset_index(drop=True, inplace=True)
     n_na = nrows - data.shape[0]
     if n_na:
@@ -230,9 +232,9 @@ def lift_coordinates_python(data, chain_path):
     data["POS"] = [res[0][1] if res else np.nan for res in results]
     data["CHR"] = [res[0][0].split("chr")[1] if res else np.nan for res in results]
     nrows = data.shape[0]
+    data["POS"] = pd.to_numeric(data["POS"], errors="coerce").astype("Int32")
+    data["CHR"] = pd.to_numeric(data["CHR"], errors="coerce").astype("Int32")
     data.dropna(subset=["POS", "CHR"], inplace=True)
-    data["POS"] = data["POS"].astype("Int32")
-    data["CHR"] = data["CHR"].astype("Int32")
     data.reset_index(drop=True, inplace=True)
     n_na = nrows - data.shape[0]
     if n_na:

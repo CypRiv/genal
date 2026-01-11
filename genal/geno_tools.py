@@ -68,10 +68,21 @@ def check_allele_column(data, allele_col, keep_indel):
 
 def fill_se_p(data):
     """If either P or SE is missing but the other and BETA are present, fill it."""
+    # Ensure SE is numeric and non-negative
+    if ("SE" in data.columns):
+        data["SE"] = pd.to_numeric(data["SE"], errors="coerce")
+        data.loc[data["SE"] < 0, "SE"] = np.nan
+        n_missing = data["SE"].isna().sum()
+        if n_missing > 0:
+            print(
+                f"{n_missing}({n_missing/data.shape[0]*100:.3f}%) values in the SE column have been set to nan for being missing, negative or non-numeric."
+            )
     # If SE is missing
     if ("P" in data.columns) & ("BETA" in data.columns) & ("SE" not in data.columns):
-        data["SE"] = np.where(
-            data["P"] < 1, np.abs(data.BETA / st.norm.ppf(data.P / 2)), 0
+        data["SE"] = np.select(
+            [data["P"] == 0, data["P"] >= 1],
+            [0, np.nan],
+            default=np.abs(data.BETA / st.norm.ppf(data.P / 2)),
         )
         print("The SE (Standard Error) column has been created.")
     # If P is missing
@@ -80,6 +91,102 @@ def fill_se_p(data):
             data["SE"] > 0, 2 * (1 - st.norm.cdf(np.abs(data.BETA) / data.SE)), 1
         )
         print("The P (P-value) column has been created.")
+    return
+
+
+def fill_fstatistic(data, overwrite=False):
+    """
+    Compute or fill the per-variant F-statistic (FSTAT) column.
+    
+    The F-statistic is computed as:
+    - Primary: FSTAT = (BETA / SE)² when BETA and SE are available and SE > 0.
+      For SE=0 (extremely significant variants), FSTAT is set to inf.
+    - Fallback: FSTAT = χ²_isf(P, df=1) when BETA/SE are unavailable but P is present.
+      For P=0 (extremely significant variants), this produces inf.
+    
+    Args:
+        data (pd.DataFrame): SNP-level DataFrame.
+        overwrite (bool): If False (default), only fill missing FSTAT values if the column 
+            exists; if it doesn't exist, create it. If True, recompute FSTAT for all rows 
+            where computable, overwriting existing values; non-computable rows become NaN.
+    
+    Returns:
+        None: Modifies data in place.
+    
+    Note:
+        FSTAT is NOT added to STANDARD_COLUMNS to avoid row deletion due to missing values.
+    """
+    nrows = data.shape[0]
+    column_created = False
+    
+    # Determine which rows need computation
+    if "FSTAT" not in data.columns:
+        data["FSTAT"] = np.nan
+        column_created = True
+        rows_to_compute = pd.Series([True] * nrows, index=data.index)
+    elif overwrite:
+        # Clear FSTAT first so non-computable rows become NaN (not stale values)
+        data["FSTAT"] = np.nan
+        rows_to_compute = pd.Series([True] * nrows, index=data.index)
+    else:
+        # Only compute for rows with missing FSTAT
+        rows_to_compute = data["FSTAT"].isna()
+    
+    if not rows_to_compute.any():
+        return
+    
+    # Track how many values are assigned
+    n_assigned = 0
+    
+    # Primary route: FSTAT = (BETA / SE)² when BETA and SE are available (SE=0 produces inf)
+    beta_se_computable = pd.Series([False] * nrows, index=data.index)
+    if "BETA" in data.columns and "SE" in data.columns:
+        beta_se_computable = (
+            rows_to_compute & 
+            data["BETA"].notna() & 
+            data["SE"].notna() & 
+            (data["SE"] >= 0)
+        )
+        if beta_se_computable.any():
+            data.loc[beta_se_computable, "FSTAT"] = (
+                data.loc[beta_se_computable, "BETA"] / data.loc[beta_se_computable, "SE"]
+            ) ** 2
+            n_assigned += beta_se_computable.sum()
+    
+    # Fallback route: FSTAT = χ²_isf(P, df=1) for remaining rows where P is present
+    # Allow P=0 (produces inf for extremely significant variants)
+    if "P" in data.columns:
+        p_fallback_computable = (
+            rows_to_compute & 
+            ~beta_se_computable & 
+            data["P"].notna() & 
+            (data["P"] >= 0) & 
+            (data["P"] <= 1)
+        )
+        if p_fallback_computable.any():
+            data.loc[p_fallback_computable, "FSTAT"] = st.chi2.isf(
+                data.loc[p_fallback_computable, "P"], df=1
+            )
+            n_assigned += p_fallback_computable.sum()
+    
+    # Logging
+    if column_created:
+        print(
+            f"The FSTAT (F-statistic) column has been created. "
+            f"{n_assigned}({n_assigned/nrows*100:.3f}%) values computed."
+        )
+    elif overwrite:
+        print(
+            f"The FSTAT (F-statistic) column has been re-created. "
+            f"{n_assigned}({n_assigned/nrows*100:.3f}%) values computed."
+        )
+    else:
+        if n_assigned > 0:
+            print(
+                f"The FSTAT (F-statistic) column: {n_assigned}({n_assigned/nrows*100:.3f}%)"
+                f"missing values have been filled."
+            )
+    
     return
 
 
@@ -96,14 +203,15 @@ def check_p_column(data):
     return
 
 
-def check_beta_column(data, effect_column, preprocessing):
+def check_beta_column(data, effect_column):
     """
     If the BETA column is a column of odds ratios, log-transform it.
     If no effect_column argument is specified, determine if the BETA column are beta estimates or odds ratios.
     """
+    # Ensure the BETA column is numeric
+    data["BETA"] = pd.to_numeric(data["BETA"], errors="coerce")
+    
     if effect_column is None:
-        if preprocessing == 'None':
-            return data
         median = data.BETA.median()
         has_negative = (data.BETA < 0).any()
         
@@ -126,7 +234,7 @@ def check_beta_column(data, effect_column, preprocessing):
         )
     if effect_column == "OR":
         data["BETA"] = np.log(data["BETA"].clip(lower=0.01))
-        data.drop(columns="SE", errors="ignore", inplace=True)
+        data.drop(columns=["SE"], errors="ignore", inplace=True)
         print("The BETA column has been log-transformed to obtain Beta estimates.")
     return
 
@@ -292,7 +400,7 @@ def check_int_column(data, int_col):
         )
     return
 
-def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns):
+def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns, F):
     """
     Rename columns to the standard names making sure that there are no duplicated names.
     Delete other columns if keep_columns=False, keep them if True.
@@ -312,6 +420,7 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
         SE: "SE",
         P: "P",
         EAF: "EAF",
+        F: "F",
     }
     for key, value in rename_dict.items():
         if key != value and key not in data.columns:

@@ -6,6 +6,8 @@ from concurrent.futures import ProcessPoolExecutor
 from .tools import check_bfiles, check_pfiles, setup_genetic_path, get_plink_path
 
 
+MIN_RAM_PER_WORKER_MB = 3500 # Minimum RAM per PLINK process (conservative for large genotype files)
+
 ### ____________________
 ### PRS functions
 ### ____________________
@@ -126,7 +128,7 @@ def extract_snps_func(snp_list, name=None, path=None, ram=20000, cpus=4):
     path, filetype = setup_genetic_path(path)
 
     # Prepare the SNP list
-    snp_list = snp_list.dropna()
+    snp_list = snp_list.dropna().drop_duplicates()
     snp_list_name = f"{name}_list.txt"
     snp_list_path = os.path.join("tmp_GENAL", snp_list_name)
     snp_list.to_csv(snp_list_path, sep=" ", index=False, header=None)
@@ -136,16 +138,29 @@ def extract_snps_func(snp_list, name=None, path=None, ram=20000, cpus=4):
     filetype_split = "split" if "$" in path else "combined"
 
     output_path = os.path.join("tmp_GENAL", f"{name}_allchr")
+
+    # Guard against empty SNP list (applies to both split and combined)
+    if nrow == 0:
+        print("The SNP list is empty after deduplication.")
+        return "FAILED"
+
     if filetype_split == "split":
-        ram_estimate_per_cpu = nrow/(1.5*10**2)
-        n_cpus = max(1, int(ram // ram_estimate_per_cpu))
-        workers = min(n_cpus, cpus)
+        # Calculate workers based on memory budget (not SNP count)
+        max_workers_by_ram = max(1, int(ram // MIN_RAM_PER_WORKER_MB))
+        workers = max(1, min(max_workers_by_ram, cpus, 22))  # Cap at 22 chromosomes, min 1
+
+        # Allocate RAM per worker
+        per_worker_ram = int(ram // workers)
+
+        #print(f"Parallelizing extraction across {workers} workers with {per_worker_ram}MB RAM each")
+
         merge_command, bedlist_path = extract_snps_from_split_data(
-            name, path, output_path, snp_list_path, filetype, workers=workers
+            name, path, output_path, snp_list_path, filetype,
+            workers=workers, per_worker_ram=per_worker_ram, ram=ram
         )
         handle_multiallelic_variants(name, merge_command, bedlist_path)
     else:
-        extract_snps_from_combined_data(name, path, output_path, snp_list_path, filetype)
+        extract_snps_from_combined_data(name, path, output_path, snp_list_path, filetype, ram=ram)
 
     #Check that at least 1 variant has been extracted. If not, return "FAILED" to warn downstream functions (prs, association_test)
     log_path = output_path + ".log"
@@ -164,7 +179,7 @@ def extract_snps_func(snp_list, name=None, path=None, ram=20000, cpus=4):
     return output_path
 
 
-def extract_command_parallel(task_id, name, path, snp_list_path, filetype):
+def extract_command_parallel(task_id, name, path, snp_list_path, filetype, per_worker_ram=4000):
     """
     Helper function to run SNP extraction in parallel for different chromosomes.
     Args:
@@ -173,8 +188,11 @@ def extract_command_parallel(task_id, name, path, snp_list_path, filetype):
         path (str): Path to the data set.
         snp_list_path (str): Path to the list of SNPs to extract.
         filetype (str): Type of genetic files ("bed" or "pgen")
+        per_worker_ram (int): RAM limit in MB for this PLINK process.
     Returns:
         int: Returns the task_id if no valid files are found.
+        dict: Returns error dict {'failed': True, 'chr': task_id, ...} if extraction fails.
+        None: Returns None on success.
     """
     input_path = path.replace("$", str(task_id))
 
@@ -185,29 +203,96 @@ def extract_command_parallel(task_id, name, path, snp_list_path, filetype):
         return task_id
 
     output_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{task_id}")
-    
+
     # Build command based on filetype
     base_cmd = f"{get_plink_path()}"
     if filetype == "bed":
         base_cmd += f" --bfile {input_path}"
     else:  # pgen
         base_cmd += f" --pfile {input_path}"
-        
-    command = f"{base_cmd} --extract {snp_list_path} --rm-dup force-first --make-pgen --out {output_path}"
-    
-    subprocess.run(
+
+    command = f"{base_cmd} --extract {snp_list_path} --memory {per_worker_ram} --threads 1 --rm-dup force-first --make-pgen --out {output_path}"
+
+    result = subprocess.run(
         command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
 
+    # Check for failures and return diagnostic info (diagnostics are in .log file)
+    if result.returncode != 0:
+        return {'failed': True, 'chr': task_id, 'log': f"{output_path}.log", 'returncode': result.returncode}
 
-def create_bedlist(bedlist_path, output_name, not_found):
-    """
-    Creates a bedlist file for SNP extraction.
-    Args:
-        bedlist_path (str): Path to save the bedlist file.
-        output_name (str): Base name for the output files.
-        not_found (List[int]): List of chromosome numbers for which no files were found.
-    """
+    # Also check if output files were created
+    if not check_pfiles(output_path):
+        return {'failed': True, 'chr': task_id, 'log': f"{output_path}.log", 'returncode': -1}
+
+    return None  # Success
+
+
+def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetype, workers=4, per_worker_ram=4000, ram=20000):
+    """Extract SNPs from data split by chromosome."""
+    print("Extracting SNPs for each chromosome...")
+    num_tasks = 22
+    partial_extract_command_parallel = partial(
+        extract_command_parallel,
+        name=name,
+        path=path,
+        snp_list_path=snp_list_path,
+        filetype=filetype,
+        per_worker_ram=per_worker_ram
+    )  # Wrapper function
+
+    # First attempt with calculated workers
+    results = []
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        results = list(
+            executor.map(partial_extract_command_parallel, range(1, num_tasks + 1))
+        )
+
+    # Check for failures (non-None returns indicate errors)
+    failed_chrs = [r for r in results if r is not None and isinstance(r, dict) and r.get('failed')]
+    not_found = [r for r in results if r is not None and not isinstance(r, dict)]
+
+    # Retry failed chromosomes with reduced workers if any failures occurred
+    if failed_chrs and workers > 1:
+        print(f"{len(failed_chrs)} chromosome(s) failed. Retrying with reduced parallelization...")
+        retry_workers = max(1, workers // 2)
+        # Recalculate RAM per worker based on original total budget
+        total_ram_budget = per_worker_ram * workers
+        per_worker_ram_retry = int(total_ram_budget // retry_workers)
+
+        partial_retry = partial(
+            extract_command_parallel,
+            name=name,
+            path=path,
+            snp_list_path=snp_list_path,
+            filetype=filetype,
+            per_worker_ram=per_worker_ram_retry
+        )
+
+        failed_chr_ids = [r['chr'] for r in failed_chrs]
+        with ProcessPoolExecutor(max_workers=retry_workers) as executor:
+            retry_results = list(executor.map(partial_retry, failed_chr_ids))
+
+        # Update results - surface errors for persistent failures
+        for orig_id, retry_result in zip(failed_chr_ids, retry_results):
+            if retry_result is not None and isinstance(retry_result, dict) and retry_result.get('failed'):
+                # Still failed - surface the error
+                log_path = os.path.join("tmp_GENAL", f"{name}_extract_chr{orig_id}.log")
+                if os.path.exists(log_path):
+                    print(f"Chr{orig_id} failed after retry. Check log: {log_path}")
+                    try:
+                        with open(log_path, 'r') as f:
+                            lines = f.readlines()
+                            print(f"Last 10 lines of log:\n{''.join(lines[-10:])}")
+                    except Exception:
+                        pass
+
+    # Merge extracted SNPs from each chromosome
+    bedlist_name = f"{name}_bedlist.txt"
+    bedlist_path = os.path.join("tmp_GENAL", bedlist_name)
+
+    # Create the bedlist file
+    output_name = os.path.join("tmp_GENAL", f"{name}_extract")
     with open(bedlist_path, "w+") as bedlist_file:
         found = []
         for i in range(1, 23):
@@ -219,31 +304,7 @@ def create_bedlist(bedlist_path, output_name, not_found):
                 print(f"SNPs extracted for chr{i}.")
             else:
                 print(f"No SNPs extracted for chr{i}.")
-    return found
 
-
-def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetype, workers=4):
-    """Extract SNPs from data split by chromosome."""
-    print("Extracting SNPs for each chromosome...")
-    num_tasks = 22
-    partial_extract_command_parallel = partial(
-        extract_command_parallel, 
-        name=name, 
-        path=path, 
-        snp_list_path=snp_list_path,
-        filetype=filetype
-    )  # Wrapper function
-    with ProcessPoolExecutor(max_workers=workers) as executor:
-        not_found = list(
-            executor.map(partial_extract_command_parallel, range(1, num_tasks + 1))
-        )
-
-    # Merge extracted SNPs from each chromosome
-    bedlist_name = f"{name}_bedlist.txt"
-    bedlist_path = os.path.join("tmp_GENAL", bedlist_name)
-    found = create_bedlist(
-        bedlist_path, os.path.join("tmp_GENAL", f"{name}_extract"), not_found
-    )
     if len(found) == 0:
         raise Warning("No SNPs were extracted from any chromosome.")
     
@@ -255,7 +316,7 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
         return None, bedlist_path
 
     print("Merging SNPs extracted from each chromosome...")
-    merge_command = f"{get_plink_path()} --pmerge-list {bedlist_path} pfile --out {output_path}"
+    merge_command = f"{get_plink_path()} --memory {ram} --pmerge-list {bedlist_path} pfile --out {output_path}"
     try:
         subprocess.run(
             merge_command, shell=True, capture_output=True, text=True, check=True
@@ -269,18 +330,18 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
     return merge_command, bedlist_path
 
 
-def extract_snps_from_combined_data(name, path, output_path, snp_list_path, filetype):
+def extract_snps_from_combined_data(name, path, output_path, snp_list_path, filetype, ram=20000):
     """Extract SNPs from combined data."""
     print("Extracting SNPs...")
-    
+
     # Build command based on filetype
     base_cmd = f"{get_plink_path()}"
     if filetype == "bed":
         base_cmd += f" --bfile {path}"
     else:  # pgen
         base_cmd += f" --pfile {path}"
-        
-    extract_command = f"{base_cmd} --extract {snp_list_path} --rm-dup force-first --make-pgen --out {output_path}"
+
+    extract_command = f"{base_cmd} --memory {ram} --extract {snp_list_path} --rm-dup force-first --make-pgen --out {output_path}"
     
     subprocess.run(
         extract_command,

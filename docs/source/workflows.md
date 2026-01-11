@@ -59,6 +59,7 @@ Key arguments you commonly tune:
 - `effect_column="OR"` forces log-transforming odds ratios into betas and adjusts SE accordingly.
 - `fill_snpids` / `fill_coordinates`: override the default logic if you want to force filling rsIDs from `CHR+POS` or vice-versa.
 - `keep_indel` / `keep_dups`: keep indels or duplicated IDs (generally you keep these `False` unless you have a reason).
+- `fill_f=True`: force recomputation of the F-statistic (`FSTAT`) column even if it already exists. By default, FSTAT is created if missing or only missing values are filled.
 
 ## 3) Select independent instruments via LD clumping
 
@@ -237,6 +238,7 @@ What you typically tune / watch:
 - `covar`: covariate names (must be present in `pheno_df` and numeric; constant covariates are dropped).
 - `standardize=True`: for quantitative traits; set `False` if you want raw-scale effects.
 - Variant matching: if `CHR+POS` are present in `G.data`, genal will map to cohort SNP IDs before running PLINK (reduces ID mismatch losses).
+- After updating `BETA`, `SE`, and `P`, the F-statistic (`FSTAT`) column is automatically recomputed to remain consistent with the updated estimates.
 
 ### Liftover between builds
 

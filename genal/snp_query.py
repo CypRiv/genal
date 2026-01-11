@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 import numpy as np
 import nest_asyncio
-from tqdm.auto import tqdm  
+from tqdm import tqdm  
 
 # Using nest_asyncio to allow execution in notebooks
 nest_asyncio.apply()

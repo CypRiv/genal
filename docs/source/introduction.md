@@ -2,7 +2,7 @@
 
 `genal` is a Python toolkit for common GWAS-derived workflows:
 
-- **Preprocess** GWAS summary statistics into a consistent SNP table (column validation, allele checks, optional filling of missing `SNP`/`CHR`/`POS`/`EA`/`NEA`/`SE`/`P` using reference data).
+- **Preprocess** GWAS summary statistics into a consistent SNP table (column validation, allele checks, optional filling of missing `SNP`/`CHR`/`POS`/`EA`/`NEA`/`SE`/`P` using reference data, and computation of per-variant F-statistic `FSTAT`).
 - **Select instruments** via LD clumping (PLINK 2).
 - **Compute PRS** on individual-level genotype data (PLINK 2), with optional **proxy SNP** support.
 - **Run two-sample MR** (multiple estimators + sensitivity analyses), with plotting helpers.

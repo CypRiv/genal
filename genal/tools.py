@@ -113,7 +113,11 @@ def create_tmp():
 def delete_tmp():
     """Delete the tmp folder."""
     if os.path.isdir("tmp_GENAL"):
-        shutil.rmtree("tmp_GENAL")
+        def _onerror(func, path, exc_info):
+            if isinstance(exc_info[1], FileNotFoundError):
+                return
+            raise exc_info[1]
+        shutil.rmtree("tmp_GENAL", onerror=_onerror)
         print("The tmp_GENAL folder has been successfully deleted.")
     else:
         print("There is no tmp_GENAL folder to delete in the current directory.")

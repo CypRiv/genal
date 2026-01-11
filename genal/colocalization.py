@@ -29,8 +29,8 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
     """
 
     # Ensure that the BETA columns are preprocessed
-    check_beta_column(data1, 'BETA', 'Fill')
-    check_beta_column(data2, 'BETA', 'Fill')
+    check_beta_column(data1, 'BETA')
+    check_beta_column(data2, 'BETA')
 
     # Adjust EAF column names before merging in case one of the datasets does not have it
     if 'EAF' in data1.columns:

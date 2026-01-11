@@ -34,6 +34,7 @@ from .geno_tools import (
     check_beta_column,
     check_p_column,
     fill_se_p,
+    fill_fstatistic,
     check_allele_column,
     check_snp_column,
     remove_na,
@@ -91,6 +92,7 @@ class Geno:
         P="P",
         EAF="EAF",
         keep_columns=True,
+        F="F",
     ):
         """
         Initializes the Geno object used to store and transform Single Nucleotide Polymorphisms (SNP) data.
@@ -107,6 +109,7 @@ class Geno:
             P (str, optional): Column name for p-value. Defaults to "P".
             EAF (str, optional): Column name for effect allele frequency. Defaults to "EAF".
             keep_columns (bool, optional): Determines if non-main columns should be kept. Defaults to True.
+            F (str, optional): Column name for F-statistic. Defaults to "F".
 
         Attributes:
             name (str): Randomly generated ID for the Geno object.
@@ -135,7 +138,7 @@ class Geno:
 
         # Standardize column names based on provided parameters +/- delete other columns
         data = adjust_column_names(
-            data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns
+            data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns, F
         )
 
         # Set object attributes
@@ -145,15 +148,9 @@ class Geno:
         # List to keep track of checks performed
         self.checks = CHECKS_DICT.copy()
 
-        # Set the maximal amount of ram/cpu to be used by the methods and dask chunksize
-        self.cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", default=os.cpu_count())) - 1
-        non_hpc_ram_per_cpu = psutil.virtual_memory().total  / (
-            1024**2 * self.cpus
-        )
-        ram_per_cpu = int(
-            os.environ.get("SLURM_MEM_PER_CPU", default=non_hpc_ram_per_cpu)
-        )
-        self.ram = int(ram_per_cpu * self.cpus * 0.8)
+        # Set the maximal amount of ram/cpu to be used by the methods
+        self.cpus = os.cpu_count() - 1
+        self.ram = int(psutil.virtual_memory().total / 1024**2 * 0.8)
 
         create_tmp()
 
@@ -168,6 +165,7 @@ class Geno:
         keep_dups=None,
         fill_snpids=None,
         fill_coordinates=None,
+        fill_f=False,
     ):
         """
         Clean and preprocess the main dataframe of Single Nucleotide Polymorphisms (SNP) data.
@@ -187,6 +185,9 @@ class Geno:
             keep_dups (bool, optional): Determines if rows with duplicate SNP IDs should be kept. If None, defers to preprocessing value. Defaults to None.
             fill_snpids (bool, optional): Decides if the SNP (rsID) column should be created or replaced based on CHR/POS columns and a reference genome. If None, defers to preprocessing value. Defaults to None.
             fill_coordinates (bool, optional): Decides if CHR and/or POS should be created or replaced based on SNP column and a reference genome. If None, defers to preprocessing value. Defaults to None.
+            fill_f (bool, optional): If True, force recomputation/overwrite of the FSTAT column even if it 
+                already exists. If False (default), FSTAT is created if missing, or only missing values 
+                are filled if the column already exists.
 
         Note:
             If you pass a standard reference_panel name (e.g. "EUR_37"), it will be converted to "37".
@@ -256,8 +257,8 @@ class Geno:
             data = fill_ea_nea(data, self.get_reference_panel(reference_panel))
 
         # Convert effect column to Beta estimates if present
-        if "BETA" in data.columns:
-            check_beta_column(data, effect_column, preprocessing)
+        if "BETA" in data.columns and preprocessing in ['Fill', 'Fill_delete']:
+            check_beta_column(data, effect_column)
             self.checks["BETA"] = True
 
         # Ensure P column contains valid values
@@ -268,6 +269,12 @@ class Geno:
         # Fill missing SE or P columns if necessary
         if preprocessing in ['Fill', 'Fill_delete']:
             fill_se_p(data)
+
+        # Compute or fill the FSTAT column
+        # Under normal preprocessing: compute/create/fill FSTAT
+        # If preprocessing == "None": only compute FSTAT when fill_f=True
+        if preprocessing in ['Fill', 'Fill_delete'] or fill_f:
+            fill_fstatistic(data, overwrite=fill_f)
 
         # Process allele columns
         for allele_col in ["EA", "NEA"]:
@@ -590,7 +597,7 @@ class Geno:
         if not self.checks.get("EA"):
             check_allele_column(data_prs, "EA", keep_indel=False)
         if not self.checks.get("BETA"):
-            check_beta_column(data_prs, effect_column=None, preprocessing='Fill_delete')
+            check_beta_column(data_prs, effect_column=None)
 
         initial_rows = data_prs.shape[0]
         data_prs.dropna(subset=["SNP", "EA", "BETA"], inplace=True)
@@ -740,8 +747,8 @@ class Geno:
                                           to make results more interpretable. Default is True.
 
         Returns:
-            None: Updates the BETA, SE, and P columns of the data attribute based on the results
-                  of the association tests.
+            None: Updates the BETA, SE, P, and FSTAT columns of the data attribute based on the 
+                  results of the association tests.
 
         Note:
             This method requires the phenotype to be set using the set_phenotype() function.
@@ -795,6 +802,9 @@ class Geno:
         print(f"The BETA, SE, P columns of the .data attribute have been updated for {n_updated} SNPs.")
         if n_updated < n_original:
             print(f"{n_original - n_updated}({(n_original - n_updated)/n_original*100:.3f}%) SNPs have been removed.")
+
+        # Recompute FSTAT to be consistent with the updated BETA/SE/P values
+        fill_fstatistic(updated_data, overwrite=True)
 
         # Update the instance data
         self.data = updated_data

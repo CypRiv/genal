@@ -2,6 +2,15 @@
 
 This page documents the main statistical models implemented in `genal`. It is intentionally brief and focuses on what is implemented in the codebase.
 
+## Per-variant F-statistic (FSTAT)
+
+Implementation: {py:func}`genal.geno_tools.fill_fstatistic`
+
+`genal` computes a per-variant F-statistic (`FSTAT`) during preprocessing and after association testing. This statistic measures instrument strength for each variant.
+
+- **Primary:** `FSTAT = (BETA / SE)²` when `BETA` and `SE` are available and `SE > 0`.
+- **Fallback:** `FSTAT = χ²_isf(P, df=1)` (equivalent to `Z²` for a two-sided p-value) when `BETA/SE` are unavailable but `P` is present.
+
 ## MR harmonization
 
 MR workflows rely on aligning exposure and outcome effects to the same effect allele.
