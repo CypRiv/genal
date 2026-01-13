@@ -9,6 +9,18 @@ from functools import partial
 
 from .constants import MR_METHODS_NAMES
 
+
+def _null_result(method_name):
+    """Generate a null result dict for early returns when insufficient data."""
+    return {
+        "method": method_name,
+        "b": np.nan,
+        "se": np.nan,
+        "pval": np.nan,
+        "nSNP": np.nan,
+    }
+
+
 """
 Mode methods
 """
@@ -36,15 +48,7 @@ def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     """
     l = len(BETA_e)
     if l < 3:
-        return [
-            {
-                "method": MR_METHODS_NAMES["Simple-mode"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["Simple-mode"])]
     
     BETA_IV   = BETA_o/BETA_e
     SE_IV = np.sqrt((SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4))
@@ -87,15 +91,7 @@ def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     """
     l = len(BETA_e)
     if l < 3:
-        return [
-            {
-                "method": MR_METHODS_NAMES["Weighted-mode"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["Weighted-mode"])]
     
     BETA_IV   = BETA_o/BETA_e
     SE_IV = np.sqrt((SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4))
@@ -201,23 +197,7 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
             - "pval": P-value for the causal estimate or intercept.
             - "nSNP": Number of genetic variants used in the analysis.
     """
-    # Initialize null result
-    null_result = [
-        {
-            "method": MR_METHODS_NAMES["Egger"][0],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        },
-        {
-            "method": MR_METHODS_NAMES["Egger"][1],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        },
-    ]
+    null_result = [_null_result(name) for name in MR_METHODS_NAMES["Egger"]]
 
     l = len(BETA_e)
     # Early return if insufficient data
@@ -303,22 +283,7 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
 
     l = len(BETA_e)
     if l < 3:
-        return [
-            {
-                "method": MR_METHODS_NAMES["Egger-boot"][0],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            },
-            {
-                "method": MR_METHODS_NAMES["Egger-boot"][1],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            },
-        ]
+        return [_null_result(name) for name in MR_METHODS_NAMES["Egger-boot"]]
 
     res = np.zeros((nboot + 1, 2))
 
@@ -442,15 +407,7 @@ def mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     """
     l = len(BETA_e)
     if l < 3:
-        return [
-            {
-                "method": MR_METHODS_NAMES["WM"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["WM"])]
 
     b_iv = BETA_o / BETA_e
     VBj = (SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4)
@@ -483,15 +440,7 @@ def mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk):
     """
     l = len(BETA_e)
     if l < 3:
-        return [
-            {
-                "method": MR_METHODS_NAMES["WM-pen"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["WM-pen"])]
 
     betaIV = BETA_o / BETA_e
     #betaIVW = np.sum(BETA_o * BETA_e / SE_o**2) / np.sum(BETA_e**2 / SE_o**2)
@@ -541,15 +490,7 @@ def mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot):
     """
     l = len(BETA_e)
     if l < 3:
-        return [
-            {
-                "method": MR_METHODS_NAMES["Simple-median"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["Simple-median"])]
 
     b_iv = BETA_o / BETA_e
     weights = np.repeat(1 / len(BETA_e), len(BETA_e))
@@ -592,26 +533,14 @@ def mr_ivw(BETA_e, SE_e, BETA_o, SE_o):
     # If less than 2 valid rows, return NA values
     l = len(BETA_e)
     if l < 2:
-        return {
-            "method": MR_METHODS_NAMES["IVW"],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        }
+        return [_null_result(MR_METHODS_NAMES["IVW"])]
 
     # Create weights and perform weighted regression
     weights = 1 / (SE_o**2)
     try:
         model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
     except:
-        return {
-            "method": MR_METHODS_NAMES["IVW"],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        }
+        return [_null_result(MR_METHODS_NAMES["IVW"])]
 
     # Extract coefficients
     b = model.params.iloc[0]
@@ -665,13 +594,7 @@ def mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o):
     # If less than 2 valid rows, return NA values
     l = len(BETA_e)
     if l < 2:
-        return {
-            "method": MR_METHODS_NAMES["IVW-RE"],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        }
+        return [_null_result(MR_METHODS_NAMES["IVW-RE"])]
 
     # Create weights and perform weighted regression
     weights = 1 / (SE_o**2)
@@ -727,28 +650,14 @@ def mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o):
     """
     l = len(BETA_e)
     if l < 2:
-        return [
-            {
-                "method": MR_METHODS_NAMES["IVW-FE"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["IVW-FE"])]
 
     # Create weights and perform weighted regression
     weights = 1 / SE_o**2
     try:
         model = sm.WLS(BETA_o, BETA_e, weights=weights).fit()
     except:
-        return {
-            "method": MR_METHODS_NAMES["IVW-FE"],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        }
+        return [_null_result(MR_METHODS_NAMES["IVW-FE"])]
 
     # Extract coefficients
     b = model.params.iloc[0]
@@ -800,13 +709,7 @@ def mr_uwr(BETA_e, SE_e, BETA_o, SE_o):
 
     l = len(BETA_e)
     if l < 2:
-        return {
-            "method": MR_METHODS_NAMES["UWR"],
-            "b": np.nan,
-            "se": np.nan,
-            "pval": np.nan,
-            "nSNP": np.nan,
-        }
+        return [_null_result(MR_METHODS_NAMES["UWR"])]
 
     # Perform regression without weights
     model = sm.OLS(BETA_o, BETA_e).fit()
@@ -869,15 +772,7 @@ def mr_sign(BETA_e, BETA_o):
     # Check for enough non-missing values
     valid_data = (~np.isnan(BETA_e)) & (~np.isnan(BETA_o))
     if np.sum(valid_data) < 6:
-        return [
-            {
-                "method": MR_METHODS_NAMES["Sign"],
-                "b": np.nan,
-                "se": np.nan,
-                "pval": np.nan,
-                "nSNP": np.nan,
-            }
-        ]
+        return [_null_result(MR_METHODS_NAMES["Sign"])]
 
     # Count the number of consistent signs
     x = np.sum(np.sign(BETA_e[valid_data]) == np.sign(BETA_o[valid_data]))

@@ -10,6 +10,7 @@ from .MRpresso import mr_presso
 from .constants import MR_METHODS_NAMES
 
 REQUIRED_COLUMNS = ["SNP", "BETA", "SE", "EA", "NEA"]
+RESULT_COLS = ["exposure", "outcome", "method", "nSNP", "b", "se", "pval", "Q", "Q_df", "Q_pval"]
 
 
 def mrpresso_func(
@@ -130,7 +131,7 @@ def MR_func(
         # Check number of instruments
         if df_exposure.shape[0] < 2:
             print("Not enough instruments to run MR. At least 2 are required.")
-            return pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame(columns=RESULT_COLS), pd.DataFrame()
 
         # Check EAF columns if action = 2
         if action == 2:
@@ -156,7 +157,7 @@ def MR_func(
         n_snps = df_mr.shape[0]
         if n_snps < 2:
             print(f"{n_snps} SNPs remaining after harmonization step but at least 2 are required to run MR.")
-            return pd.DataFrame(), df_mr
+            return pd.DataFrame(columns=RESULT_COLS), df_mr
 
     # Prepare values for MR methods
     BETA_e, BETA_o, SE_e, SE_o = (
@@ -199,21 +200,7 @@ def MR_func(
 
     res = pd.DataFrame(results)
     res["exposure"], res["outcome"] = name_exposure, name_outcome
-
-    res = res[
-        [
-            "exposure",
-            "outcome",
-            "method",
-            "nSNP",
-            "b",
-            "se",
-            "pval",
-            "Q",
-            "Q_df",
-            "Q_pval",
-        ]
-    ]
+    res = res.reindex(columns=RESULT_COLS)
     res["Q_df"] = res["Q_df"].astype("Int64")
 
     return res, df_mr
