@@ -92,7 +92,7 @@ class Geno:
         P="P",
         EAF="EAF",
         keep_columns=True,
-        F="F",
+        FSTAT="FSTAT",
     ):
         """
         Initializes the Geno object used to store and transform Single Nucleotide Polymorphisms (SNP) data.
@@ -109,7 +109,7 @@ class Geno:
             P (str, optional): Column name for p-value. Defaults to "P".
             EAF (str, optional): Column name for effect allele frequency. Defaults to "EAF".
             keep_columns (bool, optional): Determines if non-main columns should be kept. Defaults to True.
-            F (str, optional): Column name for F-statistic. Defaults to "F".
+            FSTAT (str, optional): Column name for F-statistic. Defaults to "FSTAT".
 
         Attributes:
             name (str): Randomly generated ID for the Geno object.
@@ -138,7 +138,7 @@ class Geno:
 
         # Standardize column names based on provided parameters +/- delete other columns
         data = adjust_column_names(
-            data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns, F
+            data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns, FSTAT
         )
 
         # Set object attributes

@@ -400,7 +400,7 @@ def check_int_column(data, int_col):
         )
     return
 
-def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns, F):
+def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_columns, FSTAT):
     """
     Rename columns to the standard names making sure that there are no duplicated names.
     Delete other columns if keep_columns=False, keep them if True.
@@ -420,7 +420,7 @@ def adjust_column_names(data, CHR, POS, SNP, EA, NEA, BETA, SE, P, EAF, keep_col
         SE: "SE",
         P: "P",
         EAF: "EAF",
-        F: "F",
+        FSTAT: "FSTAT",
     }
     for key, value in rename_dict.items():
         if key != value and key not in data.columns:
