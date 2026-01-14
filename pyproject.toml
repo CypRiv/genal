@@ -35,6 +35,13 @@ dependencies = [
 "pyarrow>=3.0"
 ]
 
+[project.optional-dependencies]
+test = [
+  "pytest>=7.0",
+  "pytest-cov",
+  "pytest-xdist",
+]
+
 [tool.setuptools.package-dir]
 genal = "genal/"
 

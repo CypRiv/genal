@@ -1,0 +1,47 @@
+{
+  "description": "Synthetic liftover regression baseline (chr1 positions +1000).",
+  "expected": [
+    {
+      "CHR": 1,
+      "POS": 1000
+    },
+    {
+      "CHR": 1,
+      "POS": 1010
+    },
+    {
+      "CHR": 1,
+      "POS": 100999
+    }
+  ],
+  "source": {
+    "chain_text": "chain 1 chr1 200000 + 0 100000 chr1 200000 + 1000 101000 1\n100000\n",
+    "input": [
+      {
+        "CHR": 1,
+        "POS": 0
+      },
+      {
+        "CHR": 1,
+        "POS": 10
+      },
+      {
+        "CHR": 1,
+        "POS": 99999
+      },
+      {
+        "CHR": 1,
+        "POS": 100000
+      },
+      {
+        "CHR": 2,
+        "POS": 10
+      }
+    ]
+  },
+  "tolerances": {
+    "numeric_abs": 0.0,
+    "numeric_rel": 0.0
+  },
+  "version": 1
+}

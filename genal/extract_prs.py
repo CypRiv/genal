@@ -3,7 +3,7 @@ import os, subprocess, re, uuid
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 
-from .tools import check_bfiles, check_pfiles, setup_genetic_path, get_plink_path
+from .tools import check_bfiles, check_pfiles, setup_genetic_path, get_plink_path, create_tmp
 
 
 MIN_RAM_PER_WORKER_MB = 3500 # Minimum RAM per PLINK process (conservative for large genotype files)
@@ -16,6 +16,13 @@ def prs_func(data, weighted=True, path=None, ram=20000, cpus=4, name=None):
     """
     Compute a PRS (Polygenic Risk Score) using provided SNP-level data. Corresponds to the :meth:`Geno.prs` method
     """
+    required = {"SNP", "EA", "BETA"}
+    missing = required - set(data.columns)
+    if missing: 
+        raise ValueError(f"Missing required columns for PRS: {sorted(missing)}")
+    if data.shape[0] == 0:
+        raise ValueError("No SNPs were extracted from the genetic data and the PRS can't be computed.")
+
     # Get path and filetype
     path, filetype = setup_genetic_path(path)
 
@@ -126,6 +133,7 @@ def extract_snps_func(snp_list, name=None, path=None, ram=20000, cpus=4):
 
     # Get path and filetype
     path, filetype = setup_genetic_path(path)
+    create_tmp()  # Ensure tmp_GENAL exists
 
     # Prepare the SNP list
     snp_list = snp_list.dropna().drop_duplicates()
@@ -425,4 +433,3 @@ def handle_multiallelic_variants(name, merge_command, bedlist_path):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-

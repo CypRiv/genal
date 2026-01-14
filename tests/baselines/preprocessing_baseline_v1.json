@@ -1,0 +1,128 @@
+{
+  "description": "Preprocessing baseline: Fill SNP/alleles from StudyA chr9 reference.",
+  "expected": {
+    "columns": [
+      "CHR",
+      "POS",
+      "SNP",
+      "EA",
+      "NEA"
+    ],
+    "rows": [
+      {
+        "CHR": 9,
+        "EA": "G",
+        "NEA": "C",
+        "POS": 10469,
+        "SNP": "rs56377469"
+      },
+      {
+        "CHR": 9,
+        "EA": "A",
+        "NEA": "G",
+        "POS": 10513,
+        "SNP": "9:10513:G:A"
+      },
+      {
+        "CHR": 9,
+        "EA": "G",
+        "NEA": "C",
+        "POS": 10559,
+        "SNP": "9:10559:C:G"
+      },
+      {
+        "CHR": 9,
+        "EA": "G",
+        "NEA": "C",
+        "POS": 10582,
+        "SNP": "9:10582:C:G"
+      },
+      {
+        "CHR": 9,
+        "EA": "T",
+        "NEA": "C",
+        "POS": 10583,
+        "SNP": "9:10583:C:T"
+      },
+      {
+        "CHR": 9,
+        "EA": "C",
+        "NEA": "T",
+        "POS": 10593,
+        "SNP": "9:10593:T:C"
+      },
+      {
+        "CHR": 9,
+        "EA": "T",
+        "NEA": "C",
+        "POS": 10601,
+        "SNP": "9:10601:C:T"
+      },
+      {
+        "CHR": 9,
+        "EA": "C",
+        "NEA": "G",
+        "POS": 10623,
+        "SNP": "9:10623:G:C"
+      },
+      {
+        "CHR": 9,
+        "EA": "G",
+        "NEA": "C",
+        "POS": 10651,
+        "SNP": "9:10651:C:G"
+      },
+      {
+        "CHR": 9,
+        "EA": "C",
+        "NEA": "G",
+        "POS": 10670,
+        "SNP": "9:10670:G:C"
+      },
+      {
+        "CHR": 9,
+        "EA": "T",
+        "NEA": "G",
+        "POS": 10684,
+        "SNP": "9:10684:G:T"
+      },
+      {
+        "CHR": 9,
+        "EA": "A",
+        "NEA": "C",
+        "POS": 10731,
+        "SNP": "9:10731:C:A"
+      },
+      {
+        "CHR": 9,
+        "EA": "A",
+        "NEA": "T",
+        "POS": 10784,
+        "SNP": "9:10784:T:A"
+      },
+      {
+        "CHR": 9,
+        "EA": "A",
+        "NEA": "G",
+        "POS": 10788,
+        "SNP": "9:10788:G:A"
+      },
+      {
+        "CHR": 9,
+        "EA": "C",
+        "NEA": "T",
+        "POS": 10894,
+        "SNP": "9:10894:T:C"
+      }
+    ]
+  },
+  "source": {
+    "n": 25,
+    "reference_panel": "StudyA_genetic_files/plink_sampled_9"
+  },
+  "tolerances": {
+    "numeric_abs": 0.0,
+    "numeric_rel": 0.0
+  },
+  "version": 1
+}

@@ -1,0 +1,47 @@
+{
+  "description": "MR-PRESSO baseline on synthetic data with one extreme outlier.",
+  "expected": {
+    "bias_test": {
+      "distortion_test_coefficient": 615.3726092038862,
+      "distortion_test_p": 0.0,
+      "outliers_indices": [
+        7,
+        12
+      ]
+    },
+    "global_test": {
+      "RSSobs": 10709.874694411541,
+      "global_test_p": 0.0
+    },
+    "mod_table": [
+      {
+        "b": 3.6002510288938794,
+        "exposure": "BETA_e",
+        "method": "Raw",
+        "nSNP": 20,
+        "pval": 0.21883821102319834,
+        "se": 2.8311297018018426
+      },
+      {
+        "b": 0.5032693427975214,
+        "exposure": "BETA_e",
+        "method": "Outlier-corrected",
+        "nSNP": 18,
+        "pval": 1.7078696107222536e-13,
+        "se": 0.024315545733691237
+      }
+    ],
+    "outlier_test_min_p": 0.0
+  },
+  "source": {
+    "n": 20,
+    "n_iterations": 400,
+    "outlier_index": 7,
+    "seed": 0
+  },
+  "tolerances": {
+    "numeric_abs": 1e-06,
+    "numeric_rel": 1e-06
+  },
+  "version": 1
+}

@@ -76,7 +76,8 @@ def mr_presso(
     Random_data_e = np.vstack([r[1] for r in results])
     Random_data_o = np.vstack([r[2] for r in results])
 
-    global_p = np.sum([r > RSSobs[0] for r in RSSexp]) / n_iterations
+    rss_value = RSSobs[0] if outlier_test else RSSobs
+    global_p = np.sum([r > rss_value for r in RSSexp]) / n_iterations
     
     if outlier_test:
         GlobalTest = {"RSSobs": RSSobs[0], "global_test_p": global_p}

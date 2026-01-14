@@ -1,0 +1,20 @@
+{
+  "description": "Colocalization ABF baseline on synthetic correlated traits.",
+  "expected": {
+    "PP.H0.abf": 0.9759283841908691,
+    "PP.H1.abf": 0.011792006527669232,
+    "PP.H2.abf": 0.011445388654007693,
+    "PP.H3.abf": 0.00013759641029855585,
+    "PP.H4.abf": 0.0006966242171553666,
+    "nsnps": 200
+  },
+  "source": {
+    "n": 200,
+    "seed": 0
+  },
+  "tolerances": {
+    "numeric_abs": 1e-10,
+    "numeric_rel": 1e-10
+  },
+  "version": 1
+}

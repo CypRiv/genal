@@ -199,57 +199,53 @@ def _prepare_psam_file(genetic_path, data_pheno, pheno_type, standardize):
     # Make sure the SEX column is not empty without modifying existing values
     psam["SEX"] = psam["SEX"].replace('', 'NA').fillna('NA')
 
-    psam.to_csv(genetic_path + ".psam", sep="\t", index=False)
+    # PLINK2 expects missing values to be represented as 'NA' tokens (not empty fields).
+    psam.to_csv(genetic_path + ".psam", sep="\t", index=False, na_rep="NA")
     return psam
 
 
 def _handle_covariates(covar_list, data_pheno, name):
     """Helper function to prepare the covariate file."""
-    if len(covar_list) > 0:
-        # Ensure all covariates are present in phenotype data
-        for col in covar_list:
-            if col not in data_pheno.columns:
-                raise TypeError(
-                    f"The {col} column is not found in the .phenotype dataframe."
-                )
-        # Select required columns and rename columns
-        data_cov = data_pheno[["FID", "IID"] + covar_list].copy()
+    if len(covar_list) == 0:
+        return [], None
 
-        # Ensure the covariates are numeric and not trivial (lead to association fail)
-        for col in covar_list:
-            if data_pheno[col].nunique() == 1:
-                print(
-                    f"The {col} covariate contains only one value and is removed from the tests."
-                )
-                data_cov.drop(axis=1, columns=[col], inplace=True)
-                covar_list.remove(col)
-            if not pd.api.types.is_numeric_dtype(data_pheno[col]):
-                print(
-                    f"The {col} covariate is not numeric and is removed from the tests."
-                )
-                data_cov.drop(axis=1, columns=[col], inplace=True, errors="ignore")
-                covar_list.remove(col)
+    # Ensure all covariates are present in phenotype data
+    for col in covar_list:
+        if col not in data_pheno.columns:
+            raise TypeError(f"The {col} column is not found in the .phenotype dataframe.")
 
-        # Remove rows with NA values and print their number
-        nrows = data_cov.shape[0]
-        data_cov.dropna(inplace=True)
-        removed_rows = nrows - data_cov.shape[0]
-        if removed_rows > 0:
-            print(
-                f"{removed_rows}({removed_rows/nrows*100:.3f}%) individuals have NA values in the covariates columns and will be excluded from the association tests."
-            )
+    # Keep only usable covariates
+    kept_covars: list[str] = []
+    data_cov = data_pheno[["FID", "IID"]].copy()
+    for col in covar_list:
+        if data_pheno[col].nunique() == 1:
+            print(f"The {col} covariate contains only one value and is removed from the tests.")
+            continue
+        if not pd.api.types.is_numeric_dtype(data_pheno[col]):
+            print(f"The {col} covariate is not numeric and is removed from the tests.")
+            continue
+        kept_covars.append(col)
+        data_cov[col] = data_pheno[col]
 
-        # Define the covariate filename
-        covar_filename = os.path.join("tmp_GENAL", f"{name}_covar.cov")
-        # Ensure FID and IID are in integer format and write the covariate file
-        data_cov["IID"] = data_cov["IID"].astype("Int64")
-        data_cov["FID"] = data_cov["FID"].astype("Int64")
-        data_cov.to_csv(covar_filename, sep=" ", header=True, index=False)
-        covar = True
-    else:
-        covar = False
-        covar_filename = None
-    return covar_list, covar_filename
+    if len(kept_covars) == 0:
+        return [], None
+
+    # Remove rows with NA values and print their number
+    nrows = data_cov.shape[0]
+    data_cov.dropna(inplace=True)
+    removed_rows = nrows - data_cov.shape[0]
+    if removed_rows > 0:
+        print(
+            f"{removed_rows}({removed_rows/nrows*100:.3f}%) individuals have NA values in the covariates columns and will be excluded from the association tests."
+        )
+
+    # Define the covariate filename
+    covar_filename = os.path.join("tmp_GENAL", f"{name}_covar.cov")
+    # Ensure FID and IID are in integer format and write the covariate file
+    data_cov["IID"] = data_cov["IID"].astype("Int64")
+    data_cov["FID"] = data_cov["FID"].astype("Int64")
+    data_cov.to_csv(covar_filename, sep=" ", header=True, index=False)
+    return kept_covars, covar_filename
 
 
 ### __________________________

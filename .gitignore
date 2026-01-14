@@ -1,11 +1,14 @@
+.DS_Store
 __pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
 dist/
 .ipynb_checkpoints/
 ipynb_checkpoints/
 genal/.ipynb_checkpoints/
 test_data/
 cursor/
-tests/
 tmp_GENAL/
 docs/build/
 docs/_build/
