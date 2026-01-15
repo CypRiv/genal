@@ -178,7 +178,7 @@ After `MR()`, you can generate a scatter plot with method lines:
 G_instruments.MR_plot(filename="mr_scatter")  # saves mr_scatter.png
 ```
 
-## 6) MR-PRESSO (outlier detection and distortion testing)
+## 6a) MR-PRESSO (outlier detection and distortion testing)
 
 {py:meth}`genal.Geno.MRpresso` runs a parallel MR-PRESSO implementation.
 
@@ -196,6 +196,10 @@ What you typically tune:
 - `significance_p`: threshold for global/outlier tests.
 - `outlier_test` / `distortion_test`: disable if you only want the global test.
 
+Output structure:
+- `OutlierTest`: DataFrame with per-SNP outlier p-values; SNP identifiers (rsIDs) are used as row labels (not numeric indices).
+- `BiasTest`: dictionary containing `"outliers_indices"` (list of SNP IDs), `"distortion_test_coefficient"`, and `"distortion_test_p"`.
+
 If outliers are found, you can rerun MR using the outlier-removed subset:
 
 ```python
@@ -203,6 +207,48 @@ res_no_outliers = G_instruments.MR(use_mrpresso_data=True)
 ```
 
 See {doc}`methods` for algorithm details and outputs.
+
+## 6b) Leave-one-out MR (sensitivity analysis)
+
+{py:meth}`genal.Geno.MR_loo` iteratively removes each SNP and re-estimates the causal effect. This helps identify influential variants that may be driving the overall result.
+
+```python
+loo_df = G_instruments.MR_loo(
+    method="IVW",        # any single MR method key (see MR method map)
+    action=2,
+    heterogeneity=False, # set True to include Q statistics
+    odds=False,          # set True for OR-scale output
+)
+```
+
+Key arguments:
+- `method`: a single MR method key (e.g., `"IVW"`, `"Egger"`, `"WM"`); must not be `"all"`.
+- `use_mrpresso_data=True`: use the outlier-removed dataset from MR-PRESSO instead of all instruments.
+
+### Visualizing leave-one-out results
+
+{py:meth}`genal.Geno.MR_loo_plot` creates a forest plot from the stored `MR_loo_results`:
+
+```python
+# Default: show top influential instruments (publication-ready)
+G_instruments.MR_loo_plot(filename="loo_forest")
+```
+
+```python
+# Or paginate all instruments
+G_instruments.MR_loo_plot(
+    top_influential=False,  # show all, not just influential
+    snps_per_page=30,
+    page=1,                 # or None for all pages
+    filename="loo_forest_all",
+)
+```
+
+Key arguments:
+- `top_influential=True` (default): select the `snps_per_page` most influential SNPs (largest change in estimate when removed) and render a single compact figure.
+- `top_influential=False`: paginate all instruments; use `page=N` to select a specific page or `page=None` to render all pages.
+- `snps_per_page`: number of SNPs per page (minimum 5).
+
 
 ## 7) Additional capabilities (beyond the core pipeline)
 

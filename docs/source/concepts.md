@@ -10,6 +10,7 @@ Key attributes (you don't need to manipulate these directly):
 - `G.phenotype`: set by {py:meth}`genal.Geno.set_phenotype` (phenotype DataFrame + metadata)
 - `G.MR_data`: set by {py:meth}`genal.Geno.query_outcome` (exposure/outcome tables used by MR)
 - `G.MR_results`: set by {py:meth}`genal.Geno.MR` (results table + harmonized SNP table; used by plotting)
+- `G.MR_loo_results`: set by {py:meth}`genal.Geno.MR_loo` (leave-one-out results tuple; used by `MR_loo_plot`)
 - `G.MRpresso_results` / `G.MRpresso_subset_data`: set by {py:meth}`genal.Geno.MRpresso`
 
 ## Standard columns
@@ -38,7 +39,7 @@ This is a *practical guide*, not an exhaustive contract. When a method can work 
 | {py:meth}`genal.Geno.clump` | `SNP`, `P` | LD clumping via PLINK; returns a new `Geno` (or `None` if nothing passes). |
 | {py:meth}`genal.Geno.prs` | `EA`, `BETA`, plus `SNP (or CHR+POS)` | If `CHR+POS` are available, genal will prefer position-based matching to your genotype dataset to reduce ID-mismatch losses. |
 | {py:meth}`genal.Geno.query_outcome` | `SNP`, `EA`, `NEA`, `BETA`, `SE` (exposure and outcome) | Outcome querying is rsID-based; proxy search is optional. If you plan to use `action=2` later, `EAF` in both datasets is strongly recommended. |
-| {py:meth}`genal.Geno.MR` / {py:meth}`genal.Geno.MRpresso` | `MR_data` | Both consume `MR_data` produced by `query_outcome()`. |
+| {py:meth}`genal.Geno.MR` / {py:meth}`genal.Geno.MR_loo` / {py:meth}`genal.Geno.MRpresso` | `MR_data` | All consume `MR_data` produced by `query_outcome()`. |
 | {py:meth}`genal.Geno.colocalize` | `BETA`, `SE`, plus `CHR+POS` (preferred) **or** `SNP` (in both datasets) | If `EA/NEA` are present in both datasets, effects are allele-aligned; otherwise results assume both GWAS use the same reference allele. For quantitative traits, provide `sdY` or (`EAF` + `n`) to avoid the default `sdY=1` assumption. |
 | {py:meth}`genal.Geno.update_eaf` | `EA`, plus `CHR+POS` **or** `SNP` | Uses PLINK to compute allele frequencies from a reference panel; coordinate-based matching is faster when available. |
 | {py:meth}`genal.Geno.filter_by_gene` / {py:meth}`genal.Geno.lift` | `CHR`, `POS` | Genomic coordinate operations. |
@@ -66,7 +67,9 @@ A helpful mental framework:
 | `query_outcome()` | `None` | sets `G.MR_data` (exposure/outcome tables used by MR) |
 | `MR()` | `pd.DataFrame` | sets `G.MR_results` and returns the results table |
 | `MR_plot()` | plot object | requires `G.MR_results`; writes `.png` if `filename=...` |
-| `MRpresso()` | tuple | sets `G.MRpresso_results` and `G.MRpresso_subset_data` (outlier-removed harmonized table) |
+| `MR_loo()` | `pd.DataFrame` | sets `G.MR_loo_results` and returns the LOO results table |
+| `MR_loo_plot()` | plot object(s) | requires `G.MR_loo_results`; writes `.png` if `filename=...`; may return a list for multi-page output |
+| `MRpresso()` | tuple | sets `G.MRpresso_results` and `G.MRpresso_subset_data` (outlier-removed harmonized table; SNP-indexed) |
 | `prs()` | `None` | writes `<name>.csv` and uses PLINK temp files |
 | `query_gwas_catalog()` | `pd.DataFrame` | adds an `ASSOC` column (network-bound); `replace=True` overwrites `G.data` |
 | `filter_by_gene(replace=False)` | `Geno` | returns a new `Geno` filtered to a locus |

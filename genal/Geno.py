@@ -8,11 +8,10 @@ import uuid
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 import scipy.stats as st
-from plotnine import ggplot, aes, geom_point, geom_errorbarh, geom_errorbar, theme, element_text, geom_abline, labs, expand_limits, geom_vline
 
 
 from .proxy import find_proxies, apply_proxies
-from .MR_tools import query_outcome_func, MR_func, mrpresso_func
+from .MR_tools import query_outcome_func, MR_func, MR_loo_func, mrpresso_func
 from .clump import clump_data_plink2
 from .lift import lift_data
 from .genes import filter_by_gene_func
@@ -866,7 +865,7 @@ class Geno:
         action=2,
         eaf_threshold=0.42,
         heterogeneity=False,
-        nboot=1000,
+        nboot=10000,
         penk=20,
         phi=1,
         exposure_name=None,
@@ -962,6 +961,113 @@ class Geno:
         self.MR_results = (res, df_mr, exposure_name, outcome_name)
 
         return res
+
+    def MR_loo(
+        self,
+        method="IVW",
+        action=2,
+        eaf_threshold=0.42,
+        heterogeneity=False,
+        nboot=1000,
+        penk=20,
+        phi=1,
+        exposure_name=None,
+        outcome_name=None,
+        cpus=-1,
+        odds=False,
+        use_mrpresso_data=False,
+    ):
+        """
+        Executes leave-one-out Mendelian Randomization (MR) using exposure/outcome data stored in `MR_data`
+        (created by calling :meth:`Geno.query_outcome`).
+
+        Returns:
+            pd.DataFrame: A tidy table with leave-one-out estimates.
+        """
+        if not hasattr(self, "MR_data"):
+            raise ValueError("You must first call query_outcome() before running MR.")
+
+        subset_data = None
+        if use_mrpresso_data:
+            if not hasattr(self, "MRpresso_subset_data"):
+                raise ValueError(
+                    "Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first."
+                )
+            if self.MRpresso_subset_data is None:
+                print(
+                    "Use_mrpresso_data is set to True but MRpresso did not identify any outliers. Using all instruments."
+                )
+            else:
+                subset_data = self.MRpresso_subset_data
+
+        if outcome_name:
+            self.MR_data[2] = outcome_name
+
+        exp_name = exposure_name if exposure_name else self.name
+        outcome_name_final = self.MR_data[2]
+        cpus_eff = self.cpus if cpus == -1 else cpus
+
+        loo_df, all_row, method_display_name = MR_loo_func(
+            self.MR_data,
+            method,
+            action,
+            eaf_threshold,
+            heterogeneity,
+            nboot,
+            penk,
+            phi,
+            exp_name,
+            cpus_eff,
+            subset_data,
+        )
+
+        if odds and not loo_df.empty:
+            loo_df.loc[:, "OR_95CI"] = loo_df.apply(
+                lambda row: (
+                    f"{np.exp(row['b']):.3f} ({np.exp(row['b'] - 1.96*row['se']):.3f}-{np.exp(row['b'] + 1.96*row['se']):.3f})"
+                    if not pd.isna(row["b"]) and not pd.isna(row["se"])
+                    else np.nan
+                ),
+                axis=1,
+            )
+
+        self.MR_loo_results = (
+            loo_df,
+            all_row,
+            exp_name,
+            outcome_name_final,
+            method,
+            method_display_name,
+            odds,
+            heterogeneity,
+            use_mrpresso_data,
+        )
+
+        return loo_df
+
+    def MR_loo_plot(
+        self,
+        snps_per_page=40,
+        page=None,
+        top_influential=True,
+        filename=None,
+        exposure_name=None,
+        outcome_name=None,
+    ):
+        """
+        Create a leave-one-out forest plot using results stored from :meth:`Geno.MR_loo`.
+        """
+        from .plots import mr_loo_plot
+
+        return mr_loo_plot(
+            getattr(self, "MR_loo_results", None),
+            snps_per_page=snps_per_page,
+            page=page,
+            top_influential=top_influential,
+            filename=filename,
+            exposure_name=exposure_name,
+            outcome_name=outcome_name,
+        )
     
     def MR_plot(
         self,
@@ -995,77 +1101,15 @@ class Geno:
         Note:
             This function requires prior execution of the `MR` method to compute MR results. Make sure the MR analysis is performed on the data before calling `MR_plot`.
         """
-        if not hasattr(self, "MR_results"):
-            raise ValueError("You need to run an MR analysis with the MR method before calling the MR_plot function.")
-        
-        ## Extract the previously computed MR results
-        df_mr = self.MR_results[1]
-        res = self.MR_results[0]
-        exposure_name = self.MR_results[2] if not exposure_name else exposure_name
-        exposure_name = "Effect on the exposure" if not exposure_name else f"Effect on {exposure_name}"
-        outcome_name = self.MR_results[3] if not outcome_name else outcome_name
-        outcome_name = "Effect on the outcome" if not outcome_name else f"Effect on {outcome_name}"
-        
-        ## Switch all exposure betas to >= 0
-        df_mr['BETA_e'], df_mr['BETA_o'] = np.where(df_mr['BETA_e'] < 0, (-df_mr['BETA_e'], -df_mr['BETA_o']), (df_mr['BETA_e'], df_mr['BETA_o']))
+        from .plots import mr_plot
 
-        ## Create the scatter plot with error bars
-        plot = (
-            ggplot(df_mr, aes('BETA_e', 'BETA_o'))
-
-            + geom_errorbarh(aes(xmin='BETA_e-SE_e', xmax='BETA_e+SE_e'), height=0, color="gray", size=0.1) 
-            + geom_errorbar(aes(ymin='BETA_o-SE_o', ymax='BETA_o+SE_o'), width=0, color="gray", size=0.1)
-            + geom_point(color='black', size=0.2) 
-            + geom_abline(slope=0, intercept=0, color='black')
-            + labs(x=exposure_name, y=outcome_name) 
-            + theme(
-                axis_title=element_text(size=12),
-                axis_text=element_text(size=10),
-                figure_size=(10,6)
-            )
-            + expand_limits(x=0)
+        return mr_plot(
+            getattr(self, "MR_results", None),
+            methods=methods,
+            exposure_name=exposure_name,
+            outcome_name=outcome_name,
+            filename=filename,
         )
-        
-        ## Add the lines corresponding to the specified MR methods (if present in the computation)
-        lines = []
-        for method in methods:
-            if method not in MR_METHODS_NAMES.keys():
-                warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
-                continue
-            ## If not an Egger method: only need the slope
-            if not method.startswith("Egger"):
-                method_name = MR_METHODS_NAMES[method]
-                res_row = res[res.method == method_name]
-                if res_row.shape[0] == 0:
-                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-                elif res_row.shape[0] == 1:
-                    lines.append({
-                        'slope': res_row["b"].values[0], 
-                        'intercept': 0, 
-                        'MR Methods': method_name  # Use method_name as the color label
-                    })
-            ## For Egger methods: need to get the slope and the intercept
-            else:
-                method_name = MR_METHODS_NAMES[method][0]
-                method_name_intercept = MR_METHODS_NAMES[method][1]
-                res_row = res[res.method == method_name]
-                res_row_intercept = res[res.method == method_name_intercept]
-                if res_row.shape[0] == 0:
-                    warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-                elif res_row.shape[0] == 1 and res_row_intercept.shape[0] == 1:
-                    lines.append({
-                        'slope': res_row["b"].values[0], 
-                        'intercept': res_row_intercept["b"].values[0], 
-                        'MR Methods': method_name  # Use method_name as the color label
-                    })
-        line_data = pd.DataFrame(lines)
-        plot += geom_abline(aes(slope='slope', intercept='intercept', color='MR Methods'), data=line_data)
-        
-        ## Save plot if filename is specified
-        if filename:
-            plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
-        
-        return plot
     
     def MR_forest(
         self,
@@ -1101,81 +1145,16 @@ class Geno:
         Raises:
             ValueError: If MR analysis has not been performed prior to calling this function.
         """
-        if not hasattr(self, "MR_results"):
-            raise ValueError("You need to run an MR analysis with the MR method before calling the MR_forest function.")
-        
-        # Extract the previously computed MR results
-        res = self.MR_results[0]
-        exposure_name = self.MR_results[2] if not exposure_name else exposure_name
-        exposure_name = "Exposure" if not exposure_name else exposure_name
-        outcome_name = self.MR_results[3] if not outcome_name else outcome_name
-        outcome_name = "Outcome" if not outcome_name else outcome_name
-        
-        # Create plotting dataframe
-        plot_data = []
-        for method in methods:
-            if method not in MR_METHODS_NAMES.keys():
-                warnings.warn(f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more.")
-                continue
-                
-            # Get the method name, beta estimate, standard error, and number of SNPs
-            method_name = MR_METHODS_NAMES[method]
-            
-            # Handle Egger method which has tuple of names
-            if isinstance(method_name, tuple):
-                method_name = method_name[0]  # Use first element for Egger regression
-                
-            res_row = res[res.method == method_name]
-            if res_row.shape[0] == 0:
-                warnings.warn(f"The {method_name} ({method}) method was not included in the MR method call and will be excluded from the plot.")
-            elif res_row.shape[0] == 1:
-                plot_data.append({
-                    'Method': method_name,
-                    'Estimate': res_row["b"].values[0],
-                    'SE': res_row["se"].values[0], 
-                    'nSNP': res_row["nSNP"].values[0]
-                })
-        
-        plot_df = pd.DataFrame(plot_data)
-        
-        # Calculate confidence intervals
-        if odds:
-            plot_df['CI_lower'] = np.exp(plot_df['Estimate'] - 1.96 * plot_df['SE'])
-            plot_df['CI_upper'] = np.exp(plot_df['Estimate'] + 1.96 * plot_df['SE'])
-            plot_df['Estimate'] = np.exp(plot_df['Estimate'])
-            x_label = f"Odds Ratio for {outcome_name} per unit increase in {exposure_name}"
-        else:
-            plot_df['CI_lower'] = plot_df['Estimate'] - 1.96 * plot_df['SE']
-            plot_df['CI_upper'] = plot_df['Estimate'] + 1.96 * plot_df['SE']
-            x_label = f"Effect on {outcome_name} per unit increase in {exposure_name}"
-        
-        # Convert Method to categorical with reversed order to preserve row order in plot
-        plot_df['Method'] = pd.Categorical(plot_df['Method'], categories=plot_df['Method'].values[::-1], ordered=True)
-        
-        # Create the forest plot
-        plot = (
-            ggplot(plot_df, aes(x='Estimate', y='Method'))
-            + geom_point(size=3)
-            + geom_errorbarh(aes(xmin='CI_lower', xmax='CI_upper'), height=0.2)
-            + theme(
-                axis_title=element_text(size=12),
-                axis_text=element_text(size=10),
-                figure_size=(10,6)
-            )
-            + labs(x=x_label, y="")
+        from .plots import mr_forest
+
+        return mr_forest(
+            getattr(self, "MR_results", None),
+            methods=methods,
+            exposure_name=exposure_name,
+            outcome_name=outcome_name,
+            odds=odds,
+            filename=filename,
         )
-        
-        # Add vertical line at null effect
-        if odds:
-            plot += geom_vline(xintercept=1, linetype='dashed', color='gray')
-        else:
-            plot += geom_vline(xintercept=0, linetype='dashed', color='gray')
-        
-        # Save plot if filename is specified
-        if filename:
-            plot.save(f"{filename}.png", dpi=500, width=10, height=6, verbose=False)
-        
-        return plot
 
     def MRpresso(
         self,
@@ -1218,6 +1197,11 @@ class Geno:
                 - OutlierTest: DataFrame assigning a p-value to each SNP representing the likelihood of this
                                SNP being responsible for the global pleiotropy. Set to NaN if global test p_value > significance_p.
                 - DistortionTest: p-value for the distortion test.
+
+        Note:
+            The distortion null distribution follows the paper-coherent interpretation where detected outliers are excluded from
+            the expected-bias regressions. This may differ from results produced by the current MR-PRESSO R implementation, whose
+            `getRandomBias` procedure can include outlier rows in the sampled regression subset.
         """
 
         if not hasattr(self, "MR_data"):

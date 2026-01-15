@@ -132,6 +132,30 @@ The bandwidth uses a modified Silverman rule multiplied by the user-provided fac
 
 The sign method tests whether exposure and outcome effects tend to have the same sign across variants. `genal` performs a binomial test against the null of 50% sign agreement.
 
+## Leave-one-out MR
+
+Implementation: {py:func}`genal.MR_tools.MR_loo_func`, wrapped by {py:meth}`genal.Geno.MR_loo`.
+
+Leave-one-out MR iterates over all instruments, sequentially removing each SNP and re-estimating the causal effect using the remaining instruments. This identifies variants that have a disproportionate influence on the overall estimate.
+
+For each SNP $i$ in the instrument set:
+
+1. Remove SNP $i$ from the harmonized data.
+2. Re-run the selected MR method on the remaining $J-1$ SNPs.
+3. Store the resulting estimate $\hat{\theta}_{-i}$.
+
+The "influence" of SNP $i$ is defined as:
+
+```{math}
+\text{influence}_i = \left| \hat{\theta}_{-i} - \hat{\theta}_{\text{all}} \right|
+```
+
+where $\hat{\theta}_{\text{all}}$ is the estimate using all instruments.
+
+Notes:
+- Any single MR method can be used (IVW, Egger, weighted median, mode-based, etc.).
+- At least 3 instruments are required (so that each LOO subset has ≥2 instruments).
+
 ## MR-PRESSO (summary)
 
 Implementation: {py:func}`genal.MRpresso.mr_presso`, wrapped by {py:meth}`genal.Geno.MRpresso`.
@@ -144,11 +168,26 @@ At a high level, `genal`'s MR-PRESSO implementation:
   - an outlier test (per-variant p-values, Bonferroni-corrected),
   - an optional distortion test (whether the causal estimate changes materially after removing outliers).
 
+### Distortion test
+
+The distortion test assesses whether detected outliers materially bias the causal estimate. `genal` implements the following version:
+
+1. **Observed distortion**: $D_\text{obs} = (\hat{\theta}_\text{all} - \hat{\theta}_\text{no outliers}) / |\hat{\theta}_\text{no outliers}|$
+2. **Expected distortion null**: bootstrap resampling is performed *exclusively on the non-outlier subset*. For each iteration:
+   - Sample with replacement $J-k$ SNPs from the non-outlier data (where $k$ is the number of detected outliers).
+   - Fit the IVW model on the sampled data and record $\hat{\theta}_\text{exp}$.
+   - Compute $D_\text{exp} = (\hat{\theta}_\text{all} - \hat{\theta}_\text{exp}) / |\hat{\theta}_\text{exp}|$.
+3. **P-value**: $p = \text{mean}(|D_\text{exp}| > |D_\text{obs}|)$.
+
+This differs from the original MR-PRESSO R implementation, which in some cases samples from the full dataset (including outliers) for the expected-bias regressions and was inconsistent with the paper's description.
+
+### Output structure
+
 `Geno.MRpresso()` returns four objects:
 - `mod_table`: a small results table (`Raw` and `Outlier-corrected` rows; IVW model),
 - `GlobalTest`: RSS and global p-value,
-- `OutlierTest`: per-variant outlier p-values (empty if the global test is not significant),
-- `BiasTest`: distortion test result dictionary (empty if distortion test was not run).
+- `OutlierTest`: per-variant outlier p-values (empty if the global test is not significant); SNP IDs as row labels,
+- `BiasTest`: distortion test result dictionary containing `"outliers_indices"` (SNP IDs), `"distortion_test_coefficient"`, and `"distortion_test_p"` (empty if distortion test was not run).
 
 If outliers are found, `genal` stores the outlier-removed harmonized table and allows rerunning MR with `Geno.MR(use_mrpresso_data=True)`.
 

@@ -39,7 +39,11 @@ def mr_presso(
         BiasTest (dict): Dictionary with results of the distortion test.
     """
     # Transforming the data
-    data = data[["BETA_o", *BETA_e_columns, "SE_o", "SE_e"]].dropna()
+    required_cols = ["BETA_o", *BETA_e_columns, "SE_o", "SE_e"]
+    keep_cols = required_cols.copy()
+    if "SNP" in data.columns:
+        keep_cols = ["SNP", *keep_cols]
+    data = data[keep_cols].dropna(subset=required_cols)
     data[["BETA_o", *BETA_e_columns]] = data[["BETA_o", *BETA_e_columns]].multiply(
         np.sign(data[BETA_e_columns[0]]), axis=0
     )
@@ -120,92 +124,99 @@ def mr_presso(
     subset_data = None
 
     if distortion_test and outlier_test:
-        ## Is there an error in the MRPRESSO code? The outlier indices are supposed to be excluded from the expected bias computation (as per the paper).
-        def get_random_bias(BETA_e_columns, data, ref_outlier):
-            indices = np.concatenate(
-                [
-                    ref_outlier,
-                    np.random.choice(
-                        list(set(range(len(data))) - set(ref_outlier)),
-                        len(data) - len(ref_outlier),
-                    ),
-                ]
-            )
-            subset_data = data.iloc[indices[: -len(ref_outlier)]]
-            mod_random = smf.wls(
-                f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}",
-                data=subset_data,
-                weights=subset_data["Weights"],
-            ).fit()
-            return mod_random.params[BETA_e_columns]
-
         ref_outlier = OutlierTest.loc[OutlierTest["Pvalue"] <= significance_p].index
 
-        if len(ref_outlier) > 0:
-            if len(ref_outlier) < len(data):
-                print(f"{len(ref_outlier)}/{len(data)} ({len(ref_outlier)/len(data)*100:.2f}%) outliers found. Running the Distortion test.")
-                BiasExp = [
-                    get_random_bias(BETA_e_columns, data, ref_outlier)
-                    for _ in range(n_iterations)
-                ]
-                BiasExp = pd.concat(BiasExp, axis=1).transpose()
+        k = len(ref_outlier)
+        J = len(data)
 
-                subset_data = data.drop(ref_outlier)
-                mod_no_outliers = smf.wls(
-                    f"BETA_o ~ -1 + {' + '.join(BETA_e_columns)}",
-                    data=subset_data,
-                    weights=subset_data["Weights"],
-                ).fit()
-
-                BiasObs = (
-                    mod_all.params[BETA_e_columns]
-                    - mod_no_outliers.params[BETA_e_columns]
-                ) / abs(mod_no_outliers.params[BETA_e_columns])
-                BiasExp = (mod_all.params[BETA_e_columns] - BiasExp) / abs(BiasExp)
-
-                p_value = np.sum(np.abs(BiasExp) > np.abs(BiasObs)) / n_iterations
-
-                BiasTest = {
-                    "outliers_indices": list(ref_outlier),
-                    "distortion_test_coefficient": 100 * BiasObs.values[0],
-                    "distortion_test_p": p_value.iloc[0],
-                }
-            else:
-                print("All SNPs considered as outliers. Skipping the Distortion test.")
-                BiasTest = {
-                    "outliers_indices": "All SNPs considered as outliers",
-                    "distortion_test_coefficient": np.nan,
-                    "distortion_test_p": np.nan,
-                }
-        else:
+        if k == 0:
             print("No significant outliers found. Skipping the Distortion test.")
             BiasTest = {
                 "outliers_indices": "No significant outliers",
                 "distortion_test_coefficient": np.nan,
                 "distortion_test_p": np.nan,
             }
+        elif k == J:
+            print("All SNPs considered as outliers. Skipping the Distortion test.")
+            BiasTest = {
+                "outliers_indices": "All SNPs considered as outliers",
+                "distortion_test_coefficient": np.nan,
+                "distortion_test_p": np.nan,
+            }
+        else:
+            if len(BETA_e_columns) != 1:
+                raise ValueError("Distortion test not done for multi MR.")
+
+            print(
+                f"{k}/{J} ({k/J*100:.2f}%) outliers found. Running the Distortion test."
+            )
+
+            subset_data = data.drop(index=ref_outlier)
+            mod_no_outliers = smf.wls(
+                formula, data=subset_data, weights=subset_data["Weights"]
+            ).fit()
+
+            beta_all = float(mod_all.params[BETA_e_columns[0]])
+            beta_no_outliers = float(mod_no_outliers.params[BETA_e_columns[0]])
+            D_obs = (beta_all - beta_no_outliers) / abs(beta_no_outliers)
+
+            non_outlier_data = subset_data
+            sample_size = len(non_outlier_data)
+            non_outlier_ids = non_outlier_data.index.to_numpy()
+
+            betas_exp = np.full(n_iterations, np.nan, dtype=float)
+            zero_tol = 1e-12
+            max_retries = 50
+
+            for i in range(n_iterations):
+                for _ in range(max_retries):
+                    sampled_ids = np.random.choice(
+                        non_outlier_ids, size=sample_size, replace=True
+                    )
+                    sampled_data = non_outlier_data.loc[sampled_ids]
+                    mod_random = smf.wls(
+                        formula, data=sampled_data, weights=sampled_data["Weights"]
+                    ).fit()
+                    beta_exp = float(mod_random.params[BETA_e_columns[0]])
+                    if abs(beta_exp) > zero_tol:
+                        betas_exp[i] = beta_exp
+                        break
+
+            valid_betas = betas_exp[~np.isnan(betas_exp)]
+            if len(valid_betas) == 0:
+                p_value = np.nan
+            else:
+                D_exp = (beta_all - valid_betas) / np.abs(valid_betas)
+                p_value = float(np.mean(np.abs(D_exp) > abs(D_obs)))
+
+            BiasTest = {
+                "outliers_indices": list(ref_outlier),
+                "distortion_test_coefficient": float(100 * D_obs),
+                "distortion_test_p": p_value,
+            }
 
     # 5- Format
+    main_beta_col = BETA_e_columns[0]
     row_original = {
-        "exposure": BETA_e_columns[0],
+        "exposure": main_beta_col,
         "method": "Raw",
         "nSNP": len(data),
-        "b": mod_all.params["BETA_e"],
-        "se": mod_all.bse["BETA_e"],
-        "pval": mod_all.pvalues["BETA_e"],
+        "b": mod_all.params[main_beta_col],
+        "se": mod_all.bse[main_beta_col],
+        "pval": mod_all.pvalues[main_beta_col],
     }
     if "mod_no_outliers" in locals():
         row_corrected = {
-            "exposure": BETA_e_columns[0],
+            "exposure": main_beta_col,
             "method": "Outlier-corrected",
             "nSNP": len(data) - len(ref_outlier),
-            "b": mod_no_outliers.params["BETA_e"],
-            "se": mod_no_outliers.bse["BETA_e"],
-            "pval": mod_no_outliers.pvalues["BETA_e"],
+            "b": mod_no_outliers.params[main_beta_col],
+            "se": mod_no_outliers.bse[main_beta_col],
+            "pval": mod_no_outliers.pvalues[main_beta_col],
         }
     else:
         row_corrected = {
-            "exposure": BETA_e_columns[0],
+            "exposure": main_beta_col,
             "method": "Outlier-corrected",
             "nSNP": np.nan,
             "b": np.nan,
@@ -258,7 +269,9 @@ def getRandomData(data, BETA_e_columns=["BETA_e"]):
     models = []
     for i in range(len(data)):
         lm = LinearRegression(fit_intercept=False)
-        data_i = data.drop(i)
+        mask = np.ones(len(data), dtype=bool)
+        mask[i] = False
+        data_i = data.iloc[mask]
         lm.fit(
             data_i[BETA_e_columns], data_i["BETA_o"], sample_weight=data_i["Weights"]
         )

@@ -133,6 +133,7 @@ G_instruments.MR_plot(filename="mr_scatter")
 - `G.phenotype`: stored after `G.set_phenotype(...)` (phenotype DataFrame + metadata)
 - `G.MR_data`: stored after `G.query_outcome(...)` (exposure/outcome association tables used by MR)
 - `G.MR_results`: stored after `G.MR(...)` (results table + harmonized SNP table; used by plotting)
+- `G.MRpresso_subset_data`: stored after `G.MRpresso(...)` (outlier-removed harmonized table)
 
 Most methods either:
 - return a **new `Geno`** object (e.g., `clump()`), or
@@ -147,6 +148,7 @@ Most methods either:
 - **Align rsIDs to a target genotype dataset**: `Geno.update_snpids(path=..., replace=...)`
 - **Extract genotype subset**: `Geno.extract_snps(path=...)` → writes extracted files under `tmp_GENAL/`
 - **Two-sample MR pipeline**: `Geno.query_outcome(...)` → `Geno.MR(...)` (+ `MR_plot`)
+- **Leave-one-out MR**: `Geno.MR_loo(...)` → `Geno.MR_loo_plot(...)` (identify influential variants)
 - **MR-PRESSO**: `Geno.MRpresso(...)` (parallel; outlier + distortion tests)
 - **Colocalization**: `Geno.colocalize(...)` (approx Bayes factors; returns posterior probabilities)
 - **Association testing (individual-level)**: `Geno.set_phenotype(...)` → `Geno.association_test(...)`
@@ -311,7 +313,7 @@ mod_table, GlobalTest, OutlierTest, BiasTest = G_clumped.MRpresso(
     cpus=-1,   # use all CPU cores
 )
 ```
-If you want to rerun all MR methods after removing outliers with MR-PRESSO, you can use the `use_mrpresso_data=True` argument in `MR()`:
+If you want to rerun MR methods after removing outliers with MR-PRESSO, you can use the `use_mrpresso_data=True` argument in `MR()`:
 ```python
 res = G_clumped.MR(
     action=2,
@@ -325,7 +327,27 @@ res = G_clumped.MR(
 res
 ```
 
-### 7) Single-SNP association tests (individual-level data)
+### 7) Sensitivity: Leave-One-Out MR
+Leave-one-out MR helps identify influential variants that may be driving the causal estimate.
+
+```python
+# Run leave-one-out analysis (default uses IVW)
+loo_results = G_clumped.MR_loo(method="IVW", heterogeneity=False, odds=False)
+```
+
+Visualize the results with a forest plot:
+
+```python
+# Default: show top influential instruments
+G_clumped.MR_loo_plot(filename="loo_forest")
+```
+
+Tips:
+- `MR_loo` accepts the same `action`, `use_mrpresso_data`, and method parameters as `MR`.
+- `MR_loo_plot` supports `top_influential=True` (default) for a compact figure showing the most influential SNPs, or `top_influential=False` for paginated output with all instruments.
+- Set `odds=True` in `MR_loo` if you want odds ratio scaling on the plot.
+
+### 8) Single-SNP association tests (individual-level data)
 
 Use individual-level data to re-estimate SNP–trait effects in a specific cohort (e.g., different ancestry, different measurement protocol).
 
@@ -354,7 +376,7 @@ G_adj.association_test(
 
 This updates `G_adj.data[["BETA","SE","P"]]` with cohort-specific estimates and recomputes `FSTAT` to be consistent with the updated values.
 
-### 8) Lift to a different build
+### 9) Lift to a different build
 
 Lift variants between builds (e.g., hg19 → hg38):
 
@@ -365,7 +387,7 @@ lifted.head()
 
 For large datasets, you can provide a UCSC LiftOver executable via `liftover_path`.
 
-### 9) Query the GWAS Catalog
+### 10) Query the GWAS Catalog
 
 Attach a per-SNP list of associated traits using the GWAS Catalog API:
 

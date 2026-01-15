@@ -3,6 +3,7 @@ import numpy as np
 import datetime
 import os, subprocess
 from pandas.api.types import is_numeric_dtype
+from tqdm import tqdm
 
 from .proxy import find_proxies, query_outcome_proxy
 from .MR import *
@@ -11,6 +12,20 @@ from .constants import MR_METHODS_NAMES
 
 REQUIRED_COLUMNS = ["SNP", "BETA", "SE", "EA", "NEA"]
 RESULT_COLS = ["exposure", "outcome", "method", "nSNP", "b", "se", "pval", "Q", "Q_df", "Q_pval"]
+
+def _ensure_mr_result_cols(result_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensure standard MR result columns exist and are type-stable.
+    """
+    required = ["method", "nSNP", "b", "se", "pval", "Q", "Q_df", "Q_pval"]
+    for col in required:
+        if col not in result_df.columns:
+            result_df[col] = np.nan
+
+    q_df = pd.to_numeric(result_df["Q_df"], errors="coerce")
+    intlike = q_df.isna() | np.isclose(q_df, np.round(q_df))
+    result_df["Q_df"] = np.round(q_df.where(intlike)).astype("Int64")
+    return result_df
 
 
 def mrpresso_func(
@@ -47,7 +62,7 @@ def mrpresso_func(
     # Check number of instruments
     if df_exposure.shape[0] < 3:
         print("Not enough instruments to run MRpresso. At least 3 are required.")
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), {}, pd.DataFrame(), {}, None
     
     # Check EAF columns if action = 2
     if action == 2:
@@ -68,6 +83,16 @@ def mrpresso_func(
     )
     
     df_mr = df_mr_formatting(df_mr)
+    if "SNP" not in df_mr.columns:
+        raise ValueError("MR dataframe must contain a 'SNP' column after formatting.")
+
+    df_mr = df_mr.set_index("SNP", drop=False)
+    if df_mr.index.duplicated().any():
+        duplicated_snps = df_mr.index[df_mr.index.duplicated()].unique().tolist()
+        print(
+            f"Warning: duplicated SNP IDs found in MR dataframe (keeping first occurrence): {duplicated_snps}"
+        )
+        df_mr = df_mr.loc[~df_mr.index.duplicated(keep="first")]
 
     # Call and return the results of MR-PRESSO
     return mr_presso(
@@ -199,11 +224,221 @@ def MR_func(
         results.extend(result)
 
     res = pd.DataFrame(results)
+    res = _ensure_mr_result_cols(res)
     res["exposure"], res["outcome"] = name_exposure, name_outcome
     res = res.reindex(columns=RESULT_COLS)
-    res["Q_df"] = res["Q_df"].astype("Int64")
 
     return res, df_mr
+
+
+def MR_loo_func(
+    data,
+    method,
+    action,
+    eaf_threshold,
+    heterogeneity,
+    nboot,
+    penk,
+    phi,
+    name_exposure,
+    cpus,
+    subset_data,
+):
+    """
+    Wrapper function corresponding to the :meth:`Geno.MR_loo` method.
+    """
+    valid_methods = list(MR_METHODS_NAMES.keys())
+    if not isinstance(method, str) or method not in valid_methods or method == "all":
+        raise ValueError(
+            f"The method argument must be a single string in {valid_methods} (and cannot be 'all')."
+        )
+
+    name_outcome = data[2]
+
+    if subset_data is not None:
+        df_mr = subset_data.copy()
+        if "SNP" not in df_mr.columns:
+            df_mr["SNP"] = df_mr.index
+    else:
+        if action not in [1, 2, 3]:
+            raise ValueError("The action argument only takes 1,2 or 3 as value")
+
+        df_exposure = data[0]
+        df_outcome = data[1]
+        name_outcome = data[2]
+
+        if action == 2:
+            if "EAF" not in df_exposure.columns:
+                print(
+                    "Warning: action = 2 but EAF column is missing from exposure data: palindromic SNPs will be deleted (action set to 3)."
+                )
+                action = 3
+            elif "EAF" not in df_outcome.columns:
+                print(
+                    "Warning: action = 2 but EAF column is missing from outcome data: palindromic SNPs will be deleted (action set to 3)."
+                )
+                action = 3
+
+        df_mr = harmonize_MR(
+            df_exposure, df_outcome, action=action, eaf_threshold=eaf_threshold
+        )
+        df_mr = df_mr_formatting(df_mr)
+
+    if "SNP" not in df_mr.columns:
+        raise ValueError("MR dataframe must contain a 'SNP' column for leave-one-out.")
+
+    df_mr = df_mr.set_index("SNP", drop=False)
+    if df_mr.index.duplicated().any():
+        duplicated_snps = df_mr.index[df_mr.index.duplicated()].unique().tolist()
+        print(
+            f"Warning: duplicated SNP IDs found in MR dataframe (keeping first occurrence): {duplicated_snps}"
+        )
+        df_mr = df_mr.loc[~df_mr.index.duplicated(keep="first")]
+
+    method_display_name = (
+        MR_METHODS_NAMES[method][0]
+        if isinstance(MR_METHODS_NAMES[method], (list, tuple))
+        else MR_METHODS_NAMES[method]
+    )
+
+    if len(df_mr) < 3:
+        print(
+            "Not enough instruments to run leave-one-out MR. At least 3 are required."
+        )
+        all_row = {
+            "method": method_display_name,
+            "nSNP": np.nan,
+            "b": np.nan,
+            "se": np.nan,
+            "pval": np.nan,
+            "Q": np.nan,
+            "Q_df": np.nan,
+            "Q_pval": np.nan,
+        }
+        return pd.DataFrame(), all_row, method_display_name
+
+    def _run_method(df_sub: pd.DataFrame):
+        BETA_e, BETA_o, SE_e, SE_o = (
+            df_sub["BETA_e"],
+            df_sub["BETA_o"],
+            df_sub["SE_e"],
+            df_sub["SE_o"],
+        )
+
+        if method == "Egger":
+            return mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o)
+        if method == "Egger-boot":
+            return mr_egger_regression_bootstrap(
+                BETA_e, SE_e, BETA_o, SE_o, nboot, cpus, show_progress=False
+            )
+        if method == "WM":
+            return mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot)
+        if method == "WM-pen":
+            return mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk)
+        if method == "Simple-median":
+            return mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot)
+        if method == "IVW":
+            return mr_ivw(BETA_e, SE_e, BETA_o, SE_o)
+        if method == "IVW-RE":
+            return mr_ivw_re(BETA_e, SE_e, BETA_o, SE_o)
+        if method == "IVW-FE":
+            return mr_ivw_fe(BETA_e, SE_e, BETA_o, SE_o)
+        if method == "UWR":
+            return mr_uwr(BETA_e, SE_e, BETA_o, SE_o)
+        if method == "Sign":
+            return mr_sign(BETA_e, BETA_o)
+        if method == "Simple-mode":
+            return mr_simple_mode(
+                BETA_e,
+                SE_e,
+                BETA_o,
+                SE_o,
+                phi,
+                nboot,
+                cpus,
+                show_progress=False,
+            )
+        if method == "Weighted-mode":
+            return mr_weighted_mode(
+                BETA_e,
+                SE_e,
+                BETA_o,
+                SE_o,
+                phi,
+                nboot,
+                cpus,
+                show_progress=False,
+            )
+
+        raise ValueError(f"Method '{method}' is not supported for leave-one-out.")
+
+    def _select_causal_row(method_results):
+        if not method_results:
+            return {}
+        if isinstance(MR_METHODS_NAMES[method], (list, tuple)):
+            causal = next(
+                (r for r in method_results if r.get("method") == method_display_name),
+                None,
+            )
+            return causal if causal is not None else {}
+        return method_results[0]
+
+    all_res = _select_causal_row(_run_method(df_mr))
+    all_row = {
+        "method": method_display_name,
+        "nSNP": all_res.get("nSNP", len(df_mr)),
+        "b": all_res.get("b", np.nan),
+        "se": all_res.get("se", np.nan),
+        "pval": all_res.get("pval", np.nan),
+        "Q": all_res.get("Q", np.nan),
+        "Q_df": all_res.get("Q_df", np.nan),
+        "Q_pval": all_res.get("Q_pval", np.nan),
+    }
+
+    loo_rows = []
+    for snp in tqdm(df_mr.index, desc="Leave-one-out MR", total=len(df_mr), ncols=100):
+        df_sub = df_mr.drop(index=snp)
+        res = _select_causal_row(_run_method(df_sub))
+        loo_rows.append(
+            {
+                "SNP": snp,
+                "nSNP": res.get("nSNP", len(df_sub)),
+                "b": res.get("b", np.nan),
+                "se": res.get("se", np.nan),
+                "pval": res.get("pval", np.nan),
+                "Q": res.get("Q", np.nan),
+                "Q_df": res.get("Q_df", np.nan),
+                "Q_pval": res.get("Q_pval", np.nan),
+            }
+        )
+
+    loo_df = pd.DataFrame(loo_rows)
+    loo_df["exposure"] = name_exposure
+    loo_df["outcome"] = name_outcome
+    loo_df["method"] = method_display_name
+    loo_df = _ensure_mr_result_cols(loo_df)
+    loo_df = loo_df.reindex(
+        columns=[
+            "exposure",
+            "outcome",
+            "method",
+            "SNP",
+            "nSNP",
+            "b",
+            "se",
+            "pval",
+            "Q",
+            "Q_df",
+            "Q_pval",
+        ]
+    )
+
+    if not heterogeneity:
+        loo_df = loo_df.loc[
+            :, ["exposure", "outcome", "method", "SNP", "nSNP", "b", "se", "pval"]
+        ]
+
+    return loo_df, all_row, method_display_name
 
 def df_mr_formatting(df_mr):
     """
@@ -228,10 +463,11 @@ def df_mr_formatting(df_mr):
             f"Deleting {n_deleted_outcome} SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (outcome data): {rows_to_delete_outcome['SNP'].tolist()}"
         )
 
-    df_mr = df_mr[["BETA_e", "SE_e", "BETA_o", "SE_o"]]
-    df_mr = df_mr.dropna().reset_index(drop=True)
-    
-    return df_mr
+    df_mr = df_mr.dropna(subset=["BETA_e", "SE_e", "BETA_o", "SE_o"]).reset_index(
+        drop=True
+    )
+
+    return df_mr.loc[:, ["SNP", "BETA_e", "SE_e", "BETA_o", "SE_o"]]
 
 
 

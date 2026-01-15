@@ -25,7 +25,7 @@ def _null_result(method_name):
 Mode methods
 """
 
-def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
+def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, show_progress=True):
     """
     Perform a Mendelian Randomization analysis using the simple mode method.
     
@@ -54,7 +54,7 @@ def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     SE_IV = np.sqrt((SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4))
     
     BETA_mode = beta_mode(BETA_IV, np.ones(l), phi, method="Simple") #Point estimate calculated using unweighted KDE
-    BETA_boot = bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method="Simple") #Generating bootstrapped point estimates with normal sampling and unweighted KDE
+    BETA_boot = bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method="Simple", show_progress=show_progress) #Generating bootstrapped point estimates with normal sampling and unweighted KDE
     SE_mode = stats.median_abs_deviation(BETA_boot, scale=1/1.4826)
     P_mode = 2 * t.sf(np.abs(BETA_mode / SE_mode), df=l - 1)
     
@@ -68,7 +68,7 @@ def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     }
 ]
 
-def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
+def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, show_progress=True):
     """
     Perform a Mendelian Randomization analysis using the weighted mode method.
     
@@ -97,7 +97,7 @@ def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus):
     SE_IV = np.sqrt((SE_o**2) / (BETA_e**2) + ((BETA_o**2) * (SE_e**2)) / (BETA_e**4))
     
     BETA_mode = beta_mode(BETA_IV, SE_IV, phi, method="Weighted") #Point estimate calculated using KDE weighted with standard errors
-    BETA_boot = bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method="Weighted") #Generating bootstrapped point estimates with normal sampling and weighted KDE
+    BETA_boot = bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method="Weighted", show_progress=show_progress) #Generating bootstrapped point estimates with normal sampling and weighted KDE
     SE_mode = stats.median_abs_deviation(BETA_boot, scale=1/1.4826)
     P_mode = 2 * t.sf(np.abs(BETA_mode / SE_mode), df=l - 1)
     
@@ -151,7 +151,7 @@ def bootstrap_mode_iteration(i, BETA_IV, SE_IV, phi, method):
     else:
         raise ValueError("Method should be either 'Simple' or 'Weighted'.")
 
-def bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method):
+def bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method, show_progress=True):
     """Function to obtain arrays of bootstrapped beta estimates (weighted or unweighted) to estimate SEs of mode methods."""
     
     # Declare the array to store results of the bootstrapping
@@ -168,6 +168,7 @@ def bootstrap_mode (BETA_IV, SE_IV, phi, nboot, cpus, method):
                 total=nboot,
                 desc=f"{method} mode bootstrapping",
                 ncols=100,
+                disable=not show_progress,
             )
         )
     BETA_boot = np.array(results)
@@ -260,7 +261,7 @@ def mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o):
         )
         return null_result
 
-def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
+def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4, show_progress=True):
     """
     Perform a Mendelian Randomization analysis using the egger regression method with boostrapped standard errors. See :func:`mr_egger_regression` for a version without bootstrapping.
 
@@ -294,7 +295,11 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, cpus=4):
             for i in range(nboot)
         }
         for future in tqdm(
-            as_completed(futures), total=nboot, desc="MR Egger bootstrapping", ncols=100
+            as_completed(futures),
+            total=nboot,
+            desc="MR Egger bootstrapping",
+            ncols=100,
+            disable=not show_progress,
         ):
             ahat, bhat = future.result()
             i = futures[future]  # get the original index/counter
