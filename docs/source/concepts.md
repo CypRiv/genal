@@ -66,9 +66,10 @@ A helpful mental framework:
 | `association_test()` | `None` | runs PLINK `--glm`; mutates `G.data` (`BETA/SE/P`) |
 | `query_outcome()` | `None` | sets `G.MR_data` (exposure/outcome tables used by MR) |
 | `MR()` | `pd.DataFrame` | sets `G.MR_results` and returns the results table |
-| `MR_plot()` | plot object | requires `G.MR_results`; writes `.png` if `filename=...` |
+| `MR_plot()` | plot object | requires `G.MR_results`; writes `.png` if `filename=...`; supports `use_mrpresso_data=True` for outlier highlighting |
+| `MR_funnel()` | plot object | requires `G.MR_results`; writes `.png` if `filename=...`; supports `use_mrpresso_data=True` for outlier highlighting |
 | `MR_loo()` | `pd.DataFrame` | sets `G.MR_loo_results` and returns the LOO results table |
-| `MR_loo_plot()` | plot object(s) | requires `G.MR_loo_results`; writes `.png` if `filename=...`; may return a list for multi-page output |
+| `MR_loo_plot()` | plot object(s) | requires `G.MR_loo_results`; writes `.png` if `filename=...`; may return a list for multi-page output; supports `methods=[...]` overall rows and `use_mrpresso_data=True` for outlier highlighting |
 | `MRpresso()` | tuple | sets `G.MRpresso_results` and `G.MRpresso_subset_data` (outlier-removed harmonized table; SNP-indexed) |
 | `prs()` | `None` | writes `<name>.csv` and uses PLINK temp files |
 | `query_gwas_catalog()` | `pd.DataFrame` | adds an `ASSOC` column (network-bound); `replace=True` overwrites `G.data` |
@@ -83,7 +84,7 @@ Be aware of these common side effects:
 
 - `~/.genal/config.json` is created/updated as you configure PLINK, reference folders, or default genotype paths.
 - `tmp_GENAL/` is used as a scratch directory for PLINK commands and is **not** automatically deleted.
-- Some methods generate output files in your current directory (notably `prs()`, and plot saving in `MR_plot()`).
+- Some methods generate output files in your current directory (notably `prs()`, and plot saving in `MR_plot()`, `MR_funnel()`, and `MR_loo_plot()`).
 
 ## Resource usage (`ram`, `cpus`)
 

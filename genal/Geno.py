@@ -1042,6 +1042,14 @@ class Geno:
             heterogeneity,
             use_mrpresso_data,
         )
+        self.MR_loo_config = {
+            "action": action,
+            "eaf_threshold": eaf_threshold,
+            "nboot": nboot,
+            "penk": penk,
+            "phi": phi,
+            "cpus": cpus_eff,
+        }
 
         return loo_df
 
@@ -1053,9 +1061,17 @@ class Geno:
         filename=None,
         exposure_name=None,
         outcome_name=None,
+        figure_size=None,
+        *,
+        methods=None,
+        use_mrpresso_data=None,
     ):
         """
         Create a leave-one-out forest plot using results stored from :meth:`Geno.MR_loo`.
+
+        Args:
+            figure_size (tuple[float, float] | None): Figure size in inches for both the returned
+                plot and the saved PNG (when `filename` is provided).
         """
         from .plots import mr_loo_plot
 
@@ -1064,9 +1080,16 @@ class Geno:
             snps_per_page=snps_per_page,
             page=page,
             top_influential=top_influential,
+            methods=methods,
+            use_mrpresso_data=use_mrpresso_data,
+            mr_data=getattr(self, "MR_data", None),
+            mrpresso_results=getattr(self, "MRpresso_results", None),
+            mrpresso_subset_data=getattr(self, "MRpresso_subset_data", None),
+            mr_loo_config=getattr(self, "MR_loo_config", None),
             filename=filename,
             exposure_name=exposure_name,
             outcome_name=outcome_name,
+            figure_size=figure_size,
         )
     
     def MR_plot(
@@ -1079,7 +1102,10 @@ class Geno:
         ],
         exposure_name=None,
         outcome_name=None,
-        filename=None
+        filename=None,
+        figure_size=None,
+        *,
+        use_mrpresso_data=False,
     ):
         """
         Creates and returns a scatter plot of individual SNP effects with lines representing different Mendelian Randomization (MR) methods. Each MR method specified in the 'methods' argument is represented as a line in the plot.
@@ -1091,6 +1117,8 @@ class Geno:
             outcome_name (str, optional): A custom label for the outcome effect axis. If None, uses the label provided in the MR function call or a default label.
             filename (str, optional): The filename prefix where the plot will be saved (a `.png` extension is added).
                 If None, the plot is not saved.
+            figure_size (tuple[float, float] | None): Figure size in inches for both the returned
+                plot and the saved PNG (when `filename` is provided).
 
         Returns:
             plotnine.ggplot.ggplot: A plotnine ggplot object representing the scatter plot of individual SNP effects with MR method lines.
@@ -1108,7 +1136,10 @@ class Geno:
             methods=methods,
             exposure_name=exposure_name,
             outcome_name=outcome_name,
+            use_mrpresso_data=use_mrpresso_data,
+            mrpresso_results=getattr(self, "MRpresso_results", None),
             filename=filename,
+            figure_size=figure_size,
         )
     
     def MR_forest(
@@ -1122,7 +1153,8 @@ class Geno:
         exposure_name=None,
         outcome_name=None,
         odds=False,
-        filename=None
+        filename=None,
+        figure_size=None,
     ):
         """
         Creates and returns a forest plot of MR results, with one row per method.
@@ -1137,6 +1169,8 @@ class Geno:
             odds (bool, optional): If True, plots odds ratios instead of betas. Default is False.
             filename (str, optional): The filename where the plot will be saved. If None, 
                 the plot is not saved.
+            figure_size (tuple[float, float] | None): Figure size in inches for both the returned
+                plot and the saved PNG (when `filename` is provided).
 
         Returns:
             plotnine.ggplot.ggplot: A plotnine ggplot object representing the forest plot 
@@ -1153,6 +1187,64 @@ class Geno:
             exposure_name=exposure_name,
             outcome_name=outcome_name,
             odds=odds,
+            filename=filename,
+            figure_size=figure_size,
+        )
+
+    def MR_funnel(
+        self,
+        methods="IVW",
+        exposure_name=None,
+        outcome_name=None,
+        se_method="nome",
+        symmetric_x=True,
+        add_null_line=False,
+        figure_size=(10, 6),
+        filename=None,
+        *,
+        use_mrpresso_data=False,
+    ):
+        """
+        Creates and returns a funnel plot of single-SNP causal estimates (Wald ratios).
+
+        Args:
+            methods (None | str | list[str] | tuple[str], optional): MR method(s) used to draw
+                vertical reference lines. Accepts:
+                - None: no vertical lines
+                - str: a single method key (e.g., "IVW")
+                - list/tuple of str: multiple method keys (e.g., ["WM", "IVW", "Egger"])
+                Default is "IVW".
+            exposure_name (str, optional): Custom exposure label (reserved for future plot labels).
+            outcome_name (str, optional): Custom outcome label (reserved for future plot labels).
+            se_method (str, optional): Standard error method for Wald ratios. One of {"nome", "delta"}.
+                Default is "nome".
+            symmetric_x (bool, optional): If True, apply symmetric x-limits centered on the first
+                resolved MR method line (or on the median ratio if no method line is available).
+            add_null_line (bool, optional): If True, adds a subtle vertical line at x=0.
+            figure_size (tuple[float, float], optional): Figure size in inches for both the returned
+                plot and the saved PNG (when `filename` is provided). Defaults to (10, 6).
+            filename (str, optional): Filename prefix where the plot will be saved (a `.png`
+                extension is added). If None, the plot is not saved.
+
+        Returns:
+            plotnine.ggplot.ggplot: A plotnine ggplot object representing the funnel plot.
+
+        Raises:
+            ValueError: If MR analysis has not been performed prior to calling this function.
+        """
+        from .plots import mr_funnel
+
+        return mr_funnel(
+            getattr(self, "MR_results", None),
+            methods=methods,
+            exposure_name=exposure_name,
+            outcome_name=outcome_name,
+            se_method=se_method,
+            symmetric_x=symmetric_x,
+            add_null_line=add_null_line,
+            figure_size=figure_size,
+            use_mrpresso_data=use_mrpresso_data,
+            mrpresso_results=getattr(self, "MRpresso_results", None),
             filename=filename,
         )
 

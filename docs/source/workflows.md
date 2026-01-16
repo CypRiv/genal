@@ -175,7 +175,17 @@ Key arguments you commonly tune:
 After `MR()`, you can generate a scatter plot with method lines:
 
 ```python
-G_instruments.MR_plot(filename="mr_scatter")  # saves mr_scatter.png
+G_instruments.MR_plot(filename="mr_scatter", figure_size=(10, 6))  # saves mr_scatter.png
+```
+
+You can also draw a funnel plot of single-SNP ratio estimates (Wald ratios):
+
+```python
+G_instruments.MR_funnel(
+    methods=["IVW", "WM", "Egger"],  # vertical reference lines (optional)
+    filename="mr_funnel",
+    figure_size=(10, 6),
+)
 ```
 
 ## 6a) MR-PRESSO (outlier detection and distortion testing)
@@ -206,6 +216,14 @@ If outliers are found, you can rerun MR using the outlier-removed subset:
 res_no_outliers = G_instruments.MR(use_mrpresso_data=True)
 ```
 
+To highlight MR-PRESSO outliers on plots, pass `use_mrpresso_data=True` (outliers are colored in red and shown in the legend):
+
+```python
+G_instruments.MR_plot(filename="mr_scatter_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
+G_instruments.MR_funnel(filename="mr_funnel_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
+G_instruments.MR_loo_plot(filename="loo_forest_mrpresso", figure_size=(10, 8), use_mrpresso_data=True)
+```
+
 See {doc}`methods` for algorithm details and outputs.
 
 ## 6b) Leave-one-out MR (sensitivity analysis)
@@ -230,8 +248,8 @@ Key arguments:
 {py:meth}`genal.Geno.MR_loo_plot` creates a forest plot from the stored `MR_loo_results`:
 
 ```python
-# Default: show top influential instruments (publication-ready)
-G_instruments.MR_loo_plot(filename="loo_forest")
+# Default: show top influential instruments
+G_instruments.MR_loo_plot(filename="loo_forest", figure_size=(10, 8))
 ```
 
 ```python
@@ -241,6 +259,7 @@ G_instruments.MR_loo_plot(
     snps_per_page=30,
     page=1,                 # or None for all pages
     filename="loo_forest_all",
+    figure_size=(10, 12),
 )
 ```
 
@@ -248,6 +267,8 @@ Key arguments:
 - `top_influential=True` (default): select the `snps_per_page` most influential SNPs (largest change in estimate when removed) and render a single compact figure.
 - `top_influential=False`: paginate all instruments; use `page=N` to select a specific page or `page=None` to render all pages.
 - `snps_per_page`: number of SNPs per page (minimum 5).
+- `use_mrpresso_data=True`: color MR-PRESSO outliers in red (requires `MRpresso()` first). When outliers exist, an extra summary row ("MR-PRESSO corrected") is added using the same MR method as the leave-one-out analysis.
+- `methods=["WM", "Egger"]`: add extra overall estimates for the requested methods (computed on all instruments).
 
 
 ## 7) Additional capabilities (beyond the core pipeline)

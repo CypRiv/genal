@@ -123,7 +123,7 @@ G_instruments.query_outcome(G_outcome, proxy=True, reference_panel="EUR_37")
 mr_results = G_instruments.MR(action=2, heterogeneity=True, odds=False)
 
 # 5.5) Plot MR results
-G_instruments.MR_plot(filename="mr_scatter")
+G_instruments.MR_plot(filename="mr_scatter", figure_size=(10, 6))
 ```
 ## Core concept: the `Geno` object
 
@@ -300,7 +300,17 @@ About `action` (palindromic SNP handling during harmonization):
 Plot the MR scatter:
 
 ```python
-G_clumped.MR_plot(filename="mr_scatter")
+G_clumped.MR_plot(filename="mr_scatter", figure_size=(10, 6))
+```
+
+You can also draw a funnel plot of single-SNP ratio estimates (Wald ratios):
+
+```python
+G_clumped.MR_funnel(
+    methods=["IVW", "WM", "Egger"],  # vertical reference lines (optional)
+    filename="mr_funnel",
+    figure_size=(10, 6),
+)
 ```
 
 ### 6) Sensitivity: MR-PRESSO
@@ -313,6 +323,15 @@ mod_table, GlobalTest, OutlierTest, BiasTest = G_clumped.MRpresso(
     cpus=-1,   # use all CPU cores
 )
 ```
+
+To highlight MR-PRESSO outliers on plots, pass `use_mrpresso_data=True` (outliers are colored in red):
+
+```python
+G_clumped.MR_plot(filename="mr_scatter_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
+G_clumped.MR_funnel(filename="mr_funnel_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
+G_clumped.MR_loo_plot(filename="loo_forest_mrpresso", figure_size=(10, 8), use_mrpresso_data=True)
+```
+
 If you want to rerun MR methods after removing outliers with MR-PRESSO, you can use the `use_mrpresso_data=True` argument in `MR()`:
 ```python
 res = G_clumped.MR(
@@ -339,12 +358,14 @@ Visualize the results with a forest plot:
 
 ```python
 # Default: show top influential instruments
-G_clumped.MR_loo_plot(filename="loo_forest")
+G_clumped.MR_loo_plot(filename="loo_forest", figure_size=(10, 8))
 ```
 
 Tips:
 - `MR_loo` accepts the same `action`, `use_mrpresso_data`, and method parameters as `MR`.
 - `MR_loo_plot` supports `top_influential=True` (default) for a compact figure showing the most influential SNPs, or `top_influential=False` for paginated output with all instruments.
+- `MR_loo_plot(..., use_mrpresso_data=True)` colors MR-PRESSO outliers in red (requires running `MRpresso()` first). When outliers exist, an extra summary row ("MR-PRESSO corrected") is added using the same MR method as the leave-one-out analysis.
+- `MR_loo_plot(..., methods=["WM", "Egger"])` adds extra overall estimates for the requested methods (computed on all instruments).
 - Set `odds=True` in `MR_loo` if you want odds ratio scaling on the plot.
 
 ### 8) Single-SNP association tests (individual-level data)
