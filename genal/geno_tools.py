@@ -511,7 +511,7 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     """
     Save data to a specified file format.
 
-    Supported formats: .h5 (default), .csv, .txt.
+    Supported formats: .h5 (default), .parquet, .csv, .txt.
     Future supported formats: .vcf, .vcf.gz.
 
     Args:
@@ -525,6 +525,10 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     path = os.path.join(path, name)
     if fmt == "h5":
         data.to_hdf(f"{path}.h5", key="data", mode="w", format="table")
+    elif fmt == "parquet":
+        data.to_parquet(
+            f"{path}.parquet", engine="pyarrow", compression="brotli", index=True
+        )
     elif fmt == "csv":
         data.to_csv(f"{path}.csv", sep=sep, header=header, index=False)
     elif fmt == "txt":

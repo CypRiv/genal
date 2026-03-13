@@ -826,7 +826,7 @@ class Geno:
         the outcome attribute: (exposure_data, outcome_data, name) ready for MR methods.
 
         Args:
-            outcome: Can be a Geno object (from a GWAS) or a filepath of types: .h5 or .hdf5 (created with the :meth:`Geno.save` method.
+            outcome: Can be a Geno object (from a GWAS) or a filepath of types: .h5, .hdf5, or .parquet (created with the :meth:`Geno.save` method).
             name (str, optional): Name for the outcome data. Defaults to None.
             proxy (bool, optional): If true, proxies are searched. Default is True.
             reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies (only if proxy=True). 
@@ -1609,7 +1609,9 @@ class Geno:
 
         Args:
             path (str, optional): Folder path to save the file. Defaults to the current directory.
-            fmt (str, optional): File format. Options: .h5 (default), .csv, .txt. Future: .vcf, .vcf.gz.
+            fmt (str, optional): File format. Options: .h5 (default), .parquet, .csv, .txt.
+                Parquet is saved with `index=True`, `compression="brotli"`, `engine="pyarrow"`.
+                Future: .vcf, .vcf.gz.
             sep (str, optional): Delimiter for .csv and .txt formats. Default is tab.
             header (bool, optional): Save column names for .csv and .txt formats. Default is True.
         """

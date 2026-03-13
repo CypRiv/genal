@@ -402,7 +402,7 @@ This updates `G_adj.data[["BETA","SE","P"]]` with cohort-specific estimates and 
 Lift variants between builds (e.g., hg19 → hg38):
 
 ```python
-lifted = SBP_inst.lift(start="hg19", end="hg38", replace=False)
+lifted = G.lift(start="hg19", end="hg38", replace=False)
 lifted.head()
 ```
 
@@ -413,14 +413,14 @@ For large datasets, you can provide a UCSC LiftOver executable via `liftover_pat
 Attach a per-SNP list of associated traits using the GWAS Catalog API:
 
 ```python
-SBP_inst.query_gwas_catalog(p_threshold=5e-8)
-SBP_inst.data[["SNP", "ASSOC"]].head()
+G_clumped.query_gwas_catalog(p_threshold=5e-8)
+G_clumped.data[["SNP", "ASSOC"]].head()
 ```
 
 You can include p-values and study IDs:
 
 ```python
-SBP_inst.query_gwas_catalog(p_threshold=5e-8, return_p=True, return_study=True)
+G_clumped.query_gwas_catalog(p_threshold=5e-8, return_p=True, return_study=True)
 ```
 </details>
 
@@ -516,13 +516,14 @@ Save a `Geno` to disk (handy for caching large outcome GWAS).
 
 ```python
 G.name = "Trait"
-G.save(path=".", fmt="h5")   # writes Trait.h5
+G.save(path=".", fmt="h5")       # writes Trait.h5
+G.save(path=".", fmt="parquet")  # writes Trait.parquet
 ```
 
-You can pass a saved `.h5/.hdf5` path directly to `query_outcome()`:
+You can pass a saved `.h5/.hdf5/.parquet` path directly to `query_outcome()`:
 
 ```python
-G.query_outcome("Trait.h5", name="Trait", proxy=True, reference_panel="EUR_37")
+G.query_outcome("Trait.parquet", name="Trait", proxy=True, reference_panel="EUR_37")
 ```
 </details>
 

@@ -76,7 +76,7 @@ A helpful mental framework:
 | `filter_by_gene(replace=False)` | `Geno` | returns a new `Geno` filtered to a locus |
 | `filter_by_gene(replace=True)` | `None` | filters `G.data` in place |
 | `colocalize()` | dict | returns posterior probabilities; does not modify `G.data` |
-| `save()` | `None` | writes `G.name.(h5|csv|txt)` to disk |
+| `save()` | `None` | writes `G.name.(h5|parquet|csv|txt)` to disk |
 
 ## Side effects and files
 

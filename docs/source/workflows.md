@@ -207,8 +207,10 @@ What you typically tune:
 - `outlier_test` / `distortion_test`: disable if you only want the global test.
 
 Output structure:
-- `OutlierTest`: DataFrame with per-SNP outlier p-values; SNP identifiers (rsIDs) are used as row labels (not numeric indices).
-- `BiasTest`: dictionary containing `"outliers_indices"` (list of SNP IDs), `"distortion_test_coefficient"`, and `"distortion_test_p"`.
+- `mod_table`: DataFrame with two rows (`"Raw"` and `"Outlier-corrected"`) containing columns `method`, `nSNP`, `b`, `se`, `pval` for the IVW model before and after outlier removal.
+- `GlobalTest`: dictionary with `"RSSobs"` (observed residual sum of squares) and `"global_test_p"` (p-value for the global pleiotropy test).
+- `OutlierTest`: DataFrame with per-SNP outlier p-values (`RSSobs`, `Pvalue`); SNP identifiers (rsIDs) are used as row labels. Empty if the global test is not significant.
+- `BiasTest`: dictionary containing `"outliers_indices"` (list of SNP IDs), `"distortion_test_coefficient"` (percent), and `"distortion_test_p"`.
 
 If outliers are found, you can rerun MR using the outlier-removed subset:
 
@@ -427,5 +429,5 @@ G_instruments.save(fmt="h5")           # writes my_instruments.h5 (key="data")
 
 Notes:
 - `save()` writes the file using `G.name`; set it explicitly if you want stable filenames.
-- Supported formats are `fmt="h5"` (default), `"csv"`, and `"txt"`.
-- You can later load with `pd.read_hdf("my_instruments.h5", key="data")`, or pass the `.h5/.hdf5` path directly to `query_outcome()`.
+- Supported formats are `fmt="h5"` (default), `"parquet"`, `"csv"`, and `"txt"`.
+- You can later load with `pd.read_hdf("my_instruments.h5", key="data")` or `pd.read_parquet("my_instruments.parquet")`, or pass the `.h5/.hdf5/.parquet` path directly to `query_outcome()`.

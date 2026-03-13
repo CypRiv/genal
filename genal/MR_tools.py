@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import os, subprocess
+from pathlib import Path
 from pandas.api.types import is_numeric_dtype
 from tqdm import tqdm
 
@@ -768,11 +769,18 @@ def load_outcome_from_geno_object(outcome):
 
 def load_outcome_from_filepath(outcome):
     """Load outcome data from a file path."""
-    if not os.path.isfile(outcome):
+    outcome_path = Path(outcome)
+    if not outcome_path.is_file():
         raise ValueError("The path provided doesn't lead to a file.")
-    if not (outcome.endswith(".h5") or outcome.endswith(".hdf5")):
-        raise ValueError("The file provided needs to be in .h5 or .hdf5 format.")
-    df_outcome = pd.read_hdf(outcome, key="data")
-    name = os.path.splitext(os.path.basename(outcome))[0]
+
+    suffix = outcome_path.suffix.lower()
+    if suffix in {".h5", ".hdf5"}:
+        df_outcome = pd.read_hdf(outcome, key="data")
+    elif suffix == ".parquet":
+        df_outcome = pd.read_parquet(outcome, engine="pyarrow")
+    else:
+        raise ValueError("The file provided needs to be in .h5, .hdf5, or .parquet format.")
+
+    name = outcome_path.stem
     print(f"Outcome data successfully loaded from path provided.")
     return df_outcome, name

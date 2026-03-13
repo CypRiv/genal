@@ -5,9 +5,16 @@ import subprocess
 import re
 import uuid
 
-from .tools import get_reference_panel_path, get_plink_path, run_plink_command
+from .tools import get_reference_panel_path, get_plink_path, load_reference_panel, run_plink_command
 
 ## TO DO: accept lists of CHR/POS instead of SNP names for these functions
+
+_COORD_TOKEN_RE = re.compile(
+    r"^(chr)?(?P<chr>[0-9]{1,2}|X|Y|XY|MT|M)[:_](?P<pos>[0-9]+)([:_](?P<a1>[A-Za-z]+)[:_](?P<a2>[A-Za-z]+))?$",
+    re.IGNORECASE,
+)
+
+_CHR_ALIASES = {"X": 23, "Y": 24, "XY": 25, "MT": 26, "M": 26}
 
 
 def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
@@ -190,6 +197,47 @@ def apply_proxies(df, ld, searchspace=None):
     return output
 
 
+def _normalize_chr_token(chr_token):
+    chr_token = str(chr_token).upper()
+    if chr_token.isdigit():
+        chr_int = int(chr_token)
+        if 1 <= chr_int <= 26:
+            return chr_int
+        return None
+    return _CHR_ALIASES.get(chr_token)
+
+
+def _parse_coord_token(token):
+    token = str(token)
+    match = _COORD_TOKEN_RE.match(token)
+    if not match:
+        return None
+
+    chr_int = _normalize_chr_token(match.group("chr"))
+    if chr_int is None:
+        return None
+
+    pos_int = int(match.group("pos"))
+    a1 = match.group("a1")
+    a2 = match.group("a2")
+
+    allele_min = None
+    allele_max = None
+    if a1 and a2:
+        a1 = str(a1).upper()
+        a2 = str(a2).upper()
+        allele_min = min(a1, a2)
+        allele_max = max(a1, a2)
+
+    return {
+        "raw": token,
+        "CHR": chr_int,
+        "POS": pos_int,
+        "allele_min": allele_min,
+        "allele_max": allele_max,
+    }
+
+
 def find_proxies(
     snp_list,
     searchspace=None,
@@ -204,7 +252,10 @@ def find_proxies(
     Given a list of SNPs, return a table of proxies using PLINK 2.0.
 
     Args:
-        snp_list (list): List of rsids.
+        snp_list (list): List of variant identifiers. Can be rsids (e.g. "rs123") or
+            coordinate tokens like "1:12345", "chr1:12345", optionally with alleles
+            ("1:12345:A:G"). Coordinate tokens are resolved to the reference panel ID
+            namespace using CHR/POS (and alleles when provided).
         searchspace (list, optional): List of SNPs to include in the search. By default, includes the whole reference panel.
         reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies.
             Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
@@ -225,8 +276,83 @@ def find_proxies(
     if name is None:
         name = str(uuid.uuid4())[:8]
 
-    # Convert snp_list to numpy array
-    snp_list = np.array(list(snp_list))
+    # Normalize input tokens to strings and parse coordinate tokens (CHR:POS[:A1:A2]).
+    tokens = [str(s) for s in snp_list]
+    id_tokens = []
+    coord_records = []
+    for order, token in enumerate(tokens):
+        parsed = _parse_coord_token(token)
+        if parsed is None:
+            id_tokens.append(token)
+        else:
+            parsed["_order"] = order
+            coord_records.append(parsed)
+
+    # Get reference panel path and type (needed for both mapping and LD computation).
+    ref_path, filetype = get_reference_panel_path(reference_panel)
+
+    # Resolve coordinate tokens to the reference panel ID namespace using existing helpers.
+    id_to_raw = {}
+    resolved_ids = []
+    if coord_records:
+        ref_df = load_reference_panel(ref_path)
+        coord_df = pd.DataFrame(coord_records)
+
+        mapped_frames = []
+        needs_alleles = coord_df["allele_min"].notna().any()
+        needs_pos = coord_df["allele_min"].isna().any()
+        if needs_alleles:
+            a1 = ref_df["A1"].fillna("").astype(str)
+            a2 = ref_df["A2"].fillna("").astype(str)
+            ref_allele = pd.DataFrame(
+                {
+                    "CHR": ref_df["CHR"],
+                    "POS": ref_df["POS"],
+                    "allele_min": np.minimum(a1, a2),
+                    "allele_max": np.maximum(a1, a2),
+                    "SNP": ref_df["SNP"],
+                }
+            ).drop_duplicates(["CHR", "POS", "allele_min", "allele_max"], keep="first")
+
+            coord_with = coord_df[coord_df["allele_min"].notna()]
+            if not coord_with.empty:
+                mapped_frames.append(
+                    coord_with.merge(
+                        ref_allele, on=["CHR", "POS", "allele_min", "allele_max"], how="left"
+                    )
+                )
+            coord_without = coord_df[coord_df["allele_min"].isna()]
+        else:
+            coord_without = coord_df
+
+        if needs_pos and not coord_without.empty:
+            ref_pos = ref_df[["CHR", "POS", "SNP"]].drop_duplicates(["CHR", "POS"], keep="first")
+            mapped_frames.append(coord_without.merge(ref_pos, on=["CHR", "POS"], how="left"))
+
+        mapped_all = (
+            pd.concat(mapped_frames, ignore_index=True)
+            .sort_values("_order", kind="mergesort")
+            .reset_index(drop=True)
+        )
+        n_dropped = int(mapped_all["SNP"].isna().sum())
+        if n_dropped > 0:
+            print(
+                f"Dropped {n_dropped} coordinate-based variants not found in the reference panel."
+            )
+
+        mapped_resolved = mapped_all.dropna(subset=["SNP"])
+        if not mapped_resolved.empty:
+            id_to_raw = (
+                mapped_resolved.drop_duplicates(subset=["SNP"], keep="first")
+                .set_index("SNP")["raw"]
+                .to_dict()
+            )
+            resolved_ids = mapped_resolved["SNP"].astype(str).tolist()
+
+    # Final targets for PLINK LD computation (rsids + resolved coordinate-based IDs).
+    targets_for_plink = id_tokens + resolved_ids
+    if not targets_for_plink:
+        return None
 
     # Check if searchspace is provided
     if searchspace is None:
@@ -234,22 +360,19 @@ def find_proxies(
     else:
         print("Searching proxies in the provided searchspace.")
         with open(f"tmp_GENAL/{name}_searchspace.txt", "w") as file:
-            for s in searchspace + snp_list:
+            for s in searchspace:
                 file.write(str(s) + "\n")
-        extract_arg = "--extract tmp_GENAL/{name}_searchspace.txt"
+            for s in targets_for_plink:
+                file.write(str(s) + "\n")
+        extract_arg = f"--extract tmp_GENAL/{name}_searchspace.txt"
 
-    # Save snp_list to a file
-    np.savetxt(f"tmp_GENAL/{name}_snps_to_proxy.txt", snp_list, fmt="%s", delimiter=" ")
-
-    # Get reference panel path and type
-    ref_path, filetype = get_reference_panel_path(reference_panel)
-
-    # Construct base command based on filetype
-    base_cmd = f"{get_plink_path()}"
-    if filetype == "bed":
-        base_cmd += f" --bfile {ref_path}"
-    else:  # pgen
-        base_cmd += f" --pfile {ref_path}"
+    # Save targets to a file
+    np.savetxt(
+        f"tmp_GENAL/{name}_snps_to_proxy.txt",
+        np.array(targets_for_plink, dtype=str),
+        fmt="%s",
+        delimiter=" ",
+    )
 
     # Construct base command based on filetype
     base_cmd = f"{get_plink_path()}"
@@ -275,7 +398,7 @@ def find_proxies(
     # Read log file to return amount of SNPs to be proxied present in the ref panel
     log_path = os.path.join("tmp_GENAL", f"{name}_proxy.targets.log")
     log_content = open(log_path).read()
-    match = re.search(r'(\d+) variant[s] remaining', log_content)
+    match = re.search(r"(\d+) variants? remaining", log_content)
     if match:
         n_present = int(match.group(1))
         if n_present == 0:
@@ -286,7 +409,7 @@ def find_proxies(
 
     # Read and process the output
     try:
-        ld = pd.read_csv(f"tmp_GENAL/{name}_proxy.targets.vcor", sep="\s+")
+        ld = pd.read_csv(f"tmp_GENAL/{name}_proxy.targets.vcor", sep=r"\s+")
     except FileNotFoundError:
         print("No proxies found that meet the specified criteria.")
         return None
@@ -312,5 +435,9 @@ def find_proxies(
     # Convert integer columns to Int64 type
     for int_col in ["CHR_A", "CHR_B", "BP_A", "BP_B"]:
         ld[int_col] = ld[int_col].astype("Int64")
+
+    # Rewrite coordinate-based targets back to the caller namespace for downstream merges.
+    if id_to_raw:
+        ld["SNP_A"] = ld["SNP_A"].map(id_to_raw).fillna(ld["SNP_A"])
 
     return ld
