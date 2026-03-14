@@ -380,8 +380,6 @@ Output:
 ```python
 annotated_df = G_exposure.query_gwas_catalog(
     p_threshold=5e-8,
-    return_p=True,
-    return_study=True,
     max_associations=5,
     replace=False,
 )
@@ -389,11 +387,14 @@ annotated_df = G_exposure.query_gwas_catalog(
 
 Key arguments:
 - `p_threshold`: only report associations with $p \le p_\mathrm{threshold}$.
-- `max_associations`: cap the number of reported associations per SNP (keeps the output readable).
+- `max_associations`: cap the number of reported trait-study associations per SNP after filtering and deduplication.
 - `timeout`: per-request timeout; increase for large SNP sets.
 - `replace=True|False`: whether to store the resulting `ASSOC` column in `G.data`.
 
-The returned table contains an `ASSOC` column with lists of associations; SNPs that cannot be queried are labeled `"FAILED_QUERY"` and long requests may be labeled `"TIMEOUT"`.
+The returned table contains:
+- `ASSOC`: a list of dictionaries with keys `trait`, `p_value`, and `study_accession`
+- `ASSOC_STATUS`: one of `ok`, `no_associations`, `invalid_format`, `not_found`, `timeout`, `rate_limited`, `server_error`, or `client_error`
+- `ASSOC_ERROR`: a short error string or `None`
 
 ### Gene-window filtering
 
@@ -424,10 +425,10 @@ Use {py:meth}`genal.Geno.save` to persist `G.data` to disk for reuse.
 
 ```python
 G_instruments.name = "my_instruments"  # controls the filename prefix
-G_instruments.save(fmt="h5")           # writes my_instruments.h5 (key="data")
+G_instruments.save()                   # writes my_instruments.parquet
 ```
 
 Notes:
 - `save()` writes the file using `G.name`; set it explicitly if you want stable filenames.
-- Supported formats are `fmt="h5"` (default), `"parquet"`, `"csv"`, and `"txt"`.
-- You can later load with `pd.read_hdf("my_instruments.h5", key="data")` or `pd.read_parquet("my_instruments.parquet")`, or pass the `.h5/.hdf5/.parquet` path directly to `query_outcome()`.
+- Supported formats are `fmt="parquet"` (default), `"csv"`, and `"txt"`.
+- You can later load with `pd.read_parquet("my_instruments.parquet")`, or pass the `.parquet` path directly to `query_outcome()`.

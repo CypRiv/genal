@@ -5,7 +5,7 @@
 </div>
 
 
-[![Python](https://img.shields.io/badge/python-%3E%3D3.8-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/genal-python)](https://pypi.org/project/genal-python/)
 [![Docs](https://img.shields.io/badge/docs-readthedocs-blue)](https://genal.readthedocs.io)
 [![DOI](https://img.shields.io/badge/doi-10.1093%2Fbioadv%2Fvbae207-blue)](https://doi.org/10.1093/bioadv/vbae207)
@@ -153,7 +153,7 @@ Most methods either:
 - **Colocalization**: `Geno.colocalize(...)` (approx Bayes factors; returns posterior probabilities)
 - **Association testing (individual-level)**: `Geno.set_phenotype(...)` → `Geno.association_test(...)`
 - **Liftover builds**: `Geno.lift(...)` (downloads chain files if needed; optional UCSC `liftOver` executable)
-- **GWAS Catalog query**: `Geno.query_gwas_catalog(...)` (REST API; timeouts are normal)
+- **GWAS Catalog query**: `Geno.query_gwas_catalog(...)` (GWAS Catalog REST API v2; row-level statuses are returned in `ASSOC_STATUS`)
 - **Gene-window filtering**: `Geno.filter_by_gene(...)` (filter variants around a gene; useful for protein/drug-target analyses)
 
 ## Tutorial 
@@ -414,13 +414,19 @@ Attach a per-SNP list of associated traits using the GWAS Catalog API:
 
 ```python
 G_clumped.query_gwas_catalog(p_threshold=5e-8)
-G_clumped.data[["SNP", "ASSOC"]].head()
+G_clumped.data[["SNP", "ASSOC", "ASSOC_STATUS", "ASSOC_ERROR"]].head()
 ```
 
-You can include p-values and study IDs:
+Each `ASSOC` entry is a list of dictionaries with fixed keys:
 
 ```python
-G_clumped.query_gwas_catalog(p_threshold=5e-8, return_p=True, return_study=True)
+[
+    {
+        "trait": "rheumatoid arthritis",
+        "p_value": 2e-29,
+        "study_accession": "GCST90132227",
+    }
+]
 ```
 </details>
 
@@ -516,11 +522,11 @@ Save a `Geno` to disk (handy for caching large outcome GWAS).
 
 ```python
 G.name = "Trait"
-G.save(path=".", fmt="h5")       # writes Trait.h5
+G.save(path=".")                 # writes Trait.parquet
 G.save(path=".", fmt="parquet")  # writes Trait.parquet
 ```
 
-You can pass a saved `.h5/.hdf5/.parquet` path directly to `query_outcome()`:
+You can pass a saved `.parquet` path directly to `query_outcome()`:
 
 ```python
 G.query_outcome("Trait.parquet", name="Trait", proxy=True, reference_panel="EUR_37")
@@ -547,7 +553,7 @@ A: Ensure your GWAS effects are on the **log-odds** scale. If your GWAS reports 
 A: Control this with `action` in `MR`/`MRpresso`: `1` (no flipping), `2` (frequency-based flipping; default), `3` (drop all palindromes).
 
 **Q: GWAS Catalog queries fail or time out.**  
-A: This is expected for many SNPs (catalog coverage is incomplete). Consider increasing `timeout` or limiting `max_associations`.
+A: This is expected for many SNPs (catalog coverage is incomplete and rate limits exist). Check `ASSOC_STATUS` and `ASSOC_ERROR` for the row-level outcome. Only canonical dbSNP rsIDs (`rs` + digits) are queried. Consider increasing `timeout` or limiting `max_associations`.
 
 **Q: `tmp_GENAL/` is large.**  
 A: genal writes temporary PLINK outputs there and does not automatically delete them (for debugging purposes). Delete the whole folder with `genal.delete_tmp()`.

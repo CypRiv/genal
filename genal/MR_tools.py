@@ -774,12 +774,12 @@ def load_outcome_from_filepath(outcome):
         raise ValueError("The path provided doesn't lead to a file.")
 
     suffix = outcome_path.suffix.lower()
-    if suffix in {".h5", ".hdf5"}:
-        df_outcome = pd.read_hdf(outcome, key="data")
-    elif suffix == ".parquet":
+    if suffix == ".parquet":
         df_outcome = pd.read_parquet(outcome, engine="pyarrow")
     else:
-        raise ValueError("The file provided needs to be in .h5, .hdf5, or .parquet format.")
+        raise ValueError(
+            "The file provided needs to be in .parquet format. Save Geno data with fmt='parquet'."
+        )
 
     name = outcome_path.stem
     print(f"Outcome data successfully loaded from path provided.")

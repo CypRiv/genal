@@ -1,10 +1,9 @@
 import pandas as pd
 import numpy as np
 import os
-import wget
 
 from .constants import BUCKET_URL
-from .tools import read_config
+from .tools import download_file, read_config
 
 
 
@@ -58,8 +57,7 @@ def filter_by_gene_func(data, gene_identifier, id_type="symbol", window_size=100
         print(f"Downloading gene info file to {gene_info_file}...")    
         url = BUCKET_URL + "gene_id_mapping_filtered.parquet"
         try:
-            wget.download(url, gene_info_file)
-            print("\nDownload complete.")
+            download_file(url, gene_info_file, description="gene info parquet")
         except Exception as e:
             if os.path.exists(gene_info_file):
                 os.remove(gene_info_file)

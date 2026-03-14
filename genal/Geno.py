@@ -9,12 +9,6 @@ from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 import scipy.stats as st
 
-
-from .proxy import find_proxies, apply_proxies
-from .MR_tools import query_outcome_func, MR_func, MR_loo_func, mrpresso_func
-from .clump import clump_data_plink2
-from .lift import lift_data
-from .genes import filter_by_gene_func
 from .tools import (
     create_tmp,
     load_reference_panel,
@@ -39,11 +33,7 @@ from .geno_tools import (
     remove_na,
     update_eaf_func,
 )
-from .association import set_phenotype_func, association_test_func_plink2
-from .extract_prs import extract_snps_func, prs_func
-from .snp_query import async_query_gwas_catalog
 from .constants import STANDARD_COLUMNS, REF_PANEL_COLUMNS, CHECKS_DICT, MR_METHODS_NAMES
-from .colocalization import coloc_abf_func
 
 # Do all the MR steps (query_outcome, harmonize etc) based on CHR/POS and not SNPs
 # Add proxying function (input is df + searchspace (list of SNP or path to .bim, can be separated by chromosomes) and returns proxied df)
@@ -411,6 +401,8 @@ class Geno:
         create_tmp()
 
         # Clump the data using the specified parameters
+        from .clump import clump_data_plink2
+
         clumped_data = clump_data_plink2(
             self.data,
             reference_panel,
@@ -528,6 +520,8 @@ class Geno:
         # Renaming to avoid conflicts with previous extraction
         self.name = str(uuid.uuid4())[:8]
         # Extract SNPs using the provided path and SNP list
+        from .extract_prs import extract_snps_func
+
         _ = extract_snps_func(snp_list, self.name, path, self.ram, self.cpus)
 
         return
@@ -606,8 +600,12 @@ class Geno:
                 f"{deleted_rows} ({deleted_rows/initial_rows*100:.3f}%) rows with NA values in columns SNP, EA, or BETA have been deleted."
             )
             
+        from .extract_prs import prs_func
+
         # If proxy option
         if proxy:
+            from .proxy import apply_proxies, find_proxies
+
             print("Identifying the SNPs present in the genetic data...")
             # Obtain the list of SNPs present in the genetic data
             if path.count("$") == 1: #If split: merge all SNP columns of the variant files
@@ -722,6 +720,8 @@ class Geno:
                                                 Set to True if this is not the case. Default is False.
         """
 
+        from .association import set_phenotype_func
+
         processed_data, inferred_pheno_type = set_phenotype_func(
             data, PHENO, PHENO_type, IID, FID, alternate_control
         )
@@ -765,6 +765,8 @@ class Geno:
             covar.remove(self.phenotype[2])
 
         create_tmp() #Make sure temporary folder exists
+        from .association import association_test_func_plink2
+        from .extract_prs import extract_snps_func
         
         n_original = self.data.shape[0]
         # Based on column presents, extract the SNPs based on names or genomic positions (with preference for positions)
@@ -826,7 +828,7 @@ class Geno:
         the outcome attribute: (exposure_data, outcome_data, name) ready for MR methods.
 
         Args:
-            outcome: Can be a Geno object (from a GWAS) or a filepath of types: .h5, .hdf5, or .parquet (created with the :meth:`Geno.save` method).
+            outcome: Can be a Geno object (from a GWAS) or a `.parquet` filepath created with the :meth:`Geno.save` method.
             name (str, optional): Name for the outcome data. Defaults to None.
             proxy (bool, optional): If true, proxies are searched. Default is True.
             reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies (only if proxy=True). 
@@ -842,6 +844,8 @@ class Geno:
         Returns:
             None: Sets the `MR_data` attribute for the instance.
         """
+
+        from .MR_tools import query_outcome_func
 
         exposure, outcome_data, outcome_name = query_outcome_func(
             self.data,
@@ -935,6 +939,8 @@ class Geno:
             self.MR_data[2] = outcome_name
         exp_name = exposure_name if exposure_name else self.name
         cpus = self.cpus if cpus == -1 else cpus
+        from .MR_tools import MR_func
+
         res, df_mr = MR_func(
             self.MR_data,
             methods,
@@ -1006,6 +1012,8 @@ class Geno:
         exp_name = exposure_name if exposure_name else self.name
         outcome_name_final = self.MR_data[2]
         cpus_eff = self.cpus if cpus == -1 else cpus
+
+        from .MR_tools import MR_loo_func
 
         loo_df, all_row, method_display_name = MR_loo_func(
             self.MR_data,
@@ -1300,6 +1308,8 @@ class Geno:
             raise ValueError("You must first call query_outcome() before running MR.")
         cpus = self.cpus if cpus == -1 else cpus
 
+        from .MR_tools import mrpresso_func
+
         mod_table, GlobalTest, OutlierTest, BiasTest, subset_data = mrpresso_func(
             self.MR_data,
             action,
@@ -1360,6 +1370,8 @@ class Geno:
             check_int_column(self.data, "POS")
             self.checks["POS"] = True
 
+        from .genes import filter_by_gene_func
+
         filtered = filter_by_gene_func(self.data, gene, id_type, window_size, build)
         
         if replace:
@@ -1406,6 +1418,8 @@ class Geno:
         data1 = self.data.copy()
         data2 = outcome.data.copy()
             
+        from .colocalization import coloc_abf_func
+
         # Call the implementation function
         return coloc_abf_func(data1, 
                              data2,
@@ -1479,6 +1493,8 @@ class Geno:
             f"Use replace={'False' if replace else 'True'} to {'leave it as is' if replace else 'lift inplace'}."
         )
 
+        from .lift import lift_data
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             data = lift_data(
@@ -1497,26 +1513,24 @@ class Geno:
     def query_gwas_catalog(
         self,
         p_threshold=5e-8,
-        return_p=False,
-        return_study=False,
         replace=True,
         max_associations=None,
         timeout=-1,
     ):
         """
-        Queries the GWAS Catalog Rest API and add an "ASSOC" column containing associated traits for each SNP.
+        Queries the GWAS Catalog REST API and adds structured association annotations for each SNP.
         
         Args:
             p_threshold (float, optional): Only associations that are at least as significant are reported. Default is 5e-8.
-            return_p (bool, optional): If True, include the p-value in the results. Default is False.
-            return_study (bool, optional): If True, include the ID of the study from which the association is derived in the results. Default is False.
             replace (bool, optional): If True, updates the data attribute in place. Default is True.
-            max_associations (int, optional): If not None, only the first `max_associations` associations are reported for each SNP. Default is None.
-            timeout (int, optional): Timeout for each query in seconds. Default is -1 (custom timeout based on number of SNPs to query). Choose None for no timeout.
+            max_associations (int, optional): If not None, only the first `max_associations` qualifying trait-study associations are reported for each SNP after filtering and deduplication. Default is None.
+            timeout (int, optional): Timeout for each HTTP request in seconds. Default is -1, which uses 30 seconds per request. Choose None for no timeout.
 
         Returns:
-            pd.DataFrame: Data attribute with an additional column "ASSOC".
-                The elements of this column are lists of strings or tuples depending on the `return_p` and `return_study` flags. If the SNP could not be queried, the value is set to "FAILED_QUERY".
+            pd.DataFrame: Data attribute with additional columns:
+                - ASSOC: list of dictionaries with keys `trait`, `p_value`, and `study_accession`
+                - ASSOC_STATUS: query outcome status
+                - ASSOC_ERROR: short error detail or None
         """
         # Ensure mandatory column is present in the input data
         if "SNP" not in self.data.columns:
@@ -1529,40 +1543,76 @@ class Geno:
             data = self.data
             
         print(
-            f"Querying the GWAS Catalog and creating the ASSOC column. \n"
+            f"Querying the GWAS Catalog and creating the ASSOC, ASSOC_STATUS, and ASSOC_ERROR columns. \n"
             f"Only associations with a p-value <= {p_threshold} are reported. Use the p_threshold argument to change the threshold."
         )
         if max_associations:
-            print(f"Reporting the first {max_associations} associations for each SNP.")
-        if not return_p:
-            print(f"To report the p-value for each association, use return_p=True.")
-        if not return_study :
-            print(f"To report the study ID for each association, use return_study=True.")
+            print(
+                f"Reporting at most {max_associations} qualifying trait-study associations for each SNP after filtering and deduplication."
+            )
+        print("Normalizing SNP identifiers to canonical rsIDs and rejecting non-rs inputs.")
         print(
             f"The .data attribute will {'be' if replace else 'not be'} modified. "
             f"{'Use replace=False to leave it as is.' if replace else ''}"
             )
         
-        # Estimate a reasonable timeout given the number of SNPs to query (45 SNPs per second)
-        timeout = max(len(data) / 45, 30) if timeout == -1 else timeout
+        timeout = 30 if timeout == -1 else timeout
+
+        from .snp_query import async_query_gwas_catalog
 
         # Call the async function to query all SNPs
-        results_snps, errors, timeouts = async_query_gwas_catalog(
+        outcomes, summary = async_query_gwas_catalog(
             data.SNP.to_list(), 
             p_threshold=p_threshold, 
-            return_p=return_p, 
-            return_study=return_study,
             max_associations=max_associations,
             timeout=timeout,
         )
         
-        # Create the column
-        data["ASSOC"] = data['SNP'].map(results_snps).fillna("FAILED_QUERY")
-        data.loc[data["SNP"].isin(timeouts), "ASSOC"] = "TIMEOUT"
-        
-        print("The ASSOC column has been successfully created.")
-        print(f"{len(errors)} ({len(errors)/len(data)*100:.2f}%) SNPs failed to query (not found in GWAS Catalog) and {len(timeouts)} ({len(timeouts)/len(data)*100:.1f}%) SNPs timed out after {timeout:.2f} seconds." 
-              f" You can increase the timeout value with the timeout argument.")
+        data["ASSOC"] = [outcome["associations"] for outcome in outcomes]
+        data["ASSOC_STATUS"] = [outcome["status"] for outcome in outcomes]
+        data["ASSOC_ERROR"] = [outcome["error"] for outcome in outcomes]
+
+        status_counts = summary["status_counts"]
+        retry_counts = summary["retry_counts"]
+        deduplicated_queries = summary["valid_count"] - summary["unique_query_count"]
+
+        print(
+            f"Normalized {summary['requested_count']} SNPs to {summary['unique_query_count']} unique GWAS Catalog rsID queries."
+        )
+        print(
+            f"Rejected {summary['invalid_count']} SNPs with invalid rsID format and avoided {deduplicated_queries} duplicate GWAS Catalog queries."
+        )
+        if summary["retry_total"]:
+            retry_text = ", ".join(
+                f"{status}={retry_counts[status]}"
+                for status in sorted(retry_counts)
+            )
+            print(f"Retried GWAS Catalog requests {summary['retry_total']} times ({retry_text}).")
+        else:
+            print("No GWAS Catalog retries were needed.")
+
+        print("The ASSOC, ASSOC_STATUS, and ASSOC_ERROR columns have been successfully created.")
+        print(
+            "Final GWAS Catalog status counts: "
+            + ", ".join(
+                f"{status}={status_counts[status]}"
+                for status in [
+                    "ok",
+                    "no_associations",
+                    "invalid_format",
+                    "not_found",
+                    "timeout",
+                    "rate_limited",
+                    "server_error",
+                    "client_error",
+                ]
+            )
+            + "."
+        )
+        if timeout is not None:
+            print(
+                f"Per-request timeout was set to {timeout:.2f} seconds. Increase the timeout argument if many requests finish with ASSOC_STATUS='timeout'."
+            )
             
         return data
         
@@ -1603,13 +1653,13 @@ class Geno:
             Geno_copy.reference_panel_name = self.reference_panel_name
         return Geno_copy
 
-    def save(self, path="", fmt="h5", sep="\t", header=True):
+    def save(self, path="", fmt="parquet", sep="\t", header=True):
         """
         Save the Geno data to a file.
 
         Args:
             path (str, optional): Folder path to save the file. Defaults to the current directory.
-            fmt (str, optional): File format. Options: .h5 (default), .parquet, .csv, .txt.
+            fmt (str, optional): File format. Options: .parquet (default), .csv, .txt.
                 Parquet is saved with `index=True`, `compression="brotli"`, `engine="pyarrow"`.
                 Future: .vcf, .vcf.gz.
             sep (str, optional): Delimiter for .csv and .txt formats. Default is tab.

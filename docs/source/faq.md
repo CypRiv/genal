@@ -46,6 +46,8 @@ Control this with `action` in MR/MR-PRESSO:
 ## GWAS Catalog queries fail or time out
 
 - This is expected for many SNPs (catalog coverage is incomplete and rate limits exist).
+- `query_gwas_catalog()` now records per-row outcomes in `ASSOC_STATUS` and details in `ASSOC_ERROR`.
+- Only canonical dbSNP rsIDs (`rs` + digits) are queried; other identifiers are labeled `invalid_format`.
 - Consider increasing `timeout` or limiting `max_associations`.
 - For very large SNP lists, annotate a subset.
 

@@ -507,25 +507,23 @@ def check_arguments(
     return keep_indel, keep_dups, fill_snpids, fill_coordinates
 
 
-def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
+def save_data(data, name, path="", fmt="parquet", sep="\t", header=True):
     """
     Save data to a specified file format.
 
-    Supported formats: .h5 (default), .parquet, .csv, .txt.
+    Supported formats: .parquet (default), .csv, .txt.
     Future supported formats: .vcf, .vcf.gz.
 
     Args:
         data (pd.DataFrame): DataFrame to be saved.
         name (str): A unique identifier for the data, used as the filename.
         path (str, optional): The directory where the file will be saved. Defaults to current directory.
-        fmt (str, optional): The desired file format. Defaults to "h5".
+        fmt (str, optional): The desired file format. Defaults to "parquet".
         sep (str, optional): Delimiter for text-based formats (.csv, .txt). Defaults to tab.
         header (bool, optional): Whether to include column names in text-based formats. Defaults to True.
     """
     path = os.path.join(path, name)
-    if fmt == "h5":
-        data.to_hdf(f"{path}.h5", key="data", mode="w", format="table")
-    elif fmt == "parquet":
+    if fmt == "parquet":
         data.to_parquet(
             f"{path}.parquet", engine="pyarrow", compression="brotli", index=True
         )
@@ -534,7 +532,9 @@ def save_data(data, name, path="", fmt="h5", sep="\t", header=True):
     elif fmt == "txt":
         data.to_csv(f"{path}.txt", sep=sep, header=header, index=False)
     else:
-        print(f"Format {fmt} is not supported yet.")
+        raise ValueError(
+            f"Format {fmt} is not supported. Supported formats are: parquet, csv, txt."
+        )
 
 
 def Combine_Geno(Gs):

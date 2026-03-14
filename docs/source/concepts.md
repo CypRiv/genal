@@ -72,11 +72,11 @@ A helpful mental framework:
 | `MR_loo_plot()` | plot object(s) | requires `G.MR_loo_results`; writes `.png` if `filename=...`; may return a list for multi-page output; supports `methods=[...]` overall rows and `use_mrpresso_data=True` for outlier highlighting |
 | `MRpresso()` | tuple | sets `G.MRpresso_results` and `G.MRpresso_subset_data` (outlier-removed harmonized table; SNP-indexed) |
 | `prs()` | `None` | writes `<name>.csv` and uses PLINK temp files |
-| `query_gwas_catalog()` | `pd.DataFrame` | adds an `ASSOC` column (network-bound); `replace=True` overwrites `G.data` |
+| `query_gwas_catalog()` | `pd.DataFrame` | adds `ASSOC`, `ASSOC_STATUS`, and `ASSOC_ERROR` columns (network-bound); `replace=True` overwrites `G.data` |
 | `filter_by_gene(replace=False)` | `Geno` | returns a new `Geno` filtered to a locus |
 | `filter_by_gene(replace=True)` | `None` | filters `G.data` in place |
 | `colocalize()` | dict | returns posterior probabilities; does not modify `G.data` |
-| `save()` | `None` | writes `G.name.(h5|parquet|csv|txt)` to disk |
+| `save()` | `None` | writes `G.name.(parquet|csv|txt)` to disk |
 
 ## Side effects and files
 

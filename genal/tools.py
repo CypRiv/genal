@@ -1,12 +1,14 @@
-import os, subprocess, sys
-import pandas as pd
 import json
-import wget
-import shutil
-import tarfile
+import os
 import platform
-import requests
+import shutil
+import subprocess
+import sys
+import tarfile
 import zipfile
+
+import pandas as pd
+import requests
 
 from .constants import REF_PANELS, REF_PANELS_URL, CONFIG_DIR, BUILDS, REF_PARQUET_URL
 
@@ -42,6 +44,29 @@ def write_config(config):
     with open(config_path, "w") as f:
         json.dump(config, f, indent=4)
     return
+
+
+def download_file(url, destination, description="file", chunk_size=8192, timeout=120):
+    """Download a file with cleanup on partial failures."""
+    destination_dir = os.path.dirname(destination)
+    if destination_dir:
+        os.makedirs(destination_dir, exist_ok=True)
+
+    print(f"Downloading {description}...")
+    try:
+        with requests.get(url, stream=True, timeout=timeout) as response:
+            response.raise_for_status()
+            with open(destination, "wb") as f:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
+    except (requests.RequestException, OSError) as e:
+        if os.path.exists(destination):
+            os.remove(destination)
+        raise RuntimeError(f"Failed to download {description}: {e}")
+
+    print("Download complete.")
+    return destination
 
 def setup_genetic_path(path):
     """Configure the genetic data path based on user input and saved configuration."""
@@ -233,12 +258,14 @@ def get_reference_panel_path(reference_panel="EUR_38"):
         url = REF_PANELS_URL.format(panel=reference_panel)
         tar_path = os.path.join(panel_dir, f"{reference_panel}.tar.gz")
         try:
-            wget.download(url, tar_path)
-            print(f"\nExtracting {reference_panel}...")
+            download_file(url, tar_path, description=f"reference panel {reference_panel}")
+            print(f"Extracting {reference_panel}...")
             with tarfile.open(tar_path) as tar:
                 tar.extractall(panel_dir)
             os.remove(tar_path)
         except Exception as e:
+            if os.path.exists(tar_path):
+                os.remove(tar_path)
             raise RuntimeError(f"Failed to download/extract reference panel: {e}")
         
         # Default reference panels are in pgen format
@@ -310,8 +337,11 @@ def load_reference_panel(reference_panel="38"):
             # Download parquet file
             url = REF_PARQUET_URL.format(build=build)
             try:
-                wget.download(url, variants_file)
-                print("\nDownload complete.")
+                download_file(
+                    url,
+                    variants_file,
+                    description=f"reference variants for build {build}",
+                )
             except Exception as e:
                 if os.path.exists(variants_file):
                     os.remove(variants_file)
@@ -319,7 +349,7 @@ def load_reference_panel(reference_panel="38"):
         
         # Load parquet file
         try:
-            reference_panel_df = pd.read_parquet(variants_file, engine="fastparquet")
+            reference_panel_df = pd.read_parquet(variants_file, engine="pyarrow")
             print(f"Using reference variants from build {build}.")
         except Exception as e:
             raise RuntimeError(f"Failed to load reference variants: {e}")

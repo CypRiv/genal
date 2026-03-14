@@ -1,14 +1,13 @@
 from pyliftover import LiftOver
 import os, subprocess
 import numpy as np
-import wget
 import gzip
 import shutil
 import uuid
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from .tools import read_config, create_tmp
+from .tools import create_tmp, download_file, read_config
 
 
 def lift_data(
@@ -105,15 +104,19 @@ def prepare_chain_file(chain_file, start, end):
             )
             # Download the chain file
             url = f"https://hgdownload.soe.ucsc.edu/goldenPath/{start.lower()}/liftOver/{chain_name}.gz"
+            gz_path = f"{chain_path}.gz"
             try:
-                wget.download(url, out=chains_folder_path)
+                download_file(url, gz_path, description=f"{chain_name}.gz")
                 # Decompress the downloaded file
                 print(f"The download was successful. Unzipping...")
-                with gzip.open(f"{chain_path}.gz", "rb") as f_in, open(
+                with gzip.open(gz_path, "rb") as f_in, open(
                     chain_path, "wb"
                 ) as f_out:
                     shutil.copyfileobj(f_in, f_out)
+                os.remove(gz_path)
             except Exception as e:
+                if os.path.exists(gz_path):
+                    os.remove(gz_path)
                 print(f"The download was unsuccessful: {e}")
                 print(
                     "Consider downloading the chain file manually from the UCSC website and providing its path via the chain_file argument."

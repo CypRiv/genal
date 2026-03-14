@@ -10,7 +10,7 @@ pip install genal-python
 import genal
 ```
 
-`genal` requires Python ≥ 3.8.
+`genal` requires Python ≥ 3.9.
 
 ## PLINK 2
 

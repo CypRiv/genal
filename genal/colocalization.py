@@ -5,6 +5,38 @@ from genal.geno_tools import check_beta_column, check_allele_column, check_snp_c
 
 # Currently does not support multi-allelic SNPs
 
+
+def _subset_coloc_columns(data, merge_keys):
+    """Keep only the columns needed for coloc merging and ABF calculations."""
+    required_columns = list(merge_keys) + ["BETA", "SE"]
+    optional_columns = [
+        col
+        for col in ["SNP", "CHR", "POS", "EA", "NEA", "EAF"]
+        if col in data.columns and col not in required_columns
+    ]
+    columns_to_keep = required_columns + optional_columns
+    return data.loc[:, columns_to_keep].copy()
+
+
+def _estimate_sdY_from_overlap(merged_data, eaf_col, se_col, sample_size, trait_label):
+    """Estimate sdY from the overlapping variants with valid EAF and SE values."""
+    valid = merged_data[[eaf_col, se_col]].dropna()
+    if valid.empty:
+        print(
+            f"EAF and SE values for trait {trait_label} are not available on overlapping variants. Assuming sdY{trait_label} = 1."
+        )
+        return 1
+
+    sdY = sdY_est(valid[se_col] ** 2, valid[eaf_col], sample_size)
+    if not np.isfinite(sdY):
+        print(
+            f"Estimated sdY{trait_label} is not finite from overlapping variants. Assuming sdY{trait_label} = 1."
+        )
+        return 1
+
+    print(f"Using EAF and n{trait_label} to estimate sdY{trait_label}: {sdY:.2f}")
+    return sdY
+
 def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant", 
                    sdY1=None, sdY2=None, n1=None, n2=None,
                    p1=1e-4, p2=1e-4, p12=1e-5, merge_on_snp=False):
@@ -28,11 +60,22 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
 
     """
 
+    data1 = data1.copy()
+    data2 = data2.copy()
+
     # Ensure that the BETA columns are preprocessed
     check_beta_column(data1, 'BETA')
     check_beta_column(data2, 'BETA')
 
-    # Adjust EAF column names before merging in case one of the datasets does not have it
+    # Restrict each dataset to coloc-relevant columns before merging.
+    if all(col in data1.columns for col in ['CHR', 'POS']) and \
+       all(col in data2.columns for col in ['CHR', 'POS']) and not merge_on_snp:
+        data1 = _subset_coloc_columns(data1, ["CHR", "POS"])
+        data2 = _subset_coloc_columns(data2, ["CHR", "POS"])
+    elif 'SNP' in data1.columns and 'SNP' in data2.columns:
+        data1 = _subset_coloc_columns(data1, ["SNP"])
+        data2 = _subset_coloc_columns(data2, ["SNP"])
+
     if 'EAF' in data1.columns:
         data1.rename(columns={'EAF': 'EAF_1'}, inplace=True)
     if 'EAF' in data2.columns:
@@ -55,7 +98,7 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
             data1,
             data2,
             on=['CHR', 'POS'],
-            how='left',
+            how='inner',
             suffixes=('_1', '_2')
         )
         
@@ -71,6 +114,7 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
             data1,
             data2,
             on='SNP',
+            how='inner',
             suffixes=('_1', '_2')
         )
     
@@ -80,12 +124,12 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
     # After merging, check if we can align alleles
     if all(col in merged_data.columns for col in ['EA_1', 'NEA_1', 'EA_2', 'NEA_2']):
         print("Aligning effect alleles between datasets")
-        
-        # Ensure allele columns are preprocessed
-        check_allele_column(data1, "EA", keep_indel=False)
-        check_allele_column(data1, "NEA", keep_indel=False)
-        check_allele_column(data2, "EA", keep_indel=False)
-        check_allele_column(data2, "NEA", keep_indel=False)
+
+        # Ensure allele columns are preprocessed on the merged overlap that will be used.
+        check_allele_column(merged_data, "EA_1", keep_indel=False)
+        check_allele_column(merged_data, "NEA_1", keep_indel=False)
+        check_allele_column(merged_data, "EA_2", keep_indel=False)
+        check_allele_column(merged_data, "NEA_2", keep_indel=False)
         
         # Adjust BETA from trait 2 to correspond to the same effect allele as trait 1
         conditions = [
@@ -113,8 +157,8 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
     if "CHR" in merged_data.columns and "POS" in merged_data.columns:
         merged_data.drop_duplicates(subset=["CHR", "POS"], keep='first', inplace=True)
 
-    # Drop any rows with missing values
-    merged_data = merged_data.dropna()
+    # Drop rows missing the columns required for coloc statistics.
+    merged_data = merged_data.dropna(subset=["BETA_1", "SE_1", "BETA_2", "SE_2"])
     if merged_data.empty:
         raise ValueError("No overlapping variants found between the datasets")
     
@@ -126,16 +170,14 @@ def coloc_abf_func(data1, data2, trait1_type="quant", trait2_type="quant",
             print("Neither sdY1 nor EAF and n1 are provided for trait 1. Assuming sdY1 = 1.")
             sdY1 = 1
         else:
-            sdY1 = sdY_est(merged_data['SE_1']**2, merged_data['EAF_1'], n1)
-            print(f"Using EAF and n1 to estimate sdY1: {sdY1:.2f}")
+            sdY1 = _estimate_sdY_from_overlap(merged_data, 'EAF_1', 'SE_1', n1, "1")
         
     if trait2_type == "quant" and sdY2 is None:
         if 'EAF_2' not in merged_data.columns or n2 is None:
             print("Neither sdY2 nor EAF and n2 are provided for trait 2. Assuming sdY2 = 1.")
             sdY2 = 1
         else:
-            sdY2 = sdY_est(merged_data['SE_2']**2, merged_data['EAF_2'], n2)
-            print(f"Using EAF and n2 to estimate sdY2: {sdY2:.2f}")
+            sdY2 = _estimate_sdY_from_overlap(merged_data, 'EAF_2', 'SE_2', n2, "2")
     
     # Calculate Bayes factors for each dataset
     lABF_1 = approx_bf_estimates(merged_data['BETA_1'], merged_data['SE_1']**2, 
