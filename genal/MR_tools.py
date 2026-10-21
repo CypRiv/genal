@@ -4,12 +4,14 @@ import datetime
 import os, subprocess
 from pathlib import Path
 from pandas.api.types import is_numeric_dtype
+from scipy.stats import norm as stats_norm, t as stats_t
 from tqdm import tqdm
 
-from .proxy import find_proxies, query_outcome_proxy
+from .proxy import find_proxies, query_outcome_proxy, numeric_effect_columns
 from .MR import *
 from .MRpresso import mr_presso
 from .constants import MR_METHODS_NAMES
+from .geno_tools import missing_snp_ids
 
 REQUIRED_COLUMNS = ["SNP", "BETA", "SE", "EA", "NEA"]
 RESULT_COLS = ["exposure", "outcome", "method", "nSNP", "b", "se", "pval", "Q", "Q_df", "Q_pval"]
@@ -38,6 +40,7 @@ def mrpresso_func(
     distortion_test,
     significance_p,
     cpus,
+    seed=None,
 ):
     """
     Wrapper function corresponding to the :meth:`Geno.MRpresso` method.
@@ -48,6 +51,7 @@ def mrpresso_func(
         - EAF column check if action is set to 2.
         - Data harmonization between exposure and outcome data based on action and eaf_threshold
         - NA check
+        - Check that at least 4 instruments remain
         - MRpresso call and results return
     """
 
@@ -60,11 +64,6 @@ def mrpresso_func(
     df_outcome = data[1]
     name_outcome = data[2]
 
-    # Check number of instruments
-    if df_exposure.shape[0] < 3:
-        print("Not enough instruments to run MRpresso. At least 3 are required.")
-        return pd.DataFrame(), {}, pd.DataFrame(), {}, None
-    
     # Check EAF columns if action = 2
     if action == 2:
         if "EAF" not in df_exposure.columns:
@@ -82,18 +81,15 @@ def mrpresso_func(
     df_mr = harmonize_MR(
         df_exposure, df_outcome, action=action, eaf_threshold=eaf_threshold
     )
-    
     df_mr = df_mr_formatting(df_mr)
-    if "SNP" not in df_mr.columns:
-        raise ValueError("MR dataframe must contain a 'SNP' column after formatting.")
+
+    # Check number of remaining instruments
+    n_snps = df_mr.shape[0]
+    if n_snps < 4:
+        print(f"{n_snps} SNPs remaining after harmonization step but at least 4 are required to run MR-PRESSO.")
+        return pd.DataFrame(), {}, pd.DataFrame(), {}, None
 
     df_mr = df_mr.set_index("SNP", drop=False)
-    if df_mr.index.duplicated().any():
-        duplicated_snps = df_mr.index[df_mr.index.duplicated()].unique().tolist()
-        print(
-            f"Warning: duplicated SNP IDs found in MR dataframe (keeping first occurrence): {duplicated_snps}"
-        )
-        df_mr = df_mr.loc[~df_mr.index.duplicated(keep="first")]
 
     # Call and return the results of MR-PRESSO
     return mr_presso(
@@ -104,7 +100,75 @@ def mrpresso_func(
         distortion_test,
         significance_p,
         cpus,
+        seed,
     )
+
+
+def ci_critical_value(method, nsnp):
+    """
+    Two-sided 95% critical value matching the distribution of the p-value of an MR result row: t distribution with
+    nSNP - 2 degrees of freedom for MR Egger (slope and intercept), t with nSNP - 1 degrees of freedom for the mode
+    methods, standard normal for the other methods. Confidence interval: b +/- critical value * se.
+    """
+    t_df_offset = {
+        MR_METHODS_NAMES["Egger"][0]: 2,
+        MR_METHODS_NAMES["Egger"][1]: 2,
+        MR_METHODS_NAMES["Simple-mode"]: 1,
+        MR_METHODS_NAMES["Weighted-mode"]: 1,
+    }
+    if method in t_df_offset:
+        df = nsnp - t_df_offset[method]
+        return float(stats_t.ppf(0.975, df)) if df > 0 else np.nan
+    return float(stats_norm.ppf(0.975))
+
+
+def odds_ratio_ci(b, se, method, nsnp):
+    """Odds ratio with its 95% confidence interval as "OR (lower-upper)" (see :func:`ci_critical_value`), NaN if b or se is missing."""
+    if pd.isna(b) or pd.isna(se):
+        return np.nan
+    crit = ci_critical_value(method, nsnp)
+    return f"{np.exp(b):.3f} ({np.exp(b - crit * se):.3f}-{np.exp(b + crit * se):.3f})"
+
+
+def method_seeds(seed):
+    """
+    Return one independent np.random.SeedSequence per MR method key, all derived from `seed`.
+    With seed=None, fresh entropy is used (non-reproducible draws).
+    """
+    keys = list(MR_METHODS_NAMES.keys())
+    return dict(zip(keys, np.random.SeedSequence(seed).spawn(len(keys))))
+
+
+def mrpresso_subset(subset_data, outliers):
+    """
+    Select the instruments used by MR methods called with use_mrpresso_data=True and print which ones are used.
+
+    Args:
+        subset_data (pd.DataFrame or None): Harmonized data without the MR-PRESSO outliers (stored by :meth:`Geno.MRpresso`).
+            None if no outlier-corrected subset could be built.
+        outliers (list): SNP IDs flagged as outliers by the MR-PRESSO outlier test.
+
+    Returns:
+        pd.DataFrame or None: The outlier-removed data, or None to use all instruments (no outliers identified).
+
+    Raises:
+        ValueError: If MR-PRESSO flagged all the instruments as outliers.
+    """
+    if subset_data is not None:
+        message = f"Using data for {len(subset_data)} instruments after MR-PRESSO outlier removal."
+        if outliers:
+            message += f" Outliers removed: {', '.join(map(str, outliers))}."
+        print(message + " The action is the one used in MR-PRESSO.")
+        return subset_data
+    if outliers:
+        raise ValueError(
+            f"Use_mrpresso_data is set to True but MR-PRESSO flagged all {len(outliers)} instruments as outliers: "
+            "no outlier-corrected analysis is possible. Run the analysis with use_mrpresso_data=False."
+        )
+    print(
+        "Use_mrpresso_data is set to True but MR-PRESSO did not identify any outliers (the outlier test runs only if outlier_test=True and the global test is significant). Using all instruments."
+    )
+    return None
 
 
 def MR_func(
@@ -117,7 +181,8 @@ def MR_func(
     phi,
     name_exposure,
     cpus,
-    subset_data
+    subset_data,
+    seed=None,
 ):
     """
     Wrapper function corresponding to the :meth:`Geno.MR` method. Refer to them for more details regarding arguments and return values.
@@ -128,12 +193,15 @@ def MR_func(
         - EAF column check if action is set to 2.
         - Data harmonization between exposure and outcome data based on action and eaf_threshold
         - NA check
-        - MR methods execution
+        - MR methods execution (Wald ratio only if a single SNP remains)
         - Compiles results and return a pd.DataFrame
+
+    Each bootstrap-based method draws from its own random generator derived from `seed` (see :func:`method_seeds`),
+    so its results for a given seed do not depend on the other methods requested.
     """
-    # Check the methods argument (contains either MR method names or "all")
-    valid_methods = list(MR_METHODS_NAMES.keys())
-    valid_methods.append("all")
+    # Check the methods argument (contains either MR method names or "all"). The Wald ratio is used automatically for a single SNP.
+    mr_methods = [m for m in MR_METHODS_NAMES.keys() if m != "Wald"]
+    valid_methods = mr_methods + ["all"]
     methods = methods if isinstance(methods, list) else [methods]
     if not all(m in valid_methods for m in methods):
         raise ValueError(
@@ -155,8 +223,8 @@ def MR_func(
         name_outcome = data[2]
 
         # Check number of instruments
-        if df_exposure.shape[0] < 2:
-            print("Not enough instruments to run MR. At least 2 are required.")
+        if df_exposure.shape[0] == 0:
+            print("No instruments available to run MR (the exposure data in MR_data is empty).")
             return pd.DataFrame(columns=RESULT_COLS), pd.DataFrame()
 
         # Check EAF columns if action = 2
@@ -181,8 +249,8 @@ def MR_func(
 
         # Check number of remaining instruments
         n_snps = df_mr.shape[0]
-        if n_snps < 2:
-            print(f"{n_snps} SNPs remaining after harmonization step but at least 2 are required to run MR.")
+        if n_snps == 0:
+            print("0 SNPs remaining after harmonization step: MR cannot be run.")
             return pd.DataFrame(columns=RESULT_COLS), df_mr
 
     # Prepare values for MR methods
@@ -191,38 +259,45 @@ def MR_func(
         df_mr["BETA_o"],
         df_mr["SE_e"],
         df_mr["SE_o"],
-    )  
-    
+    )
+
     print(
         f"Running Mendelian Randomization with {name_exposure} as exposure and {name_outcome} as outcome."
     )
 
-    # Mapping the methods passed as argument to the corresponding functions and freeze arguments
-    FUNCTION_MAP = {
-        "Egger": partial(mr_egger_regression, BETA_e, SE_e, BETA_o, SE_o),
-        "Egger-boot": partial(
-            mr_egger_regression_bootstrap, BETA_e, SE_e, BETA_o, SE_o, nboot, cpus
-        ),
-        "WM": partial(mr_weighted_median, BETA_e, SE_e, BETA_o, SE_o, nboot),
-        "WM-pen": partial(mr_pen_wm, BETA_e, SE_e, BETA_o, SE_o, nboot, penk),
-        "Simple-median": partial(mr_simple_median, BETA_e, SE_e, BETA_o, SE_o, nboot),
-        "IVW": partial(mr_ivw, BETA_e, SE_e, BETA_o, SE_o),
-        "IVW-RE": partial(mr_ivw_re, BETA_e, SE_e, BETA_o, SE_o),
-        "IVW-FE": partial(mr_ivw_fe, BETA_e, SE_e, BETA_o, SE_o),
-        "UWR": partial(mr_uwr, BETA_e, SE_e, BETA_o, SE_o),
-        "Sign": partial(mr_sign, BETA_e, BETA_o),
-        "Simple-mode": partial(mr_simple_mode, BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus),
-        "Weighted-mode": partial(mr_weighted_mode, BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus),
-    }
+    if len(df_mr) == 1:
+        # A single instrument: the Wald ratio is the only estimator available
+        print(
+            "Only 1 SNP available: returning the Wald ratio estimate (the requested MR methods require at least 2 SNPs)."
+        )
+        results = mr_wald_ratio(BETA_e, SE_e, BETA_o, SE_o)
+    else:
+        seeds = method_seeds(seed)
 
-    # Compute required MR methods and gather results
-    results = []
-    if "all" in methods:
-        methods = list(MR_METHODS_NAMES.keys())
-    for method in methods:
-        func = FUNCTION_MAP.get(method, None)
-        result = func()
-        results.extend(result)
+        # Mapping the methods passed as argument to the corresponding functions and freeze arguments
+        FUNCTION_MAP = {
+            "Egger": partial(mr_egger_regression, BETA_e, SE_e, BETA_o, SE_o),
+            "Egger-boot": partial(
+                mr_egger_regression_bootstrap, BETA_e, SE_e, BETA_o, SE_o, nboot, seed=seeds["Egger-boot"]
+            ),
+            "WM": partial(mr_weighted_median, BETA_e, SE_e, BETA_o, SE_o, nboot, seed=seeds["WM"]),
+            "WM-pen": partial(mr_pen_wm, BETA_e, SE_e, BETA_o, SE_o, nboot, penk, seed=seeds["WM-pen"]),
+            "Simple-median": partial(mr_simple_median, BETA_e, SE_e, BETA_o, SE_o, nboot, seed=seeds["Simple-median"]),
+            "IVW": partial(mr_ivw, BETA_e, SE_e, BETA_o, SE_o),
+            "IVW-RE": partial(mr_ivw_re, BETA_e, SE_e, BETA_o, SE_o),
+            "IVW-FE": partial(mr_ivw_fe, BETA_e, SE_e, BETA_o, SE_o),
+            "UWR": partial(mr_uwr, BETA_e, SE_e, BETA_o, SE_o),
+            "Sign": partial(mr_sign, BETA_e, BETA_o),
+            "Simple-mode": partial(mr_simple_mode, BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, seed=seeds["Simple-mode"]),
+            "Weighted-mode": partial(mr_weighted_mode, BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, seed=seeds["Weighted-mode"]),
+        }
+
+        # Compute required MR methods and gather results
+        results = []
+        if "all" in methods:
+            methods = mr_methods
+        for method in methods:
+            results.extend(FUNCTION_MAP[method]())
 
     res = pd.DataFrame(results)
     res = _ensure_mr_result_cols(res)
@@ -244,12 +319,15 @@ def MR_loo_func(
     name_exposure,
     cpus,
     subset_data,
+    seed=None,
 ):
     """
     Wrapper function corresponding to the :meth:`Geno.MR_loo` method.
+    Each fit (all instruments, then each leave-one-out subset) of a bootstrap-based method draws from its own
+    random generator derived from `seed`.
     """
-    valid_methods = list(MR_METHODS_NAMES.keys())
-    if not isinstance(method, str) or method not in valid_methods or method == "all":
+    valid_methods = [m for m in MR_METHODS_NAMES.keys() if m != "Wald"]
+    if not isinstance(method, str) or method not in valid_methods:
         raise ValueError(
             f"The method argument must be a single string in {valid_methods} (and cannot be 'all')."
         )
@@ -285,16 +363,7 @@ def MR_loo_func(
         )
         df_mr = df_mr_formatting(df_mr)
 
-    if "SNP" not in df_mr.columns:
-        raise ValueError("MR dataframe must contain a 'SNP' column for leave-one-out.")
-
     df_mr = df_mr.set_index("SNP", drop=False)
-    if df_mr.index.duplicated().any():
-        duplicated_snps = df_mr.index[df_mr.index.duplicated()].unique().tolist()
-        print(
-            f"Warning: duplicated SNP IDs found in MR dataframe (keeping first occurrence): {duplicated_snps}"
-        )
-        df_mr = df_mr.loc[~df_mr.index.duplicated(keep="first")]
 
     method_display_name = (
         MR_METHODS_NAMES[method][0]
@@ -318,7 +387,7 @@ def MR_loo_func(
         }
         return pd.DataFrame(), all_row, method_display_name
 
-    def _run_method(df_sub: pd.DataFrame):
+    def _run_method(df_sub: pd.DataFrame, fit_seed):
         BETA_e, BETA_o, SE_e, SE_o = (
             df_sub["BETA_e"],
             df_sub["BETA_o"],
@@ -330,14 +399,14 @@ def MR_loo_func(
             return mr_egger_regression(BETA_e, SE_e, BETA_o, SE_o)
         if method == "Egger-boot":
             return mr_egger_regression_bootstrap(
-                BETA_e, SE_e, BETA_o, SE_o, nboot, cpus, show_progress=False
+                BETA_e, SE_e, BETA_o, SE_o, nboot, seed=fit_seed
             )
         if method == "WM":
-            return mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot)
+            return mr_weighted_median(BETA_e, SE_e, BETA_o, SE_o, nboot, seed=fit_seed)
         if method == "WM-pen":
-            return mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk)
+            return mr_pen_wm(BETA_e, SE_e, BETA_o, SE_o, nboot, penk, seed=fit_seed)
         if method == "Simple-median":
-            return mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot)
+            return mr_simple_median(BETA_e, SE_e, BETA_o, SE_o, nboot, seed=fit_seed)
         if method == "IVW":
             return mr_ivw(BETA_e, SE_e, BETA_o, SE_o)
         if method == "IVW-RE":
@@ -358,6 +427,7 @@ def MR_loo_func(
                 nboot,
                 cpus,
                 show_progress=False,
+                seed=fit_seed,
             )
         if method == "Weighted-mode":
             return mr_weighted_mode(
@@ -369,6 +439,7 @@ def MR_loo_func(
                 nboot,
                 cpus,
                 show_progress=False,
+                seed=fit_seed,
             )
 
         raise ValueError(f"Method '{method}' is not supported for leave-one-out.")
@@ -384,7 +455,9 @@ def MR_loo_func(
             return causal if causal is not None else {}
         return method_results[0]
 
-    all_res = _select_causal_row(_run_method(df_mr))
+    # One independent random generator per fit: all instruments first, then each leave-one-out subset
+    fit_seeds = np.random.SeedSequence(seed).spawn(len(df_mr) + 1)
+    all_res = _select_causal_row(_run_method(df_mr, fit_seeds[0]))
     all_row = {
         "method": method_display_name,
         "nSNP": all_res.get("nSNP", len(df_mr)),
@@ -397,9 +470,9 @@ def MR_loo_func(
     }
 
     loo_rows = []
-    for snp in tqdm(df_mr.index, desc="Leave-one-out MR", total=len(df_mr), ncols=100):
+    for snp, fit_seed in tqdm(zip(df_mr.index, fit_seeds[1:]), desc="Leave-one-out MR", total=len(df_mr), ncols=100):
         df_sub = df_mr.drop(index=snp)
-        res = _select_causal_row(_run_method(df_sub))
+        res = _select_causal_row(_run_method(df_sub, fit_seed))
         loo_rows.append(
             {
                 "SNP": snp,
@@ -443,32 +516,37 @@ def MR_loo_func(
 
 def df_mr_formatting(df_mr):
     """
-    Function to delete invalid values from the MR dataframe (after the harmonization step)
+    Function to keep the MR columns and delete invalid values from the MR dataframe (after the harmonization step)
     """
-    # Delete NAs or infinite values (or null values in SE columns, null values in BETA are accepted) and print the SNP names and if the invalid value came from exposure or outcome data.
     df_mr = df_mr[["SNP", "BETA_e", "SE_e", "BETA_o", "SE_o"]].copy()
-    df_mr.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df_mr.loc[:, ["SE_e", "SE_o"]] = df_mr.loc[:, ["SE_e", "SE_o"]].replace(0, np.nan)
-    mask_exposure = df_mr[["BETA_e", "SE_e"]].isna().any(axis=1)
-    mask_outcome = df_mr[["BETA_o", "SE_o"]].isna().any(axis=1)
-    rows_to_delete_exposure = df_mr[mask_exposure]
-    rows_to_delete_outcome = df_mr[mask_outcome]
-    n_deleted_exposure = len(rows_to_delete_exposure)
-    n_deleted_outcome = len(rows_to_delete_outcome)
-    if n_deleted_exposure > 0:
-        print(
-            f"Deleting {n_deleted_exposure} SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (exposure data): {rows_to_delete_exposure['SNP'].tolist()}"
-        )
-    if n_deleted_outcome > 0:
-        print(
-            f"Deleting {n_deleted_outcome} SNPs with NA or infinite values in BETA/SE columns, or null values in SE column (outcome data): {rows_to_delete_outcome['SNP'].tolist()}"
-        )
+    return drop_invalid_effects(df_mr).reset_index(drop=True)
 
-    df_mr = df_mr.dropna(subset=["BETA_e", "SE_e", "BETA_o", "SE_o"]).reset_index(
-        drop=True
-    )
 
-    return df_mr.loc[:, ["SNP", "BETA_e", "SE_e", "BETA_o", "SE_o"]]
+def drop_invalid_effects(df):
+    """
+    Delete the rows with missing or non-finite BETA/SE values, or SE <= 0, in the exposure (BETA_e, SE_e) or outcome
+    (BETA_o, SE_o) data, and print the SNP names. BETA = 0 is valid.
+    """
+    masks = []
+    for beta, se, label in [("BETA_e", "SE_e", "exposure"), ("BETA_o", "SE_o", "outcome")]:
+        b = pd.to_numeric(df[beta], errors="coerce").to_numpy(dtype=float)
+        s = pd.to_numeric(df[se], errors="coerce").to_numpy(dtype=float)
+        with np.errstate(invalid="ignore"):
+            invalid = ~(np.isfinite(b) & np.isfinite(s) & (s > 0))
+        if invalid.any():
+            print(
+                f"Deleting {int(invalid.sum())} SNPs with missing or non-finite values in BETA/SE columns, or SE <= 0 ({label} data): {df.loc[invalid, 'SNP'].tolist()}"
+            )
+        masks.append(invalid)
+    return df[~(masks[0] | masks[1])]
+
+
+def drop_missing_snp_ids(df, label):
+    """Delete the rows with a missing SNP ID (NaN or placeholder such as '', '.', 'NA') and print their number."""
+    missing = missing_snp_ids(df["SNP"]).to_numpy()
+    if missing.any():
+        print(f"Deleting {int(missing.sum())} rows with a missing SNP ID in the {label} data (they cannot be matched).")
+    return df[~missing]
 
 
 
@@ -489,19 +567,26 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
         - pd.DataFrame: Harmonized data.
 
     Notes:
-        - Verify the presence of required columns in both dataframes and rename them
-        - Merge exposure and outcome data
+        - Verify the presence of required columns in both dataframes, convert BETA/SE/EAF to numbers and rename them
+        - Remove the rows with a missing SNP ID, merge exposure and outcome data and convert alleles to upper case
+        - Set EAF values outside [0, 1] to missing
         - Identify palindromes
         - Classify SNPs into aligned / inverted / need to be flipped
-        - Flip the ones that require flipping
+        - Flip the ones that require flipping (strand complement, also for multi-character alleles)
         - Switch those that are inverted to align them
         - Remove those that are still not aligned
+        - Remove the rows with invalid effects (missing or non-finite BETA/SE, SE <= 0)
         - Treat palindromes based on action parameter
+        - Keep the first row of SNPs that appear several times after harmonization
     """
 
     # Check required columns in both dataframes
     check_required_columns(df_exposure, REQUIRED_COLUMNS)
     check_required_columns(df_outcome, REQUIRED_COLUMNS)
+
+    # BETA, SE and EAF as numbers (values that cannot be converted become missing and are handled as invalid values)
+    df_exposure = numeric_effect_columns(df_exposure)
+    df_outcome = numeric_effect_columns(df_outcome)
 
     # Rename columns
     df_exposure = df_exposure.rename(
@@ -533,12 +618,28 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
         )
     ]
 
+    # Rows without a usable SNP ID cannot be matched
+    df_exposure = drop_missing_snp_ids(df_exposure, "exposure")
+    df_outcome = drop_missing_snp_ids(df_outcome, "outcome")
+
     # Merge the dataframes on SNP
     df = df_exposure.merge(df_outcome, on="SNP", how="left")
+
+    # Compare alleles in upper case
+    for col in ["EA_e", "NEA_e", "EA_o", "NEA_o"]:
+        df[col] = df[col].astype(object).str.upper()
 
     # Default EAF columns if they do not exist
     df["EAF_e"] = df.get("EAF_e", 0.5)
     df["EAF_o"] = df.get("EAF_o", 0.5)
+
+    # EAF values outside [0, 1] are invalid: set them to missing
+    for col, label in [("EAF_e", "exposure"), ("EAF_o", "outcome")]:
+        eaf = pd.to_numeric(df[col], errors="coerce")
+        invalid_eaf = eaf.notna() & ((eaf < 0) | (eaf > 1))
+        if invalid_eaf.any():
+            print(f"{int(invalid_eaf.sum())} EAF values outside [0, 1] in the {label} data have been set to missing.")
+        df[col] = eaf.where(~invalid_eaf)
 
     # Identify palindromes
     condition1 = ((df["EA_e"] == "A") & (df["NEA_e"] == "T")) | (
@@ -590,7 +691,9 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
             f"{mismatched_snps} SNPs have been excluded due to a mismatch between the exposure and outcome alleles data."
         )
     df = df[~df["allele_mismatch"]]
-    df.reset_index(inplace=True, drop=True)
+
+    # Remove the rows with invalid effects before resolving duplicated SNPs
+    df = drop_invalid_effects(df).reset_index(drop=True)
 
     # Treat palindromes based on the action parameter
     if action == 3:  # Simply delete them
@@ -607,15 +710,21 @@ def harmonize_MR(df_exposure, df_outcome, action=2, eaf_threshold=0.42):
             "Action = 1: Keeping all palindromic SNPs without attempting to flip them."
         )
 
+    # Keep a single row per SNP (first allele-compatible row) so that all MR methods use identical data
+    duplicated = df["SNP"].duplicated(keep="first")
+    if duplicated.any():
+        duplicated_snps = df.loc[duplicated, "SNP"].astype(str).unique().tolist()
+        print(
+            f"Warning: {len(duplicated_snps)} SNPs have several rows after harmonization (duplicated SNP IDs in the exposure or outcome data); keeping the first row for each: {', '.join(duplicated_snps)}"
+        )
+        df = df[~duplicated].reset_index(drop=True)
+
     return df
 
 
 def flip_alleles(x):
-    """Flip the alleles."""
-    x = x.str.upper()
-    x = x.replace("C", "g").replace("G", "c").replace("A", "t").replace("T", "a")
-    x = x.str.upper()
-    return x
+    """Flip the alleles to the complementary strand (each base is complemented, also for multi-character alleles)."""
+    return x.astype(object).str.upper().str.translate(str.maketrans("ACGT", "TGCA"))
 
 
 def check_required_columns(df, columns):
@@ -630,26 +739,26 @@ def check_required_columns(df, columns):
 def apply_action_2(df, eaf_threshold):
     """
     Use EAF_e and EAF_o to align palindromes if both EAFs are outside the intermediate allele frequency range.
-        - Replace NA values in EAF columns by 0.5 (will be flagged and removed in step 3)
-        - Set boundaries for intermediate allele frequencies
+        - Missing EAF values are treated as 0.5 (intermediate) for the palindrome checks; the EAF columns are not modified
+        - Set boundaries for intermediate allele frequencies (strictly between eaf_threshold and 1 - eaf_threshold, as in TwoSampleMR)
         - Identify palindromes that have an intermediate allele frequency and delete them
         - Among the remaining palindromes, identify the ones that need to be flipped and flip them
     """
-    # If EAF is nan for a SNP, it will be removed
-    df["EAF_e"] = np.where(df.EAF_e.isna(), 0.5, df.EAF_e)
-    df["EAF_o"] = np.where(df.EAF_o.isna(), 0.5, df.EAF_o)
+    # If EAF is nan for a palindromic SNP, it will be removed
+    eaf_e = df["EAF_e"].fillna(0.5)
+    eaf_o = df["EAF_o"].fillna(0.5)
 
-    # Set the boundaries for intermediate frequencies
-    minf = np.minimum(eaf_threshold, 1 - eaf_threshold)
-    maxf = 1 - minf
+    # Set the boundaries for intermediate frequencies (rounded to avoid floating-point artefacts such as 1 - 0.42 = 0.5800000000000001)
+    minf = round(min(eaf_threshold, 1 - eaf_threshold), 10)
+    maxf = round(1 - minf, 10)
 
     # Identify palindromes that have an intermediate allele frequency and delete them
     df["ambiguous"] = df["palindrome"] & (
-        ((minf <= df["EAF_e"]) & (df["EAF_e"] <= maxf))
-        | ((minf <= df["EAF_o"]) & (df["EAF_o"] <= maxf))
+        ((minf < eaf_e) & (eaf_e < maxf))
+        | ((minf < eaf_o) & (eaf_o < maxf))
     )
     snps_deleted = df[df.ambiguous].SNP.values
-    df = df[~df.ambiguous]
+    df = df[~df.ambiguous].copy()
     diff = len(snps_deleted)
     if diff > 0:
         print(
@@ -661,7 +770,7 @@ def apply_action_2(df, eaf_threshold):
         )
 
     # Identify palindromes that need to be flipped and flip them
-    df.loc[:, "to_flip"] = df["palindrome"] & ((df.EAF_e - 0.5) * (df.EAF_o - 0.5) < 0)
+    df["to_flip"] = df["palindrome"] & ((eaf_e.loc[df.index] - 0.5) * (eaf_o.loc[df.index] - 0.5) < 0)
     if df["to_flip"].sum() > 0:
         to_flip_idx = df[df["to_flip"]].index  # Get indices of SNPs to be flipped
         df.loc[to_flip_idx, "BETA_o"] *= -1  # Invert outcome BETA
@@ -702,13 +811,15 @@ def query_outcome_func(
     import genal
 
     if isinstance(outcome, genal.Geno):
-        df_outcome, name = load_outcome_from_geno_object(outcome)
+        df_outcome, loaded_name = load_outcome_from_geno_object(outcome)
     elif isinstance(outcome, str):
-        df_outcome, name = load_outcome_from_filepath(outcome)
+        df_outcome, loaded_name = load_outcome_from_filepath(outcome)
     else:
         raise ValueError(
             "You need to provide either a Geno object or filepath string to the outcome variable."
         )
+    # An explicit name takes precedence over the name of the loaded outcome
+    name = loaded_name if name is None else name
 
     # Check necessary columns from outcome
     for column in REQUIRED_COLUMNS:
@@ -716,6 +827,10 @@ def query_outcome_func(
             raise ValueError(
                 f"The column {column} is not found in the outcome data and is necessary."
             )
+
+    # Rows without a usable SNP ID cannot be matched
+    data = drop_missing_snp_ids(data, "exposure")
+    df_outcome = drop_missing_snp_ids(df_outcome, "outcome")
 
     # Identify the exposure SNPs present in the outcome data
     print("Identifying the exposure SNPs present in the outcome data...")

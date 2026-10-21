@@ -1,6 +1,6 @@
 # Tutorial (detailed)
 
-The `README.md` shows a compact “GWAS → instruments → PRS → MR” example. This page expands that workflow into a **tutorial**, explaining *why* each step exists and which parameters you typically tune.
+The `README.md` shows a compact “GWAS → instruments → PRS → MR” example. This page expands that workflow into a **tutorial**, explaining *why* each step exists and which parameters you typically tune. The rules applied to your data at each step are described in {doc}`methods`.
 
 If you haven't configured PLINK/reference data yet, start with {doc}`setup`.
 
@@ -56,10 +56,12 @@ Key arguments you commonly tune:
   - `"Fill"` keeps rows and sets invalid values to `NaN` (useful for exploratory work).
   - `"Fill_delete"` drops invalid/duplicated/NA rows (recommended before downstream genetics methods).
 - `reference_panel="37"` vs `"38"` should match your GWAS build.
-- `effect_column="OR"` forces log-transforming odds ratios into betas and adjusts SE accordingly.
+- `effect_column="OR"` if the `BETA` column holds odds ratios (they are log-transformed). By default, genal detects the scale from the data and prints its decision.
 - `fill_snpids` / `fill_coordinates`: override the default logic if you want to force filling rsIDs from `CHR+POS` or vice-versa.
 - `keep_indel` / `keep_dups`: keep indels or duplicated IDs (generally you keep these `False` unless you have a reason).
 - `fill_f=True`: force recomputation of the F-statistic (`FSTAT`) column even if it already exists. By default, FSTAT is created if missing or only missing values are filled.
+
+The validation and filling rules are listed in [Methods: preprocessing](methods.md#preprocessing).
 
 ## 3) Select independent instruments via LD clumping
 
@@ -70,7 +72,7 @@ G_instruments = G_exposure.clump(
     p1=5e-8,       # significance threshold for index variants
     r2=0.01,       # LD threshold
     kb=10_000,     # window size in kb
-    p2=0.01,       # secondary threshold
+    p2=0.01,       # PLINK's secondary threshold (only affects PLINK's clump listing, not the index SNPs returned)
     reference_panel="EUR_37",  # LD reference panel (not the same as build-only reference)
 )
 ```
@@ -91,9 +93,12 @@ G_instruments.prs(
 )
 ```
 
+The output `<name>.csv` has one row per individual, with the sum score `SCORE1_SUM` and PLINK's average score `SCORE1_AVG`. `BETA` is used as given: for odds ratios, run `preprocess_data(effect_column="OR")` first.
+
 Tunable options and common pitfalls:
+- `weighted=False` gives each variant a weight of 1 on its trait-increasing allele (an allele count).
 - **Variant matching**:
-  - If `CHR+POS` are available in `G_instruments.data`, genal prefers coordinate matching and will call `update_snpids()` internally to reduce ID mismatches.
+  - If `CHR+POS` are available in `G_instruments.data`, genal matches variants to your genotype files by position and alleles (keep `NEA` in your data) and calls `update_snpids()` internally to reduce ID mismatches.
   - If you only have rsIDs, ensure your cohort uses compatible IDs (or add coordinates and rerun preprocessing).
 - `proxy=True` enables proxy SNP search when variants are missing in your cohort:
   - `r2`, `kb`, `window_snps`, and the LD `reference_panel` control proxy search scope/strictness.
@@ -113,6 +118,8 @@ G_instruments.prs(
 )
 ```
 
+Matching, scoring and proxy rules: [Methods: polygenic risk scores](methods.md#polygenic-risk-scores).
+
 ## 5) Two-sample MR: query an outcome GWAS and run MR
 
 ### 5.1) Load and preprocess the outcome GWAS
@@ -131,7 +138,7 @@ G_outcome.preprocess_data(preprocessing="Fill_delete", reference_panel="37")
 
 ### 5.2) Query the outcome at the instrument variants
 
-{py:meth}`genal.Geno.query_outcome` extracts exposure SNPs from an outcome dataset and stores `(exposure_df, outcome_df, outcome_name)` in `G_instruments.MR_data`.
+{py:meth}`genal.Geno.query_outcome` extracts the exposure SNPs from an outcome dataset (matching on rsID) and stores the exposure and outcome tables, with the outcome name, in `G_instruments.MR_data`.
 
 ```python
 G_instruments.query_outcome(
@@ -143,8 +150,9 @@ G_instruments.query_outcome(
 ```
 
 Tunable options:
-- `proxy=True` searches proxies when SNPs are missing from the outcome.
+- `proxy=True` searches proxies when SNPs are missing from the outcome (see [Methods: proxy SNPs](methods.md#proxy-snps)).
 - `r2`, `kb`, `window_snps` control proxy search scope/strictness.
+- `name` sets the outcome name used in the MR results.
 
 ### 5.3) Run MR
 
@@ -169,6 +177,7 @@ Key arguments you commonly tune:
   - `3`: drop all palindromes
 - `heterogeneity=True` adds Cochran’s Q diagnostics for methods that support it.
 - `odds=True` adds exponentiated effect summaries (odds ratios + 95% CI strings) when appropriate.
+- `seed`: random seed for the bootstrap-based methods (reproducible results).
 
 ### 5.4) Plot MR results
 
@@ -190,7 +199,7 @@ G_instruments.MR_funnel(
 
 ## 6a) MR-PRESSO (outlier detection and distortion testing)
 
-{py:meth}`genal.Geno.MRpresso` runs a parallel MR-PRESSO implementation.
+{py:meth}`genal.Geno.MRpresso` runs a parallel MR-PRESSO implementation (at least 4 instruments are needed).
 
 ```python
 mod_table, GlobalTest, OutlierTest, BiasTest = G_instruments.MRpresso(
@@ -205,28 +214,28 @@ What you typically tune:
 - `n_iterations`: more iterations → more stable p-values but slower.
 - `significance_p`: threshold for global/outlier tests.
 - `outlier_test` / `distortion_test`: disable if you only want the global test.
+- `seed`: random seed for the simulated datasets (reproducible results).
 
 Output structure:
-- `mod_table`: DataFrame with two rows (`"Raw"` and `"Outlier-corrected"`) containing columns `method`, `nSNP`, `b`, `se`, `pval` for the IVW model before and after outlier removal.
+- `mod_table`: DataFrame with two rows (`"Raw"` and `"Outlier-corrected"`) for the IVW model before and after outlier removal.
 - `GlobalTest`: dictionary with `"RSSobs"` (observed residual sum of squares) and `"global_test_p"` (p-value for the global pleiotropy test).
 - `OutlierTest`: DataFrame with per-SNP outlier p-values (`RSSobs`, `Pvalue`); SNP identifiers (rsIDs) are used as row labels. Empty if the global test is not significant.
 - `BiasTest`: dictionary containing `"outliers_indices"` (list of SNP IDs), `"distortion_test_coefficient"` (percent), and `"distortion_test_p"`.
 
-If outliers are found, you can rerun MR using the outlier-removed subset:
-
-```python
-res_no_outliers = G_instruments.MR(use_mrpresso_data=True)
-```
-
-To highlight MR-PRESSO outliers on plots, pass `use_mrpresso_data=True` (outliers are colored in red and shown in the legend):
+To highlight MR-PRESSO outliers on plots, pass `use_mrpresso_data=True` (outliers are colored in red and shown in the legend). The plots show the instruments of the last `MR()` call, so draw them before rerunning MR without the outliers:
 
 ```python
 G_instruments.MR_plot(filename="mr_scatter_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
 G_instruments.MR_funnel(filename="mr_funnel_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
-G_instruments.MR_loo_plot(filename="loo_forest_mrpresso", figure_size=(10, 8), use_mrpresso_data=True)
 ```
 
-See {doc}`methods` for algorithm details and outputs.
+If outliers are found, you can then rerun MR using the outlier-removed subset:
+
+```python
+res_no_outliers = G_instruments.MR(use_mrpresso_data=True, exposure_name="SBP", outcome_name="Stroke")
+```
+
+See [Methods: MR-PRESSO](methods.md#mr-presso-summary) for algorithm details, and for when each test runs and what the outputs contain otherwise.
 
 ## 6b) Leave-one-out MR (sensitivity analysis)
 
@@ -244,6 +253,7 @@ loo_df = G_instruments.MR_loo(
 Key arguments:
 - `method`: a single MR method key (e.g., `"IVW"`, `"Egger"`, `"WM"`); must not be `"all"`.
 - `use_mrpresso_data=True`: use the outlier-removed dataset from MR-PRESSO instead of all instruments.
+- `seed`: random seed for bootstrap-based methods.
 
 ### Visualizing leave-one-out results
 
@@ -265,11 +275,16 @@ G_instruments.MR_loo_plot(
 )
 ```
 
+```python
+# Highlight MR-PRESSO outliers (requires MRpresso() first)
+G_instruments.MR_loo_plot(filename="loo_forest_mrpresso", figure_size=(10, 8), use_mrpresso_data=True)
+```
+
 Key arguments:
 - `top_influential=True` (default): select the `snps_per_page` most influential SNPs (largest change in estimate when removed) and render a single compact figure.
 - `top_influential=False`: paginate all instruments; use `page=N` to select a specific page or `page=None` to render all pages.
 - `snps_per_page`: number of SNPs per page (minimum 5).
-- `use_mrpresso_data=True`: color MR-PRESSO outliers in red (requires `MRpresso()` first). When outliers exist, an extra summary row ("MR-PRESSO corrected") is added using the same MR method as the leave-one-out analysis.
+- `use_mrpresso_data=True`: color MR-PRESSO outliers in red (requires `MRpresso()` first). When outliers exist and the leave-one-out analysis used all instruments, an extra summary row ("MR-PRESSO corrected") is added using the same MR method.
 - `methods=["WM", "Egger"]`: add extra overall estimates for the requested methods (computed on all instruments).
 
 
@@ -291,9 +306,9 @@ G_instruments.set_phenotype(
 )
 ```
 
-For binary phenotypes, `set_phenotype()` recodes the two observed values to `0/1` (control/case) using the most frequent value as the control code by default (use `alternate_control=True` to invert this interpretation).
+For binary phenotypes, `set_phenotype()` recodes the two observed values to `0/1` (control/case) and prints the coding it used; use `alternate_control=True` to invert it.
 
-2) Run association tests (updates `G.data` in place):
+2) Run association tests (`G.data` is replaced by the tested variants, with their cohort estimates):
 
 ```python
 G_instruments.association_test(
@@ -304,10 +319,13 @@ G_instruments.association_test(
 ```
 
 What you typically tune / watch:
-- `covar`: covariate names (must be present in `pheno_df` and numeric; constant covariates are dropped).
+- `covar`: covariate names (must be present in `pheno_df`; text or categorical covariates are encoded as indicator columns, and constant covariates are dropped).
 - `standardize=True`: for quantitative traits; set `False` if you want raw-scale effects.
-- Variant matching: if `CHR+POS` are present in `G.data`, genal will map to cohort SNP IDs before running PLINK (reduces ID mismatch losses).
+- `EA` is required, and `NEA` recommended (it selects the allele pair tested at multi-allelic variants).
+- Variant matching: if `CHR+POS` are present in `G.data`, genal maps them to cohort SNP IDs by position and alleles before running PLINK (reduces ID mismatch losses).
 - After updating `BETA`, `SE`, and `P`, the F-statistic (`FSTAT`) column is automatically recomputed to remain consistent with the updated estimates.
+
+Allele alignment and filtering rules: [Methods: association tests](methods.md#association-tests).
 
 ### Liftover between builds
 
@@ -319,10 +337,13 @@ lifted_df = G_exposure.lift(start="hg19", end="hg38", replace=False)  # G_exposu
 ```
 
 Key arguments:
+- `start` / `end`: `"hg17"`, `"hg18"`, `"hg19"` or `"hg38"` (`"GRCh37"` and `"GRCh38"` are accepted for `"hg19"` and `"hg38"`).
 - `replace=True|False`: whether to overwrite `G.data` (return value is still a DataFrame either way).
 - `chain_file=...`: use a local UCSC chain file (useful for offline/reproducible builds).
 - `liftover_path=...`: use UCSC `liftOver` executable (faster than Python liftover for large datasets).
 - `name=...` / `extraction_file=True`: optionally write the lifted table and/or an extraction file.
+
+Variants that cannot be lifted are removed (their number is printed); see [Methods: liftover](methods.md#liftover) for strand and contig handling.
 
 If you want a lifted `Geno` object (to keep chaining methods), use:
 
@@ -344,8 +365,8 @@ Key arguments:
 - `fill=True|False`: keep existing `EAF` values for variants not found in the reference (`True`), or set them to `NaN` (`False`).
 
 Requirements / behavior:
-- Requires `EA` and either `SNP` or `CHR+POS`.
-- Uses PLINK `--freq` and aligns the returned frequency to the **effect allele** (`EA`). If alleles do not match the reference panel, the updated EAF is set to `NaN` (or left unchanged if `fill=True`).
+- Requires `EA` and either `SNP` or `CHR+POS` (`NEA` recommended).
+- Uses PLINK `--freq` and aligns the returned frequency to the **effect allele** (`EA`). Variants whose alleles do not match the reference panel get `NaN` (or keep their value if `fill=True`); see [Methods: allele frequencies](methods.md#allele-frequencies).
 
 ### Colocalization (ABF)
 
@@ -366,7 +387,7 @@ coloc = G_exp_region.colocalize(
 
 Key arguments:
 - `trait1_type` / `trait2_type`: `"quant"` or `"cc"`.
-- For quantitative traits: provide `sdY1`/`sdY2`, or provide `n1`/`n2` *and* `EAF` so genal can estimate $sd_Y$; otherwise genal falls back to $sd_Y = 1$.
+- For quantitative traits: provide `sdY1`/`sdY2`, or `n1`/`n2` with an `EAF` column; otherwise $sd_Y = 1$ is assumed (with a warning).
 - `p1`, `p2`, `p12`: priors for the ABF model (see {doc}`methods`).
 - Matching: by default, genal attempts to merge on `CHR+POS` when available; set `merge_on_snp=True` to force merging by rsID (`SNP`).
 
@@ -387,9 +408,9 @@ annotated_df = G_exposure.query_gwas_catalog(
 
 Key arguments:
 - `p_threshold`: only report associations with $p \le p_\mathrm{threshold}$.
-- `max_associations`: cap the number of reported trait-study associations per SNP after filtering and deduplication.
+- `max_associations`: cap the number of reported trait-study associations per SNP (the most significant ones are kept).
 - `timeout`: per-request timeout; increase for large SNP sets.
-- `replace=True|False`: whether to store the resulting `ASSOC` column in `G.data`.
+- `replace=True` (default) adds the result columns to `G.data`; with `replace=False` they are only added to the returned copy.
 
 The returned table contains:
 - `ASSOC`: a list of dictionaries with keys `trait`, `p_value`, and `study_accession`
@@ -409,15 +430,15 @@ apoe_region = G_exposure.filter_by_gene(
 ```
 
 Key arguments:
-- `gene`: gene identifier (e.g. `"APOE"`).
+- `gene`: gene identifier (e.g. `"APOE"`; text identifiers are matched case-insensitively).
 - `id_type`: identifier type (`"symbol"`, `"HGNC"`, `"Ensembl"`, `"NCBI"`, `"UCSC"`, `"Vega"`, or `"name"`).
 - `window_size`: total window size in base pairs (± `window_size/2` around the gene).
-- `build`: `"37"` or `"38"` (must match your `CHR/POS` coordinates).
+- `build`: `"37"` or `"38"` (required; must match your `CHR/POS` coordinates).
 - `replace=False|True`: return a new `Geno` (default) or filter this object in place.
 
 Notes:
 - Requires `CHR` and `POS`.
-- On first use, genal may download a small gene-mapping parquet file into your configured reference folder (network required).
+- On first use, genal downloads a small gene-mapping file into your reference folder (network required).
 
 ### Save intermediate datasets
 

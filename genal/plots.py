@@ -13,9 +13,10 @@ from plotnine import (
     expand_limits,
     guide_legend,
     geom_abline,
-    geom_errorbar,
     geom_errorbarh,
+    geom_linerange,
     geom_point,
+    geom_segment,
     geom_vline,
     ggplot,
     guides,
@@ -75,27 +76,28 @@ def _validate_figure_size(figure_size):
     return float(fig_width), float(fig_height)
 
 
-def _extract_mrpresso_outlier_ids(mrpresso_results) -> set[str]:
+def _mrpresso_outlier_ids(mrpresso_outliers) -> set[str]:
     """
-    Return MR-PRESSO outlier SNP IDs (if available) as a set of strings.
+    Return the SNP IDs flagged by the MR-PRESSO outlier test (stored by :meth:`Geno.MRpresso`) as a set of strings.
+    Raises an error if MR-PRESSO has not been run.
+    """
+    if mrpresso_outliers is None:
+        raise ValueError(
+            "Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first."
+        )
+    return {str(x) for x in mrpresso_outliers}
 
-    MR-PRESSO stores outliers in the BiasTest dict under the "outliers_indices" key.
-    This helper normalizes the output and handles "no outliers" sentinel strings.
+
+def _wald_only_methods(methods, res):
     """
-    if mrpresso_results is None:
-        return set()
-    if not isinstance(mrpresso_results, (list, tuple)) or len(mrpresso_results) < 4:
-        return set()
-    bias_test = mrpresso_results[3]
-    if not isinstance(bias_test, dict):
-        return set()
-    outliers = bias_test.get("outliers_indices")
-    if outliers is None or isinstance(outliers, str):
-        return set()
-    try:
-        return {str(x) for x in outliers}
-    except TypeError:
-        return set()
+    If the MR results only contain the Wald ratio (single instrument), return ["Wald"] so that it is plotted
+    instead of the requested methods. Otherwise return the requested methods.
+    """
+    wald_name = MR_METHODS_NAMES["Wald"]
+    if not res.empty and (res["method"] == wald_name).all():
+        print("The MR results contain only the Wald ratio (single instrument): plotting the Wald ratio estimate.")
+        return ["Wald"]
+    return methods
 
 
 def mr_loo_plot(
@@ -111,7 +113,7 @@ def mr_loo_plot(
     methods=None,
     use_mrpresso_data=None,
     mr_data=None,
-    mrpresso_results=None,
+    mrpresso_outliers=None,
     mrpresso_subset_data=None,
     mr_loo_config=None,
 ):
@@ -161,15 +163,17 @@ def mr_loo_plot(
     )
     outlier_ids: set[str] = set()
     if use_mrpresso_effective:
-        if mrpresso_results is None:
-            raise ValueError(
-                "Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first."
-            )
-        outlier_ids = _extract_mrpresso_outlier_ids(mrpresso_results)
+        outlier_ids = _mrpresso_outlier_ids(mrpresso_outliers)
+
+    from .MR_tools import ci_critical_value
 
     plot_df = loo_df.copy().reset_index(drop=True)
     all_b = float(all_row.get("b", np.nan))
     all_se = float(all_row.get("se", np.nan))
+    # 95% CI critical values: same distribution as the p-value of the method (t for MR Egger and the mode methods)
+    loo_nsnp = plot_df["nSNP"] if "nSNP" in plot_df.columns else pd.Series(np.nan, index=plot_df.index)
+    plot_df["crit"] = [ci_critical_value(method_display_name, n) for n in loo_nsnp]
+    all_crit = ci_critical_value(method_display_name, all_row.get("nSNP", np.nan))
     plot_df["_orig_order"] = np.arange(len(plot_df))
     plot_df["influence"] = (plot_df["b"] - all_b).abs()
     plot_df["estimate_sort"] = np.exp(plot_df["b"]) if odds else plot_df["b"]
@@ -231,35 +235,35 @@ def mr_loo_plot(
     if odds:
         all_est = np.exp(all_b) if not np.isnan(all_b) else np.nan
         all_ci_lower = (
-            np.exp(all_b - 1.96 * all_se)
+            np.exp(all_b - all_crit * all_se)
             if not np.isnan(all_b) and not np.isnan(all_se)
             else np.nan
         )
         all_ci_upper = (
-            np.exp(all_b + 1.96 * all_se)
+            np.exp(all_b + all_crit * all_se)
             if not np.isnan(all_b) and not np.isnan(all_se)
             else np.nan
         )
         null_line = 1
         x_label = "Odds ratio"
-        ci_lower_all = np.exp(plot_df["b"] - 1.96 * plot_df["se"])
-        ci_upper_all = np.exp(plot_df["b"] + 1.96 * plot_df["se"])
+        ci_lower_all = np.exp(plot_df["b"] - plot_df["crit"] * plot_df["se"])
+        ci_upper_all = np.exp(plot_df["b"] + plot_df["crit"] * plot_df["se"])
     else:
         all_est = all_b
         all_ci_lower = (
-            all_b - 1.96 * all_se
+            all_b - all_crit * all_se
             if not np.isnan(all_b) and not np.isnan(all_se)
             else np.nan
         )
         all_ci_upper = (
-            all_b + 1.96 * all_se
+            all_b + all_crit * all_se
             if not np.isnan(all_b) and not np.isnan(all_se)
             else np.nan
         )
         null_line = 0
         x_label = "Causal estimate"
-        ci_lower_all = plot_df["b"] - 1.96 * plot_df["se"]
-        ci_upper_all = plot_df["b"] + 1.96 * plot_df["se"]
+        ci_lower_all = plot_df["b"] - plot_df["crit"] * plot_df["se"]
+        ci_upper_all = plot_df["b"] + plot_df["crit"] * plot_df["se"]
 
     def _normalize_extra_methods(extra):
         if extra is None:
@@ -276,7 +280,7 @@ def mr_loo_plot(
         for method in extra_list:
             if not isinstance(method, str):
                 raise TypeError("methods must be None, a string, or a list/tuple of strings")
-            if method not in MR_METHODS_NAMES.keys() or method == "all":
+            if method not in MR_METHODS_NAMES.keys() or method in ("all", "Wald"):
                 warnings.warn(
                     f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more."
                 )
@@ -303,6 +307,7 @@ def mr_loo_plot(
         penk = int(mr_loo_config.get("penk", 20))
         phi = float(mr_loo_config.get("phi", 1))
         cpus = int(mr_loo_config.get("cpus", 1))
+        seed = mr_loo_config.get("seed")
 
         res, _df_mr = MR_func(
             mr_data,
@@ -315,6 +320,7 @@ def mr_loo_plot(
             name_exposure=exp_name,
             cpus=cpus,
             subset_data=subset_data,
+            seed=seed,
         )
 
         method_name = MR_METHODS_NAMES[method]
@@ -332,16 +338,19 @@ def mr_loo_plot(
             "SNP": str(method_name),
             "Estimate": float(row["b"].values[0]),
             "SE": float(row["se"].values[0]),
+            "crit": ci_critical_value(method_name, row["nSNP"].values[0]),
         }
 
+    # "MR-PRESSO corrected" summary row: only when MR_loo ran on all instruments (otherwise "All instruments"
+    # is already the outlier-removed estimate)
     corrected_row = None
-    if use_mrpresso_effective and mrpresso_subset_data is not None:
+    if use_mrpresso_effective and mrpresso_subset_data is not None and not used_mrpresso:
         corrected = _compute_method_summary(method_key, mrpresso_subset_data)
         if corrected is not None:
             corrected["SNP"] = "MR-PRESSO corrected"
             corrected_row = corrected
 
-    summary_rows = [{"SNP": "All instruments", "Estimate": all_b, "SE": all_se}]
+    summary_rows = [{"SNP": "All instruments", "Estimate": all_b, "SE": all_se, "crit": all_crit}]
 
     for method in extra_method_keys:
         method_summary = _compute_method_summary(method, subset_data=None)
@@ -361,12 +370,13 @@ def mr_loo_plot(
     summary_df = pd.DataFrame(summary_rows)
     summary_df["mrpresso_corrected"] = summary_df["SNP"] == "MR-PRESSO corrected"
     if odds:
-        summary_df["CI_lower"] = np.exp(summary_df["Estimate"] - 1.96 * summary_df["SE"])
-        summary_df["CI_upper"] = np.exp(summary_df["Estimate"] + 1.96 * summary_df["SE"])
+        summary_df["CI_lower"] = np.exp(summary_df["Estimate"] - summary_df["crit"] * summary_df["SE"])
+        summary_df["CI_upper"] = np.exp(summary_df["Estimate"] + summary_df["crit"] * summary_df["SE"])
         summary_df["Estimate"] = np.exp(summary_df["Estimate"])
     else:
-        summary_df["CI_lower"] = summary_df["Estimate"] - 1.96 * summary_df["SE"]
-        summary_df["CI_upper"] = summary_df["Estimate"] + 1.96 * summary_df["SE"]
+        summary_df["CI_lower"] = summary_df["Estimate"] - summary_df["crit"] * summary_df["SE"]
+        summary_df["CI_upper"] = summary_df["Estimate"] + summary_df["crit"] * summary_df["SE"]
+    summary_df = summary_df.drop(columns="crit")
     summary_df["row_type"] = "overall"
 
     x_scale_kwargs = {}
@@ -400,12 +410,12 @@ def mr_loo_plot(
 
         if odds:
             df_page["Estimate"] = np.exp(df_page["b"])
-            df_page["CI_lower"] = np.exp(df_page["b"] - 1.96 * df_page["se"])
-            df_page["CI_upper"] = np.exp(df_page["b"] + 1.96 * df_page["se"])
+            df_page["CI_lower"] = np.exp(df_page["b"] - df_page["crit"] * df_page["se"])
+            df_page["CI_upper"] = np.exp(df_page["b"] + df_page["crit"] * df_page["se"])
         else:
             df_page["Estimate"] = df_page["b"]
-            df_page["CI_lower"] = df_page["b"] - 1.96 * df_page["se"]
-            df_page["CI_upper"] = df_page["b"] + 1.96 * df_page["se"]
+            df_page["CI_lower"] = df_page["b"] - df_page["crit"] * df_page["se"]
+            df_page["CI_upper"] = df_page["b"] + df_page["crit"] * df_page["se"]
 
         plot_cols = ["SNP", "Estimate", "CI_lower", "CI_upper"]
         if "mrpresso_status" in df_page.columns:
@@ -622,7 +632,7 @@ def mr_plot(
     filename=None,
     figure_size=None,
     use_mrpresso_data=False,
-    mrpresso_results=None,
+    mrpresso_outliers=None,
 ):
     """
     Creates and returns a scatter plot of individual SNP effects with lines representing
@@ -652,11 +662,7 @@ def mr_plot(
 
     mrpresso_status = None
     if use_mrpresso_data:
-        if mrpresso_results is None:
-            raise ValueError(
-                "Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first."
-            )
-        outlier_ids = _extract_mrpresso_outlier_ids(mrpresso_results)
+        outlier_ids = _mrpresso_outlier_ids(mrpresso_outliers)
         if outlier_ids:
             if "SNP" in df_mr.columns:
                 snp_ids = df_mr["SNP"].astype(str)
@@ -668,17 +674,16 @@ def mr_plot(
                 df_mr = df_mr.copy()
                 df_mr["mrpresso_status"] = mrpresso_status
 
+    # Error bars without caps (+/- 1 SE on each axis)
     plot = (
         ggplot(df_mr, aes("BETA_e", "BETA_o"))
-        + geom_errorbarh(
-            aes(xmin="BETA_e-SE_e", xmax="BETA_e+SE_e"),
-            height=0,
+        + geom_segment(
+            aes(x="BETA_e-SE_e", xend="BETA_e+SE_e", yend="BETA_o"),
             color="gray",
             size=0.1,
         )
-        + geom_errorbar(
+        + geom_linerange(
             aes(ymin="BETA_o-SE_o", ymax="BETA_o+SE_o"),
-            width=0,
             color="gray",
             size=0.1,
         )
@@ -723,7 +728,7 @@ def mr_plot(
         plot += guides(fill=guide_legend(override_aes={"size": 4, "alpha": 1}))
 
     lines = []
-    for method in methods:
+    for method in _wald_only_methods(methods, res):
         if method not in MR_METHODS_NAMES.keys():
             warnings.warn(
                 f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more."
@@ -788,7 +793,7 @@ def mr_funnel(
     figure_size=(10, 6),
     filename=None,
     use_mrpresso_data=False,
-    mrpresso_results=None,
+    mrpresso_outliers=None,
 ):
     """
     Creates and returns a funnel plot of single-SNP causal estimates (Wald ratios).
@@ -835,11 +840,7 @@ def mr_funnel(
 
     mrpresso_status = None
     if use_mrpresso_data:
-        if mrpresso_results is None:
-            raise ValueError(
-                "Use_mrpresso_data is set to True but MRpresso results not found. Please run MRpresso first."
-            )
-        outlier_ids = _extract_mrpresso_outlier_ids(mrpresso_results)
+        outlier_ids = _mrpresso_outlier_ids(mrpresso_outliers)
         if outlier_ids:
             if "SNP" in df_mr.columns:
                 snp_ids = df_mr["SNP"].astype(str)
@@ -865,6 +866,8 @@ def mr_funnel(
         method_keys = list(methods)
     else:
         raise TypeError("methods must be None, a string, or a list/tuple of strings")
+    if method_keys:
+        method_keys = _wald_only_methods(method_keys, res)
 
     vlines = []
     seen_methods = set()
@@ -1020,7 +1023,7 @@ def mr_forest(
     figure_size_norm = _validate_figure_size(figure_size) or (10, 6)
 
     plot_data = []
-    for method in methods:
+    for method in _wald_only_methods(methods, res):
         if method not in MR_METHODS_NAMES.keys():
             warnings.warn(
                 f"{method} is not an appropriate MR method. MR methods can be IVW, WM, Egger... Please refer to the documentation for more."
@@ -1047,15 +1050,23 @@ def mr_forest(
             )
 
     plot_df = pd.DataFrame(plot_data)
+    if plot_df.empty:
+        raise ValueError(
+            "None of the requested methods are available in the MR results: nothing to plot."
+        )
+    # 95% CI critical values: same distribution as the p-value of each method (t for MR Egger and the mode methods)
+    from .MR_tools import ci_critical_value
+
+    crit = np.array([ci_critical_value(m, n) for m, n in zip(plot_df["Method"], plot_df["nSNP"])])
     if odds:
-        plot_df["CI_lower"] = np.exp(plot_df["Estimate"] - 1.96 * plot_df["SE"])
-        plot_df["CI_upper"] = np.exp(plot_df["Estimate"] + 1.96 * plot_df["SE"])
+        plot_df["CI_lower"] = np.exp(plot_df["Estimate"] - crit * plot_df["SE"])
+        plot_df["CI_upper"] = np.exp(plot_df["Estimate"] + crit * plot_df["SE"])
         plot_df["Estimate"] = np.exp(plot_df["Estimate"])
         x_label = f"Odds Ratio for {outcome_name} per unit increase in {exposure_name}"
         null_line = 1
     else:
-        plot_df["CI_lower"] = plot_df["Estimate"] - 1.96 * plot_df["SE"]
-        plot_df["CI_upper"] = plot_df["Estimate"] + 1.96 * plot_df["SE"]
+        plot_df["CI_lower"] = plot_df["Estimate"] - crit * plot_df["SE"]
+        plot_df["CI_upper"] = plot_df["Estimate"] + crit * plot_df["SE"]
         x_label = f"Effect on {outcome_name} per unit increase in {exposure_name}"
         null_line = 0
 

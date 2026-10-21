@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="genal_logo.png" height="80" alt="genal logo" />
+  <img src="https://raw.githubusercontent.com/CypRiv/genal/main/genal_logo.png" height="80" alt="genal logo" />
   <h1>genal</h1>
   <p><b>Polygenic risk scoring (PRS) and Mendelian randomization (MR) in Python</b></p>
 </div>
@@ -12,14 +12,14 @@
 
 **Quick links**
 - Documentation (tutorial + API): https://genal.readthedocs.io
-- Introduction/tutorial page: https://genal.readthedocs.io/en/latest/introduction.html
+- Tutorial: https://genal.readthedocs.io/en/latest/workflows.html
 - API reference: https://genal.readthedocs.io/en/latest/api.html
 - Paper (citation): https://doi.org/10.1093/bioadv/vbae207
 
 ## What can you do with genal?
 genal is built around one main object, `genal.Geno`, which wraps a pandas DataFrame of SNP-level data and provides end-to-end workflows:
 
-- **Preprocess messy GWAS summary statistics**: validate/standardize columns and alleles; fill missing `SNP`, `CHR`, `POS`, `NEA`, `SE`, `P` using reference data.
+- **Preprocess messy GWAS summary statistics**: validate/standardize columns and alleles; fill missing `SNP`, `CHR`, `POS`, `NEA` using reference data, and `SE`/`P` from the other columns.
 - **Select independent instruments**: LD clumping (PLINK2).
 - **Compute PRS**: weighted/unweighted scoring from PLINK genotype files, including optional **proxy SNP** support when variants are missing.
 - **Run two-sample MR**: multiple methods + sensitivity analyses (heterogeneity, pleiotropy), with plotting utilities.
@@ -31,7 +31,7 @@ genal is built around one main object, `genal.Geno`, which wraps a pandas DataFr
 <details>
 <summary>Flowchart (high-level pipeline)</summary>
 
-![Genal flowchart](Genal_flowchart.png)
+![Genal flowchart](https://raw.githubusercontent.com/CypRiv/genal/main/Genal_flowchart.png)
 
 </details>
 
@@ -81,7 +81,7 @@ Used by: `Geno.clump()`, proxy search in `Geno.prs()` / `Geno.query_outcome()`, 
 </details>
 <br>
 
-By default, reference files are stored under `~/.genal/`, and temporary PLINK outputs go to `./tmp_GENAL/` (you can remove it with `genal.delete_tmp()`).
+By default, reference files are stored under `~/.genal/Reference_files/`, and temporary PLINK outputs go to `./tmp_GENAL/` (you can remove it with `genal.delete_tmp()`).
 
 ## Quickstart (GWAS → instruments → PRS → MR)
 ```python
@@ -133,7 +133,7 @@ G_instruments.MR_plot(filename="mr_scatter", figure_size=(10, 6))
 - `G.phenotype`: stored after `G.set_phenotype(...)` (phenotype DataFrame + metadata)
 - `G.MR_data`: stored after `G.query_outcome(...)` (exposure/outcome association tables used by MR)
 - `G.MR_results`: stored after `G.MR(...)` (results table + harmonized SNP table; used by plotting)
-- `G.MRpresso_subset_data`: stored after `G.MRpresso(...)` (outlier-removed harmonized table)
+- `G.MRpresso_subset_data` / `G.MRpresso_outliers`: stored after `G.MRpresso(...)` (outlier-removed harmonized table / outlier SNP IDs)
 
 Most methods either:
 - return a **new `Geno`** object (e.g., `clump()`), or
@@ -144,7 +144,7 @@ Most methods either:
 - **Load/hold SNP-level data**: `genal.Geno(df, ...)` → main data is in `.data`
 - **Preprocess/standardize summary stats**: `Geno.preprocess_data(...)` (modifies `.data`)
 - **LD clumping (C+T instruments)**: `Geno.clump(...)` → returns a new `Geno`
-- **PRS on genotype files**: `Geno.prs(...)` → saves a CSV in the current directory
+- **PRS on genotype files**: `Geno.prs(...)` → saves a CSV in the current directory (`SCORE1_SUM` and `SCORE1_AVG` scores)
 - **Align rsIDs to a target genotype dataset**: `Geno.update_snpids(path=..., replace=...)`
 - **Extract genotype subset**: `Geno.extract_snps(path=...)` → writes extracted files under `tmp_GENAL/`
 - **Two-sample MR pipeline**: `Geno.query_outcome(...)` → `Geno.MR(...)` (+ `MR_plot`)
@@ -157,7 +157,7 @@ Most methods either:
 - **Gene-window filtering**: `Geno.filter_by_gene(...)` (filter variants around a gene; useful for protein/drug-target analyses)
 
 ## Tutorial 
-The full tutorial with richer narrative is in the docs: https://genal.readthedocs.io/en/latest/introduction.html
+The full tutorial with richer narrative is in the docs: https://genal.readthedocs.io/en/latest/workflows.html
 
 <details>
 <summary>Abbreviated tutorial </summary>
@@ -190,7 +190,7 @@ G.preprocess_data(preprocessing="Fill_delete", reference_panel="37")
 ```
 What preprocessing typically does (depending on options):
 - validates types, formats, and values of CHR/POS/EA/NEA/BETA/SE/P/EAF columns
-- detects OR vs beta columns (and log-transforms OR when needed)
+- detects OR vs beta columns and log-transforms OR when needed
 - fills missing columns (e.g., rsID from CHR/POS, SE from BETA+P, P from BETA+SE)
 - computes **FSTAT** (F-statistic) from BETA and SE when possible, with a fallback method when only P is present
 - handles duplicates and invalid rows under `"Fill_delete"`
@@ -246,8 +246,8 @@ G_clumped.prs(
 # writes prs_proxy.csv
 ```
 Notes:
-- If `CHR`/`POS` are present, `genal` prefers coordinate-based matching to find variants in your genotype data.
-- `prs()` writes a CSV file and does not return a DataFrame.
+- If `CHR`/`POS` are present, `genal` matches variants to your genotype data by position and alleles.
+- `prs()` writes a CSV file (with `SCORE1_SUM` and `SCORE1_AVG` scores) and does not return a DataFrame.
 
 ### 5) Two-sample MR
 Load an outcome GWAS into another `Geno`, preprocess it, then extract the exposure instruments from it.
@@ -321,6 +321,7 @@ mod_table, GlobalTest, OutlierTest, BiasTest = G_clumped.MRpresso(
     action=2,
     n_iterations=10000,
     cpus=-1,   # use all CPU cores
+    seed=42,   # optional: reproducible results
 )
 ```
 
@@ -329,7 +330,6 @@ To highlight MR-PRESSO outliers on plots, pass `use_mrpresso_data=True` (outlier
 ```python
 G_clumped.MR_plot(filename="mr_scatter_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
 G_clumped.MR_funnel(filename="mr_funnel_mrpresso", figure_size=(10, 6), use_mrpresso_data=True)
-G_clumped.MR_loo_plot(filename="loo_forest_mrpresso", figure_size=(10, 8), use_mrpresso_data=True)
 ```
 
 If you want to rerun MR methods after removing outliers with MR-PRESSO, you can use the `use_mrpresso_data=True` argument in `MR()`:
@@ -359,12 +359,15 @@ Visualize the results with a forest plot:
 ```python
 # Default: show top influential instruments
 G_clumped.MR_loo_plot(filename="loo_forest", figure_size=(10, 8))
+
+# Color MR-PRESSO outliers in red (requires running MRpresso() first)
+G_clumped.MR_loo_plot(filename="loo_forest_mrpresso", figure_size=(10, 8), use_mrpresso_data=True)
 ```
 
 Tips:
 - `MR_loo` accepts the same `action`, `use_mrpresso_data`, and method parameters as `MR`.
 - `MR_loo_plot` supports `top_influential=True` (default) for a compact figure showing the most influential SNPs, or `top_influential=False` for paginated output with all instruments.
-- `MR_loo_plot(..., use_mrpresso_data=True)` colors MR-PRESSO outliers in red (requires running `MRpresso()` first). When outliers exist, an extra summary row ("MR-PRESSO corrected") is added using the same MR method as the leave-one-out analysis.
+- `MR_loo_plot(..., use_mrpresso_data=True)` colors MR-PRESSO outliers in red (requires running `MRpresso()` first). When outliers exist and the leave-one-out analysis used all instruments, an extra summary row ("MR-PRESSO corrected") is added using the same MR method.
 - `MR_loo_plot(..., methods=["WM", "Egger"])` adds extra overall estimates for the requested methods (computed on all instruments).
 - Set `odds=True` in `MR_loo` if you want odds ratio scaling on the plot.
 
@@ -440,11 +443,11 @@ Each `ASSOC` entry is a list of dictionaries with fixed keys:
 Keep only variants within a window around a gene, using different gene identifier types:
 
 ```python
-# ±250kb around APOE (build 37 coordinates by default)
+# 250kb window centred on APOE: ±125kb around the gene (build 37 coordinates)
 apoe_region = G_clumped.filter_by_gene(
     gene="APOE",
     id_type="symbol",
-    window_size=250000, # 250kb
+    window_size=250000, # total window size in bp
     build="37",
     replace=False,
 )
@@ -473,7 +476,7 @@ coloc_res = G_trait_1.colocalize(
 coloc_res
 ```
 
-Tip: colocalization is usually performed on a **single region**, not genome-wide.
+Tip: colocalization is usually performed on a **single region**, not genome-wide. For quantitative traits, also give `sdY1`/`sdY2` (or an `EAF` column with `n1`/`n2`).
 
 ### Update allele frequencies (EAF)
 
@@ -503,7 +506,7 @@ G_std.standardize_betas(n_samples=500_000, replace=True)
 
 Two utilities that are useful when genotype variant IDs do not match rsIDs:
 
-- **Match/update SNP IDs** in your table based on CHR/POS in genotype files:
+- **Match/update SNP IDs** in your table based on CHR/POS and alleles in genotype files:
   ```python
   G.update_snpids(path="Pop_chr$", replace=True)
   ```
@@ -538,10 +541,10 @@ G.query_outcome("Trait.parquet", name="Trait", proxy=True, reference_panel="EUR_
 A: Run `genal.install_plink()` (downloads PLINK2) or `genal.set_plink("/path/to/plink2")`.
 
 **Q: `preprocess_data` can’t find rsIDs / too many SNPs are missing.**  
-A: This usually means a **build mismatch**. If your GWAS is GRCh38/hg38, use `reference_panel="38"` (or lift your data with `Geno.lift(start="hg38", end="hg19")` to match build 37). Also confirm your `CHR`/`POS` columns are numeric and in base-pair coordinates.
+A: This usually means a **build mismatch**. If your GWAS is GRCh38/hg38, use `reference_panel="38"` (or lift your data with `G.lift(start="hg38", end="hg19", replace=True)` to match build 37). Also confirm your `CHR`/`POS` columns hold chromosome codes and base-pair positions.
 
 **Q: PRS/MR uses far fewer SNPs than expected.**  
-A: Common causes are SNP-ID mismatches between summary stats and genotype/outcome datasets. If you have `CHR`/`POS`, genal prefers position-based matching; you can also try `Geno.update_snpids(path="target_chr$")` to align rsIDs to your target genotype files. For missing variants, enable `proxy=True` with an ancestry-matched LD reference panel.
+A: Usually an ID or build mismatch. PRS uses `CHR`/`POS` when available, so check that your data and genotype files are on the same build; MR (`query_outcome()`) matches on rsIDs, so make sure exposure and outcome use the same ones. For missing variants, enable `proxy=True` with an ancestry-matched LD reference panel.
 
 **Q: Clumping returns no SNPs.**  
 A: Check that your `P` column is valid and that `p1` isn’t too strict. Also ensure your SNP IDs exist in (or match) the LD reference panel used for clumping.
@@ -553,7 +556,7 @@ A: Ensure your GWAS effects are on the **log-odds** scale. If your GWAS reports 
 A: Control this with `action` in `MR`/`MRpresso`: `1` (no flipping), `2` (frequency-based flipping; default), `3` (drop all palindromes).
 
 **Q: GWAS Catalog queries fail or time out.**  
-A: This is expected for many SNPs (catalog coverage is incomplete and rate limits exist). Check `ASSOC_STATUS` and `ASSOC_ERROR` for the row-level outcome. Only canonical dbSNP rsIDs (`rs` + digits) are queried. Consider increasing `timeout` or limiting `max_associations`.
+A: This is expected for many SNPs (catalog coverage is incomplete and rate limits exist). Check `ASSOC_STATUS` and `ASSOC_ERROR` for the row-level outcome. Only canonical dbSNP rsIDs (`rs` + digits) are queried. Consider increasing `timeout` or querying fewer SNPs at once.
 
 **Q: `tmp_GENAL/` is large.**  
 A: genal writes temporary PLINK outputs there and does not automatically delete them (for debugging purposes). Delete the whole folder with `genal.delete_tmp()`.

@@ -5,15 +5,20 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 import pandas as pd
 import requests
 
-from .constants import REF_PANELS, REF_PANELS_URL, CONFIG_DIR, BUILDS, REF_PARQUET_URL
+from .constants import REF_PANELS, REF_PANELS_URL, CONFIG_DIR, BUILDS, REF_PARQUET_URL, CHR_CODES, REF_DATA_VERSION
 
 config_path = os.path.join(CONFIG_DIR, "config.json")
 default_ref_path = os.path.join(CONFIG_DIR, "Reference_files")
+PLINK_EXTENSIONS = (".bed", ".bim", ".fam", ".pgen", ".pvar", ".psam")
+SPLIT_CHROMOSOMES = range(1, 27)  # Chromosomes searched in paths split by chromosome ('$' placeholder)
+CHR_NAMES = {23: "X", 24: "Y", 25: "XY", 26: "MT"}  # Names also searched for chromosomes 23-26
+COMPLEMENT = {"A": "T", "T": "A", "C": "G", "G": "C"}  # Complementary bases (strand flips)
 
 
 def default_config():
@@ -39,10 +44,23 @@ def read_config():
     return config
 
 
+def reference_data_dir():
+    """Folder of the reference data downloaded from the genal bucket: the version subfolder (REF_DATA_VERSION) of the reference folder."""
+    return os.path.join(read_config()["paths"]["ref_path"], REF_DATA_VERSION)
+
+
 def write_config(config):
-    """Write data to config file"""
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=4)
+    """Write data to config file (atomically: concurrent readers see the previous or the new file, never a partial one)"""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=CONFIG_DIR, prefix=".config_", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(config, f, indent=4)
+        os.replace(tmp_path, config_path)
+    except BaseException:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
     return
 
 
@@ -68,11 +86,16 @@ def download_file(url, destination, description="file", chunk_size=8192, timeout
     print("Download complete.")
     return destination
 
+def strip_plink_extension(path):
+    """Remove a PLINK file extension (.bed, .bim, .fam, .pgen, .pvar, .psam) from a path, keeping any other dots."""
+    root, ext = os.path.splitext(path)
+    return root if ext in PLINK_EXTENSIONS else path
+
 def setup_genetic_path(path):
     """Configure the genetic data path based on user input and saved configuration."""
     config = read_config()
     if path is None:
-        if not "geno_path" in config["paths"]:
+        if not config["paths"].get("geno_path"):
             raise TypeError("No path has been saved in the config file. Please provide one.")
         path = config["paths"]["geno_path"]
         filetype = config["paths"].get("geno_filetype", "bed")  # Default to bed if not specified
@@ -85,7 +108,7 @@ def setup_genetic_path(path):
             "The path should contain at most 1 '$' sign. Use it to indicate the chromosome number if the data is split by chromosomes."
         )
     # Check if the path is valid
-    path = os.path.splitext(path)[0]  # Remove file extension
+    path = strip_plink_extension(path)  # Remove file extension
     if path.count("$") == 0:
         is_bed = check_bfiles(path)
         is_pgen = check_pfiles(path)
@@ -93,17 +116,46 @@ def setup_genetic_path(path):
             raise TypeError("The path does not lead to valid bed/bim/fam or pgen/pvar/psam files.")
         filetype = "bed" if is_bed else "pgen"
     else:
-        check_split_bed = [check_bfiles(path.replace("$", str(i))) for i in range(1, 23, 1)]
-        check_split_pgen = [check_pfiles(path.replace("$", str(i))) for i in range(1, 23, 1)]
+        check_split_bed = [split_chromosome_path(path, i, "bed") is not None for i in SPLIT_CHROMOSOMES]
+        check_split_pgen = [split_chromosome_path(path, i, "pgen") is not None for i in SPLIT_CHROMOSOMES]
         if not (any(check_split_bed) or any(check_split_pgen)):
             raise TypeError("The path does not lead to valid bed/bim/fam or pgen/pvar/psam files.")
         filetype = "bed" if any(check_split_bed) else "pgen"
 
-    # Save path and filetype to config.json file
-    config["paths"]["geno_path"] = path
-    config["paths"]["geno_filetype"] = filetype
-    write_config(config)
+    # Save path and filetype to config.json file (used when path=None)
+    if (config["paths"].get("geno_path"), config["paths"].get("geno_filetype")) != (path, filetype):
+        config["paths"]["geno_path"] = path
+        config["paths"]["geno_filetype"] = filetype
+        write_config(config)
+        print(f"Saved '{path}' as the default genotype path (used when path=None).")
     return path, filetype
+
+def split_chromosome_path(path, chrom, filetype):
+    """
+    Get the path of the genetic files of one chromosome, for genetic data split by chromosome.
+
+    The '$' sign of the path is replaced by the chromosome number and, for chromosomes 23, 24, 25 and 26,
+    also by their name (X, Y, XY and MT): for instance, "data_chr$" leads to "data_chr23" or "data_chrX".
+
+    Args:
+        path (str): Path with a '$' sign in place of the chromosome.
+        chrom (int): Chromosome number.
+        filetype (str): "bed" for bed/bim/fam files or "pgen" for pgen/pvar/psam files.
+
+    Returns:
+        str or None: Path of the genetic files of this chromosome (without extension), None if there are none.
+
+    Raises:
+        ValueError: If genetic files exist under both the number and the name of the chromosome.
+    """
+    check_files = check_bfiles if filetype == "bed" else check_pfiles
+    labels = [str(chrom)] + ([CHR_NAMES[chrom]] if chrom in CHR_NAMES else [])
+    found = [path.replace("$", label) for label in labels if check_files(path.replace("$", label))]
+    if len(found) > 1:
+        raise ValueError(
+            f"Genetic files of chromosome {chrom} exist under several names ({', '.join(found)}). Keep only one of them."
+        )
+    return found[0] if found else None
 
 def check_bfiles(filepath):
     """Check if the path specified leads to a bed/bim/fam triple."""
@@ -136,7 +188,7 @@ def create_tmp():
             )
         
 def delete_tmp():
-    """Delete the tmp folder."""
+    """Delete the tmp_GENAL folder of the current directory."""
     if os.path.isdir("tmp_GENAL"):
         def _onerror(func, path, exc_info):
             if isinstance(exc_info[1], FileNotFoundError):
@@ -204,19 +256,25 @@ def get_reference_panel_path(reference_panel="EUR_38"):
     Retrieve the path of the specified reference panel.
 
     This function checks if the provided reference panel is a valid path to bed/bim/fam or pgen/pvar/psam files.
-    If not, it checks if the reference panel exists in the reference folder. If it doesn't exist,
-    the function attempts to download it.
-    
+    If not, it checks if the reference panel exists in the reference folder (`<ref_path>/v2/<PANEL>/`, ref_path being
+    the reference folder of the configuration file, ~/.genal/Reference_files by default). If it doesn't exist,
+    the function downloads it.
+
     Args:
-        reference_panel (str): Reference panel identifier (e.g., "EUR_38", "AFR_37") 
-            or path to custom reference panel (bed/bim/fam or pgen/pvar/psam files)
-    
+        reference_panel (str): Reference panel identifier (e.g., "EUR_38", "AFR_37")
+            or path to custom reference panel (bed/bim/fam or pgen/pvar/psam files). Default is "EUR_38".
+
     Returns:
         tuple: (path to reference panel, filetype ['bed' or 'pgen'])
+
+    Raises:
+        ValueError: If reference_panel is neither a valid path nor a valid panel identifier, or is a path split by
+            chromosome ('$'), which must first be merged into one fileset.
+        RuntimeError: If the download or extraction of the reference panel fails.
     """
 
     # Remove file extension and check if it's a path to a bed/bim/fam or pgen/pvar/psam triple
-    reference_panel = os.path.splitext(reference_panel)[0]
+    reference_panel = strip_plink_extension(reference_panel)
     if check_bfiles(reference_panel):
         print(f"Using the provided path as the reference panel (bed format).")
         return reference_panel, "bed"
@@ -224,6 +282,13 @@ def get_reference_panel_path(reference_panel="EUR_38"):
         print(f"Using the provided path as the reference panel (pgen format).")
         return reference_panel, "pgen"
     else:
+        if "$" in reference_panel:
+            raise ValueError(
+                f"Reference panels split by chromosome ('$' in {reference_panel!r}) are not supported. Merge the chromosome "
+                "filesets into one with PLINK 2 (plink2 --pmerge-list <file listing the fileset prefixes> --make-pgen "
+                "--out <merged prefix>; add 'bfile' after the list file for bed/bim/fam filesets) and use the merged prefix."
+            )
+
         # Standardize panel name
         reference_panel = reference_panel.upper()
         
@@ -234,10 +299,8 @@ def get_reference_panel_path(reference_panel="EUR_38"):
                 "or a path to a valid reference panel in bed/bim/fam or pgen/pvar/psam format."
             )
         
-        # Get config and set paths
-        config = read_config()
-        ref_path = config["paths"]["ref_path"]
-        panel_dir = os.path.join(ref_path, reference_panel)
+        # Set paths
+        panel_dir = os.path.join(reference_data_dir(), reference_panel)
         panel_path = os.path.join(panel_dir, reference_panel)
         population, build = reference_panel.split("_")
         
@@ -291,24 +354,17 @@ def load_reference_panel(reference_panel="38"):
     """
     # Make sure it's a string
     reference_panel = str(reference_panel)
-    
+
     # Check if it's a path to a .bim or .pvar file
-    reference_panel = os.path.splitext(reference_panel)[0]
+    reference_panel = strip_plink_extension(reference_panel)
     if os.path.exists(reference_panel + ".bim"):
         print(f"Using the provided bim file as the reference dataset.")
-        reference_panel_df = pd.read_csv(
-            reference_panel + ".bim", sep="\t", names=["CHR","SNP","F","POS","A1","A2"]
-        )
-        reference_panel_df = check_reference_panel(reference_panel_df)
+        reference_panel_df = check_reference_panel(read_variant_file(reference_panel + ".bim"))
 
     elif os.path.exists(reference_panel + ".pvar"):
         print(f"Using the provided pvar file as the reference dataset.")
-        reference_panel_df = pd.read_csv(
-            reference_panel + ".pvar", sep="\t", comment="#",
-            names=["CHR","POS","SNP","A1","A2"]
-        )
-        reference_panel_df = check_reference_panel(reference_panel_df)
-        
+        reference_panel_df = check_reference_panel(read_variant_file(reference_panel + ".pvar"))
+
     # Else, check if it points to a standard 37 or 38 reference panel
     else:
         # Extract build number if population is provided
@@ -324,9 +380,7 @@ def load_reference_panel(reference_panel="38"):
                 )
         
         # Set up paths
-        config = read_config()
-        ref_path = config["paths"]["ref_path"]
-        variants_dir = os.path.join(ref_path, "reference_variants")
+        variants_dir = os.path.join(reference_data_dir(), "reference_variants")
         variants_file = os.path.join(variants_dir, f"reference_variants_{build}.parquet")
         
         # Download if not exists
@@ -357,34 +411,107 @@ def load_reference_panel(reference_panel="38"):
     
     return reference_panel_df
 
+def normalize_chr(chrom):
+    """
+    Convert chromosome codes to numbers: remove a 'chr' prefix and map X, Y, XY and MT (or M) to 23, 24, 25 and 26.
+
+    Args:
+        chrom (pd.Series): Chromosome codes (numbers or strings).
+
+    Returns:
+        pd.Series: Chromosome numbers (float), NaN for codes that are not chromosomes (e.g. unplaced contigs).
+    """
+    codes = pd.Series(pd.unique(chrom))
+    names = codes.astype(str).str.strip().str.replace(r"^chr", "", regex=True, case=False).str.upper()
+    numbers = pd.to_numeric(names.replace({code: str(number) for code, number in CHR_CODES.items()}), errors="coerce")
+    return chrom.map(pd.Series(numbers.to_numpy(), index=codes)).astype(float)
+
+def read_variant_file(path):
+    """
+    Read the variants of a .bim or .pvar file.
+
+    .pvar files: the '##' header lines are skipped and the columns are selected by name from the '#CHROM' header line
+    (QUAL, FILTER, INFO or CM columns are ignored), with A1 = REF and A2 = ALT. A .pvar file without '#CHROM' header line
+    is read in .bim column order, as PLINK does.
+    .bim files: whitespace-delimited columns CHR, SNP, CM (optional), POS, A1, A2.
+    Chromosome codes are converted to numbers (see :func:`normalize_chr`), variants on other contigs are removed
+    and missing variant IDs ('.') are set to NaN.
+
+    Args:
+        path (str): Path to the .bim or .pvar file.
+
+    Returns:
+        pd.DataFrame: Variants with the columns CHR, POS, SNP, A1, A2.
+    """
+    n_meta, first_line = 0, None
+    with open(path, "r") as f:
+        for line in f:
+            if line.startswith("##"):
+                n_meta += 1
+                continue
+            first_line = line
+            break
+    if first_line is None:
+        return pd.DataFrame(columns=["CHR", "POS", "SNP", "A1", "A2"])
+
+    if path.endswith(".pvar") and first_line.startswith("#CHROM"):
+        variants = pd.read_csv(
+            path, sep="\t", skiprows=n_meta, usecols=["#CHROM", "POS", "ID", "REF", "ALT"],
+            dtype={"#CHROM": "category", "ID": str, "REF": str, "ALT": str}, keep_default_na=False,
+        ).rename(columns={"#CHROM": "CHR", "ID": "SNP", "REF": "A1", "ALT": "A2"})
+    else:
+        n_columns = len(first_line.split())
+        if n_columns == 6:
+            names = ["CHR", "SNP", "CM", "POS", "A1", "A2"]
+        elif n_columns == 5:
+            names = ["CHR", "SNP", "POS", "A1", "A2"]
+        else:
+            raise ValueError(f"The variant file {path} should have 5 or 6 columns (.bim format) or a '#CHROM' header line (.pvar format).")
+        variants = pd.read_csv(
+            path, sep=r"\s+", header=None, names=names, skiprows=n_meta,
+            dtype={"CHR": "category", "SNP": str, "A1": str, "A2": str}, keep_default_na=False,
+        )
+
+    variants["CHR"] = normalize_chr(variants["CHR"])
+    variants["POS"] = pd.to_numeric(variants["POS"], errors="coerce")
+    invalid = variants["CHR"].isna() | variants["POS"].isna()
+    if invalid.any():
+        print(f"{invalid.sum()} variants of {path} without a valid chromosome (1-22, X, Y, XY, MT) or position are ignored.")
+        variants = variants[~invalid].reset_index(drop=True)
+    variants["CHR"] = variants["CHR"].astype(int)
+    variants["POS"] = variants["POS"].astype(int)
+    missing_id = variants["SNP"] == "."
+    if missing_id.any():
+        variants["SNP"] = variants["SNP"].mask(missing_id)
+    columns = ["CHR", "POS", "SNP", "A1", "A2"]
+    return variants if list(variants.columns) == columns else variants[columns]
+
 def check_reference_panel(df):
     """
     Check and standardize the reference panel DataFrame.
-    
+
     Args:
-        reference_panel_df (pd.DataFrame): Reference panel DataFrame with required columns 
+        df (pd.DataFrame): Reference panel DataFrame with required columns
             ["CHR", "POS", "SNP", "A1", "A2"]
-            
+
     Returns:
         pd.DataFrame: Processed reference panel with standardized columns
-        
+
     Raises:
         ValueError: If required columns are missing or if data types are invalid
     """
-    
+    df = df.copy()
+
     # Convert allele columns to uppercase strings
     for col in ["A1", "A2"]:
         df[col] = df[col].astype(str).str.upper()
-        
-    # Convert CHR to string and remove 'chr' prefix if present
-    if str(df["CHR"][0]).startswith("chr"):
-        df["CHR"] = df["CHR"].astype(str).str.replace("^chr", "", regex=True)
-    # Convert numeric values to int
-    try:
-        df["CHR"] = df["CHR"].astype(int)
-    except ValueError:
-        raise ValueError("Chromosome (CHR) column of the reference panel must contain integer values")
-    
+
+    # Convert chromosome codes to numbers ('chr' prefix removed, X/Y/XY/MT coded 23/24/25/26)
+    chrom = normalize_chr(df["CHR"])
+    if chrom.isna().any():
+        raise ValueError("Chromosome (CHR) column of the reference panel must contain chromosome numbers or X, Y, XY, MT codes")
+    df["CHR"] = chrom.astype(int)
+
     # Convert POS to integer
     try:
         df["POS"] = df["POS"].astype(int)
@@ -409,7 +536,15 @@ def is_plink2_installed(plink_path):
 
 
 def set_plink(path=""):
-    """Set the plink 2.0 path and verify that it is the correct version."""
+    """
+    Set the path to the plink 2.0 executable, verify that it is the correct version and save it in the configuration file.
+
+    Args:
+        path (str): Path to the plink2 executable, or to the folder containing it.
+
+    Raises:
+        TypeError: If no path is provided, or if the path does not lead to an executable plink 2.0.
+    """
     if not path:
         raise TypeError("You need to provide a path.")
 
@@ -418,7 +553,7 @@ def set_plink(path=""):
 
     try:
         process = subprocess.run(
-            [path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5, text=True
+            [path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60, text=True
         )
 
         if not os.access(path, os.X_OK):
@@ -441,7 +576,15 @@ def set_plink(path=""):
 
 
 def get_plink_path():
-    """Return the plink2 path if it exists in the config file."""
+    """
+    Return the path to the plink 2.0 executable saved in the configuration file.
+
+    Returns:
+        str: Path to the plink2 executable.
+
+    Raises:
+        ValueError: If no plink 2.0 path has been set (see :func:`set_plink` and :func:`install_plink`).
+    """
     config = read_config()
     if not config["paths"]["plink2_path"]:
         raise ValueError(
@@ -452,7 +595,17 @@ def get_plink_path():
 
 
 def install_plink(path=None):
-    """Install plink 2.0 for the current operating system."""
+    """
+    Download plink 2.0 for the current operating system and save its path in the configuration file.
+
+    Args:
+        path (str, optional): Folder where plink 2.0 is installed. Defaults to ~/.genal/plink2/.
+            If this folder already contains a working plink 2.0 executable, it is used without downloading.
+
+    Raises:
+        ValueError: If the operating system is not supported.
+        RuntimeError: If the download, the extraction or the installation fails.
+    """
     # Use default path if none provided
     if not path:
         path = os.path.join(CONFIG_DIR, "plink2")
@@ -599,21 +752,23 @@ def install_plink(path=None):
 def run_plink_command(command):
     """
     Execute a PLINK command with proper error handling.
-    
+
     Args:
-        command (str): The PLINK command to execute
-        ram_param_name (str): Name of the RAM parameter in the calling method
-        class_name (str): Name of the class containing the RAM parameter
-        
+        command (list or str): The PLINK command to execute. A list of arguments is run directly (no shell,
+            so paths may contain spaces); a string is run through the shell.
+
+    Returns:
+        subprocess.CompletedProcess: The completed PLINK process (with captured stdout and stderr).
+
     Raises:
-        RuntimeError: If PLINK command fails with detailed error message
+        RuntimeError: If the PLINK command fails because of insufficient memory.
+        ValueError: If the PLINK command fails for another reason (the PLINK output is printed, and the message
+            contains the PLINK error).
     """
     try:
-        output = subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
-        if output.returncode != 0:
-            raise subprocess.CalledProcessError(output.returncode, command, output.stdout, output.stderr)
+        return subprocess.run(command, shell=isinstance(command, str), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        if "Out of memory" in e.stderr:
+        if "Out of memory" in f"{e.stderr}{e.stdout}":
             raise RuntimeError(
                 f"PLINK command failed due to insufficient memory.\n"
                 f"Try increasing the RAM allocation. Example:\n"
@@ -624,4 +779,21 @@ def run_plink_command(command):
             print(f"Error running PLINK command: {e}")
             print(f"PLINK stdout: {e.stdout}")
             print(f"PLINK stderr: {e.stderr}")
-            raise ValueError("PLINK command failed. Check the error messages above for details.")
+            raise ValueError(plink_error_message(e.stderr))
+
+
+def plink_error_message(stderr):
+    """
+    Message of a failed PLINK command: the PLINK error (from its 'Error' line to the end of stderr, line breaks removed),
+    with a hint when the covariates are collinear (VIF_TOO_HIGH or CORR_TOO_HIGH).
+    """
+    lines = [line.strip() for line in (stderr or "").splitlines() if line.strip()]
+    start = next((i for i, line in enumerate(lines) if line.startswith("Error")), None)
+    error = " ".join(lines[start:] if start is not None else lines[-3:])
+    message = f"PLINK command failed: {error}" if error else "PLINK command failed (see the PLINK output printed above)."
+    if "VIF_TOO_HIGH" in error or "CORR_TOO_HIGH" in error:
+        message += (
+            " The covariates are collinear (rescaling does not help): center continuous covariates before squaring them "
+            "or forming interactions, and remove redundant covariates."
+        )
+    return message

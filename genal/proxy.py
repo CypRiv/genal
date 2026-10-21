@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
 import os
-import subprocess
 import re
 import uuid
 
 from .tools import get_reference_panel_path, get_plink_path, load_reference_panel, run_plink_command
+from .geno_tools import missing_snp_ids
 
 ## TO DO: accept lists of CHR/POS instead of SNP names for these functions
 
@@ -17,6 +17,48 @@ _COORD_TOKEN_RE = re.compile(
 _CHR_ALIASES = {"X": 23, "Y": 24, "XY": 25, "MT": 26, "M": 26}
 
 
+def numeric_effect_columns(df):
+    """Return a copy of df with the BETA, SE and EAF columns (when present) converted to numbers; values that cannot be converted become NaN."""
+    df = df.copy()
+    for col in ["BETA", "SE", "EAF"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
+def _drop_palindromic_proxies(ld):
+    """Remove candidate proxies with palindromic alleles (A/T or C/G): their strand cannot be resolved from the alleles."""
+    pair = ld["MAJ_B"].astype(str).str.upper() + ld["NONMAJ_B"].astype(str).str.upper()
+    palindromic = pair.isin(["AT", "TA", "CG", "GC"])
+    if palindromic.any():
+        print(f"Excluded {int(palindromic.sum())} palindromic (A/T or C/G) candidate proxies.")
+    return ld[~palindromic]
+
+
+def _drop_missing_proxy_ids(ld):
+    """Remove the LD pairs whose target (SNP_A) or proxy (SNP_B) has a missing ID (NaN or placeholder such as '.')."""
+    missing = missing_snp_ids(ld["SNP_A"]) | missing_snp_ids(ld["SNP_B"])
+    if missing.any():
+        print(f"Excluded {int(missing.sum())} candidate proxy pairs with a missing SNP ID.")
+    return ld[~missing]
+
+
+def _best_proxies(candidates):
+    """
+    Assign proxies to target SNPs (SNP_A) greedily by decreasing |R|: each target gets its best available candidate and a
+    proxy serves at most one target (a target whose best proxy is taken by a target in higher LD falls back to its next best).
+    """
+    order = candidates["R"].abs().sort_values(ascending=False, kind="mergesort").index
+    used_targets, used_proxies, keep = set(), set(), []
+    for idx, target, proxy in zip(order, candidates.loc[order, "SNP_A"], candidates.loc[order, "SNP_B"]):
+        if target in used_targets or proxy in used_proxies:
+            continue
+        used_targets.add(target)
+        used_proxies.add(proxy)
+        keep.append(idx)
+    return candidates.loc[keep]
+
+
 def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     """
     Extract the best proxies from a dataframe, as well as specific SNPs.
@@ -25,6 +67,15 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
     (output from `find_proxies`), this function extracts the best proxies from `df` as well as
     the SNPs specified in `snps_to_extract`.
     This is suited for querying outcome data.
+
+    Candidate proxies must be present in `df`, differ from their target SNP, not be part of
+    `snps_to_extract` (those SNPs are used as themselves), have non-missing IDs, be non-palindromic, have alleles
+    in `df` matching the reference panel alleles, and have valid BETA/SE values (finite, SE > 0). Proxies are then
+    assigned greedily by decreasing |r|: each target gets its best remaining candidate and a proxy serves at most
+    one target. The proxy association is reported for the target SNP, with the target's
+    minor allele in the reference panel as effect allele. If `df` has an EAF column, the EAF of the proxied
+    SNP is the reference panel frequency of this effect allele (the target's own frequency, used by the
+    palindrome checks of the harmonization).
 
     Args:
         df (pd.DataFrame): Dataframe of SNP information with the usual Geno columns
@@ -35,75 +86,77 @@ def query_outcome_proxy(df, ld, snps_to_extract, snps_df=[]):
                                   SNPs in df. Can be provided to avoid recomputing it. Defaults to an empty list.
 
     Returns:
-        pd.DataFrame: Dataframe with queried SNPs and their proxies.
+        pd.DataFrame: Dataframe with queried SNPs and their proxies (the "proxy" column indicates proxied SNPs).
     """
     # If ld is None
     if not isinstance(ld, pd.DataFrame):
         raise ValueError("ld is None (The SNPs to be proxied were not found in the reference panel)")
+    df = numeric_effect_columns(df)
 
     # If snps_df is empty, populate it with SNPs from df
-    if not snps_df:
+    if len(snps_df) == 0:
         snps_df = df.SNP.values
 
-    # Filter proxies that are present in df
-    ld = ld[ld.SNP_B.isin(snps_df)]
+    # Candidate proxies: present in df, different from the target and not extracted as themselves
+    ld = ld[
+        ld["SNP_B"].isin(snps_df)
+        & (ld["SNP_A"] != ld["SNP_B"])
+        & ~ld["SNP_B"].isin(snps_to_extract)
+    ]
+    ld = _drop_palindromic_proxies(_drop_missing_proxy_ids(ld))
 
-    # Remove original SNPs
-    ld = ld[ld["SNP_A"] != ld["SNP_B"]]
-
-    # Sort by r and select the best proxy for each SNP
-    ld = ld.reindex(ld["R"].abs().sort_values(ascending=False).index)
-    ld = ld.groupby("SNP_A").first().reset_index(drop=False)
-
-    # Determine SNPs to query
-    snps_to_query = set(snps_to_extract) | set(ld.SNP_B.values)
-    df_queried = df[df.SNP.isin(snps_to_query)]
-
-    # Merge dataframes and identify proxies
-    output = df_queried.merge(ld, how="left", left_on="SNP", right_on="SNP_B")
-    output["proxy"] = output["SNP_B"].notnull()
+    # Pair each candidate with its association in df and keep the allele-compatible pairs
+    # (alleles in df equal to the reference panel alleles of the proxy, in either order)
+    candidates = df.merge(ld, how="inner", left_on="SNP", right_on="SNP_B")
+    ea = candidates["EA"].astype(str).str.upper()
+    nea = candidates["NEA"].astype(str).str.upper()
+    compatible = ((ea == candidates["NONMAJ_B"]) & (nea == candidates["MAJ_B"])) | (
+        (ea == candidates["MAJ_B"]) & (nea == candidates["NONMAJ_B"])
+    )
+    if (~compatible).any():
+        print(
+            f"Excluded {int((~compatible).sum())} candidate proxies whose alleles do not match the reference panel alleles."
+        )
+    # Candidates with a missing or invalid association (non-finite BETA/SE or SE <= 0) cannot be used
+    beta = pd.to_numeric(candidates["BETA"], errors="coerce")
+    se = pd.to_numeric(candidates["SE"], errors="coerce")
+    valid_effect = np.isfinite(beta) & np.isfinite(se) & (se > 0)
+    if (compatible & ~valid_effect).any():
+        print(
+            f"Excluded {int((compatible & ~valid_effect).sum())} candidate proxies with missing or invalid BETA/SE values in the outcome data."
+        )
+    proxies = _best_proxies(candidates[compatible & valid_effect]).copy()
 
     # In the plink output, the alleles taken as reference for proxying are "MAJ_A" and "MAJ_B" (major alleles in the reference panel)
-    # We want to use as effect allele for the original SNP its minor allele in the reference panel
-    # So, we flip BETA if the proxied SNP's effect allele is the major allele in the reference panel
-    conditions = [
-        output["EA"] == output["MAJ_B"],
-        output["EA"] == output["NONMAJ_B"],
-        ~output["proxy"],
-        True,
-    ]
-    choices = [
-        -output["BETA"],  # if EA == MAJ_B, flip the sign of BETA 
-        output["BETA"],  # if EA == NONMAJ_B, BETA does not change
-        output["BETA"],  # if SNP_B is NaN (The original SNP was not proxied), BETA does not change
-        np.nan,  # if the original SNP was proxied but "EA" is neither "MAJ_A" nor "NONMAJ_A", BETA is NaN
-    ]
-    output["BETA"] = np.select(conditions, choices)
+    # We want to use as effect allele for the original SNP its minor allele in the reference panel (NONMAJ_A)
+    # So, we flip BETA if the proxy's effect allele is the major allele in the reference panel (BETA of NONMAJ_B)...
+    ea_is_maj = proxies["EA"].astype(str).str.upper() == proxies["MAJ_B"]
+    beta_nonmaj_b = np.where(ea_is_maj, -proxies["BETA"], proxies["BETA"])
+    # ...and flip it again if R is negative: NONMAJ_A is then in phase with MAJ_B
+    negative_r = np.sign(proxies["R"]) == -1
+    proxies["BETA"] = np.where(negative_r, -beta_nonmaj_b, beta_nonmaj_b)
 
-    # Flip BETA if the sign of R is negative: indicates that the positive correlation corresponds to MAJ_A with NONMAJ_B
-    sign_r = np.sign(output["R"]) # Sign of R
-    output["BETA"] = np.where(sign_r == -1, -output["BETA"], output["BETA"])
-
-    # Delete SNPs with mismatched alleles
-    nrow = output.shape[0]
-    output = output.dropna(subset=["BETA"])
-    if output.shape[0] < nrow:
-        print(
-            f"Deleted {nrow-output.shape[0]} base SNPs that did not have matching alleles in reference data."
-        )
-    print(f"Found proxies for {output['proxy'].sum()} SNPs.")
+    # EAF of the proxied SNP: reference panel frequency of its effect allele NONMAJ_A
+    if "EAF" in proxies.columns:
+        proxies["EAF"] = proxies["NONMAJ_FREQ_A"]
 
     # Replace the proxied SNPs with the position and alleles of the original SNPs
-    output["SNP"] = np.where(output["proxy"], output["SNP_A"], output["SNP"])
-    output["POS"] = np.where(output["proxy"], output["BP_A"], output["POS"])
-    output["CHR"] = np.where(output["proxy"], output["CHR_A"], output["CHR"])
-    output["EA"] = np.where(output["proxy"], output["NONMAJ_A"], output["EA"])
-    output["NEA"] = np.where(output["proxy"], output["MAJ_A"], output["NEA"])
-    if "EAF" in output.columns:
-        output["EAF"] = np.where(output["proxy"], output["NONMAJ_FREQ_A"], output["EAF"])
+    proxies["SNP"] = proxies["SNP_A"]
+    proxies["EA"] = proxies["NONMAJ_A"]
+    proxies["NEA"] = proxies["MAJ_A"]
+    if "POS" in proxies.columns:
+        proxies["POS"] = proxies["BP_A"]
+    if "CHR" in proxies.columns:
+        proxies["CHR"] = proxies["CHR_A"]
+    print(f"Found proxies for {len(proxies)} SNPs.")
 
-    # Drop columns related to ld
-    output = output.drop(columns=ld.columns)
+    output = pd.concat(
+        [
+            df[df.SNP.isin(snps_to_extract)].assign(proxy=False),
+            proxies[df.columns].assign(proxy=True),
+        ],
+        ignore_index=True,
+    )
 
     return output
 
@@ -113,6 +166,11 @@ def apply_proxies(df, ld, searchspace=None):
     Given a dataframe (coming from GENO.data attribute) and a dataframe of proxies
     (output from find_proxies), replace the SNPs in df with their best proxies, if they exist.
     This function is suited for exposure data (before running a PRS for instance).
+
+    Candidate proxies must differ from their target SNP, not already be a SNP of df, have non-missing IDs and be
+    non-palindromic. The target SNP alleles in df (EA, and NEA if present) must match the reference panel alleles; SNPs
+    with candidate proxies but mismatching alleles are deleted. Proxies are assigned greedily by decreasing |r|: each
+    target gets its best remaining candidate and a proxy serves at most one target.
 
     Args:
         df (DataFrame): Dataframe of SNP information with the usual GENO columns (SNP, BETA, SE, EAF, EA, NEA). EAF is not necessary.
@@ -131,51 +189,47 @@ def apply_proxies(df, ld, searchspace=None):
     for col in mandatory_cols:
         if col not in df.columns:
             raise ValueError(f"The column {col} is not found in the data!")
+    df = numeric_effect_columns(df)
     
     # Filter by searchspace if provided
     if searchspace:
         print("Filtering the potential proxies with the searchspace provided.")
         ld = ld[ld.SNP_B.isin(searchspace)]
 
-    # Remove original SNPs and sort by r
-    ld = ld[ld["SNP_A"] != ld["SNP_B"]]
-    ld = ld.reindex(ld["R"].abs().sort_values(ascending=False).index)
+    # Candidate proxies: different from the target and not already in df (those SNPs are used as themselves)
+    ld = ld[(ld["SNP_A"] != ld["SNP_B"]) & ~ld["SNP_B"].isin(df["SNP"])]
+    ld = _drop_palindromic_proxies(_drop_missing_proxy_ids(ld))
 
-    # Select the best proxy for each SNP
-    ld = ld.groupby("SNP_A").first().reset_index(drop=False)
+    # Keep the candidates of target SNPs whose alleles match the reference panel alleles of the target
+    targets = df[["SNP", "EA"] + (["NEA"] if "NEA" in df.columns else [])].drop_duplicates(subset="SNP")
+    candidates = targets.merge(ld, how="inner", left_on="SNP", right_on="SNP_A")
+    ea = candidates["EA"].astype(str).str.upper()
+    compatible = (ea == candidates["MAJ_A"]) | (ea == candidates["NONMAJ_A"])
+    if "NEA" in candidates.columns:
+        nea = candidates["NEA"].astype(str).str.upper()
+        compatible &= ((ea == candidates["MAJ_A"]) & (nea == candidates["NONMAJ_A"])) | (
+            (ea == candidates["NONMAJ_A"]) & (nea == candidates["MAJ_A"])
+        )
+    mismatched = set(candidates.loc[~compatible, "SNP_A"]) - set(candidates.loc[compatible, "SNP_A"])
+    ld = _best_proxies(candidates.loc[compatible, ld.columns])
 
     # Merge the dataframes
-    output = df.merge(ld, how="left", left_on="SNP", right_on="SNP_A")
+    output = df[~df["SNP"].isin(mismatched)].merge(ld, how="left", left_on="SNP", right_on="SNP_A")
     output["proxy"] = pd.notnull(output["SNP_B"])
+    if mismatched:
+        print(
+            f"Deleted {len(mismatched)} base SNPs that did not have matching alleles in reference data."
+        )
 
     # In the plink output, the alleles taken as reference for proxying are "MAJ_A" and "MAJ_B" (major alleles in the reference panel)
     # We want to use as effect allele for the proxy SNP its minor allele in the reference panel
     # So, we flip BETA if the original SNP's effect allele is the major allele in the reference panel
-    conditions = [
-        output["EA"] == output["MAJ_A"],
-        output["EA"] == output["NONMAJ_A"],
-        ~output["proxy"],
-        True,
-    ]
-    choices = [
-        -output["BETA"],  # if EA == MAJ_A, flip the sign of BETA 
-        output["BETA"],  # if EA == NONMAJ_A, BETA does not change
-        output["BETA"],  # if SNP_B is NaN (The original SNP was not proxied), BETA does not change
-        np.nan,  # if the original SNP was proxied but "EA" is neither "MAJ_A" nor "NONMAJ_A", BETA is NaN
-    ]
-    output["BETA"] = np.select(conditions, choices)
+    ea_is_maj = output["proxy"] & (output["EA"].astype(str).str.upper() == output["MAJ_A"])
+    output["BETA"] = np.where(ea_is_maj, -output["BETA"], output["BETA"])
 
     # Flip BETA if the sign of R is negative: indicates that the positive correlation corresponds to MAJ_A with NONMAJ_B
     sign_r = np.sign(output["R"]) # Sign of R
     output["BETA"] = np.where(sign_r == -1, -output["BETA"], output["BETA"])
-
-    # Delete SNPs with mismatched alleles
-    nrow = output.shape[0]
-    output = output.dropna(subset=["BETA"])
-    if output.shape[0] < nrow:
-        print(
-            f"Deleted {nrow-output.shape[0]} base SNPs that did not have matching alleles in reference data."
-        )
     print(f"Found proxies for {output['proxy'].sum()} SNPs.")
 
     # Replace the original SNPs with their proxy (if proxied)
@@ -195,6 +249,21 @@ def apply_proxies(df, ld, searchspace=None):
     output.drop(columns=ld.columns, inplace=True)
 
     return output
+
+
+def _match_reference_ids(coord, ref, keys):
+    """
+    Map coordinate tokens to reference panel IDs on the columns `keys` (CHR/POS, optionally with the allele pair).
+    Tokens matching several reference variants (different IDs) are left unresolved, so the result does not depend on
+    the order of the reference panel. Returns the tokens with a SNP column (NaN if unresolved) and the set of the
+    _order values of the ambiguous tokens.
+    """
+    ref = ref[keys + ["SNP"]].drop_duplicates()
+    n_matches = ref.groupby(keys).size().rename("n_matches").reset_index()
+    unique_ref = ref.merge(n_matches[n_matches["n_matches"] == 1][keys], on=keys)
+    mapped = coord.merge(unique_ref, on=keys, how="left")
+    ambiguous = coord.merge(n_matches[n_matches["n_matches"] > 1][keys], on=keys)["_order"]
+    return mapped, set(ambiguous)
 
 
 def _normalize_chr_token(chr_token):
@@ -255,7 +324,8 @@ def find_proxies(
         snp_list (list): List of variant identifiers. Can be rsids (e.g. "rs123") or
             coordinate tokens like "1:12345", "chr1:12345", optionally with alleles
             ("1:12345:A:G"). Coordinate tokens are resolved to the reference panel ID
-            namespace using CHR/POS (and alleles when provided).
+            namespace using CHR/POS (and alleles when provided). A token matching several reference
+            variants (e.g. a multi-allelic position given without alleles) is not resolved.
         searchspace (list, optional): List of SNPs to include in the search. By default, includes the whole reference panel.
         reference_panel (str, optional): The reference population to get linkage disequilibrium values and find proxies.
             Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
@@ -299,6 +369,7 @@ def find_proxies(
         coord_df = pd.DataFrame(coord_records)
 
         mapped_frames = []
+        ambiguous_orders = set()
         needs_alleles = coord_df["allele_min"].notna().any()
         needs_pos = coord_df["allele_min"].isna().any()
         if needs_alleles:
@@ -312,29 +383,33 @@ def find_proxies(
                     "allele_max": np.maximum(a1, a2),
                     "SNP": ref_df["SNP"],
                 }
-            ).drop_duplicates(["CHR", "POS", "allele_min", "allele_max"], keep="first")
+            )
 
             coord_with = coord_df[coord_df["allele_min"].notna()]
             if not coord_with.empty:
-                mapped_frames.append(
-                    coord_with.merge(
-                        ref_allele, on=["CHR", "POS", "allele_min", "allele_max"], how="left"
-                    )
-                )
+                mapped, ambiguous = _match_reference_ids(coord_with, ref_allele, ["CHR", "POS", "allele_min", "allele_max"])
+                mapped_frames.append(mapped)
+                ambiguous_orders |= ambiguous
             coord_without = coord_df[coord_df["allele_min"].isna()]
         else:
             coord_without = coord_df
 
         if needs_pos and not coord_without.empty:
-            ref_pos = ref_df[["CHR", "POS", "SNP"]].drop_duplicates(["CHR", "POS"], keep="first")
-            mapped_frames.append(coord_without.merge(ref_pos, on=["CHR", "POS"], how="left"))
+            mapped, ambiguous = _match_reference_ids(coord_without, ref_df, ["CHR", "POS"])
+            mapped_frames.append(mapped)
+            ambiguous_orders |= ambiguous
 
         mapped_all = (
             pd.concat(mapped_frames, ignore_index=True)
             .sort_values("_order", kind="mergesort")
             .reset_index(drop=True)
         )
-        n_dropped = int(mapped_all["SNP"].isna().sum())
+        if ambiguous_orders:
+            print(
+                f"{len(ambiguous_orders)} coordinate-based variants match several reference panel variants and were not resolved: "
+                "give them as CHR:POS:A1:A2 or as rsIDs."
+            )
+        n_dropped = int(mapped_all["SNP"].isna().sum()) - len(ambiguous_orders)
         if n_dropped > 0:
             print(
                 f"Dropped {n_dropped} coordinate-based variants not found in the reference panel."
@@ -356,7 +431,7 @@ def find_proxies(
 
     # Check if searchspace is provided
     if searchspace is None:
-        extract_arg = ""
+        extract_arg = []
     else:
         print("Searching proxies in the provided searchspace.")
         with open(f"tmp_GENAL/{name}_searchspace.txt", "w") as file:
@@ -364,7 +439,7 @@ def find_proxies(
                 file.write(str(s) + "\n")
             for s in targets_for_plink:
                 file.write(str(s) + "\n")
-        extract_arg = f"--extract tmp_GENAL/{name}_searchspace.txt"
+        extract_arg = ["--extract", os.path.join("tmp_GENAL", f"{name}_searchspace.txt")]
 
     # Save targets to a file
     np.savetxt(
@@ -374,25 +449,20 @@ def find_proxies(
         delimiter=" ",
     )
 
-    # Construct base command based on filetype
-    base_cmd = f"{get_plink_path()}"
-    if filetype == "bed":
-        base_cmd += f" --bfile {ref_path}"
-    else:  # pgen
-        base_cmd += f" --pfile {ref_path}"
+    # Construct and execute the plink2 command (input flag based on filetype)
+    command = [
+        get_plink_path(),
+        "--bfile" if filetype == "bed" else "--pfile", ref_path,
+        *extract_arg,
+        "--r-unphased", "cols=chrom,pos,id,maj,nonmaj,freq",
+        "--ld-snp-list", os.path.join("tmp_GENAL", f"{name}_snps_to_proxy.txt"),
+        "--ld-window-kb", str(kb),
+        "--ld-window-r2", str(r2),
+        "--ld-window", str(window_snps),
+        "--threads", str(threads),
+        "--out", os.path.join("tmp_GENAL", f"{name}_proxy.targets"),
+    ]
 
-    # Construct and execute the plink2 command
-    command = (
-        f"{base_cmd} {extract_arg} "
-        f"--r-unphased 'cols=chrom,pos,id,maj,nonmaj,freq' "
-        f"--ld-snp-list tmp_GENAL/{name}_snps_to_proxy.txt "
-        f"--ld-window-kb {kb} "
-        f"--ld-window-r2 {r2} "
-        f"--ld-window {window_snps} "
-        f"--threads {threads} "
-        f"--out tmp_GENAL/{name}_proxy.targets"
-    )
-    
     run_plink_command(command)
 
     # Read log file to return amount of SNPs to be proxied present in the ref panel

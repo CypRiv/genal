@@ -24,10 +24,11 @@ def clump_data_plink2(
             Acceptable populations are "EUR", "SAS", "AFR", "EAS", "AMR" and available builds are 37 and 38 ("EUR_38" or "AFR_37" etc...)
             Also accepts or a path to a specific bed/bim/fam or pgen/pvar/psam panel.
             Default is "EUR_37".
-        kb (int, optional): Clumping window in terms of thousands of SNPs. Default is 10000.
-        r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. Default is 0.01.
-        p1 (float, optional): P-value threshold during clumping. SNPs above this value are not considered. Default is 5e-8.
-        p2 (float, optional): P-value threshold post-clumping to further filter the clumped SNPs. If p2 < p1, it won't be considered. Default is 0.01.
+        kb (int, optional): Clumping window in kilobases (kb): SNPs less than kb kilobases away from an index SNP can be clumped with it. Default is 10000.
+        r2 (float, optional): Linkage disequilibrium threshold, values between 0 and 1. SNPs with an r2 above this value with an index SNP are clumped with it. Default is 0.01.
+        p1 (float, optional): P-value threshold for index SNPs. SNPs with a P-value above this value can't be index SNPs. Default is 5e-8.
+        p2 (float, optional): Secondary P-value threshold of PLINK (--clump-p2): the clumped SNPs with a P-value below it are listed in the SP2 column of the PLINK report.
+            It does not change the index SNPs, which are the SNPs returned. Default is 0.01.
         name (str, optional): Name used for the files created in the tmp_GENAL folder.
         ram (int, optional): Amount of RAM in MB to be used by plink.
 
@@ -49,15 +50,11 @@ def clump_data_plink2(
     # Construct and execute the plink clumping command
     output_path = os.path.join("tmp_GENAL", name)
     
-    # Base command differs based on filetype
-    base_cmd = f"{get_plink_path()} --memory {ram}"
-    if filetype == "bed":
-        base_cmd += f" --bfile {ref_path}"
-    else:  # pgen
-        base_cmd += f" --pfile {ref_path}"
-        
-    plink_command = f"{base_cmd} --rm-dup force-first --clump {to_clump_filename} --clump-kb {kb} \
-                     --clump-r2 {r2} --clump-p1 {p1} --clump-p2 {p2} --out {output_path}"
+    plink_command = [
+        get_plink_path(), "--memory", str(ram), "--bfile" if filetype == "bed" else "--pfile", ref_path,
+        "--rm-dup", "force-first", "--clump", to_clump_filename, "--clump-kb", str(kb),
+        "--clump-r2", str(r2), "--clump-p1", str(p1), "--clump-p2", str(p2), "--out", output_path,
+    ]
     
     run_plink_command(plink_command)
     
@@ -66,7 +63,7 @@ def clump_data_plink2(
     match = re.search(r"(\d+)\s+top\s+variant\s+ID", log_content)
     if match:
         missing_variants = int(match.group(1))
-        print(f"Warning: {missing_variants} top variant IDs missing")
+        print(f"Warning: {missing_variants} SNPs with a P-value below p1 are absent from the reference panel and are excluded from the clumped data.")
 
     if "No significant --clump results." in log_content:
         print("No SNPs remaining after clumping.")
@@ -80,7 +77,7 @@ def clump_data_plink2(
     clumped_filename = os.path.join("tmp_GENAL", f"{name}.clumps")
     if not os.path.exists(clumped_filename):
         raise FileNotFoundError(f"'{clumped_filename}' is missing.")
-    plink_clumped = pd.read_csv(clumped_filename, sep="\s+", usecols=["ID"])
+    plink_clumped = pd.read_csv(clumped_filename, sep=r"\s+", usecols=["ID"])
     clumped_data = data[data["SNP"].isin(plink_clumped["ID"])]
     clumped_data.reset_index(drop=True, inplace=True)
     return clumped_data

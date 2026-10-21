@@ -35,6 +35,9 @@ extensions = [
 
 autosummary_generate = True
 
+# Class pages show the class docstring followed by the __init__ docstring (constructor arguments)
+autoclass_content = "both"
+
 source_suffix = {
     ".rst": "restructuredtext",
     ".md": "markdown",

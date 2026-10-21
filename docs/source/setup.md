@@ -30,8 +30,9 @@ genal.set_plink("/path/to/plink2")  # or "/path/to/folder/containing/plink2"
 
 On first import, `genal` creates a configuration folder under:
 
-- `~/.genal/` (see {py:data}`genal.constants.CONFIG_DIR`)
-- `~/.genal/config.json` stores paths (PLINK 2, liftover, default genotype path, reference data folder)
+- `~/.genal/` (see `genal.constants.CONFIG_DIR`)
+- `~/.genal/config.json` stores paths (PLINK 2 executable, default genotype path and file type, reference data folder)
+- `~/.genal/Reference_files/` is the default reference folder, where reference data is downloaded on first use (layout below).
 
 Temporary PLINK outputs are written to:
 
@@ -48,9 +49,16 @@ from genal.tools import set_reference_folder
 set_reference_folder("/path/to/genal_reference_data")
 ```
 
+Downloaded reference data is stored in the `v2/` subfolder of this folder, and chain files in its `chain_files/` subfolder:
+
+- `v2/EUR_37/EUR_37.pgen` (`.pvar`, `.psam`): built-in LD reference panels (one folder per panel)
+- `v2/reference_variants/reference_variants_37.parquet` (and `_38`): build-only reference variants used by `preprocess_data`
+- `v2/gene_id_mapping_filtered.parquet`: gene table used by `filter_by_gene`
+- `chain_files/hg19ToHg38.over.chain`: chain files used by `lift`
+
 ### Saving a default genotype path
 
-Most methods that take a genotype `path=...` (PRS, extraction, association testing) save that path in `~/.genal/config.json` so you can omit it next time by passing `path=None`.
+Most methods that take a genotype `path=...` (PRS, extraction, association testing) save that path in `~/.genal/config.json` so you can omit it next time by passing `path=None` (a message is printed when the saved path changes).
 
 ## Reference data (two different concepts)
 
@@ -78,6 +86,6 @@ Used by: {py:meth}`genal.Geno.clump`, proxy search in {py:meth}`genal.Geno.prs` 
 You can run fully offline once you have:
 
 - a configured `plink2` path, and
-- downloaded (or custom) reference panels already present locally.
+- downloaded (or custom) reference data already present locally (see the folder layout above).
 
-Features that may require internet on first use include: `install_plink()`, built-in reference panel downloads, chain file downloads for liftover, gene mapping downloads for `filter_by_gene`, and GWAS Catalog queries.
+Features that may require internet on first use include: `install_plink()`, built-in reference panel and reference variant downloads (`preprocess_data` with `"37"`/`"38"`), chain file downloads for liftover, gene mapping downloads for `filter_by_gene`, and GWAS Catalog queries.

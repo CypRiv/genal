@@ -1,13 +1,17 @@
 import os
 
 STANDARD_COLUMNS = ["CHR", "POS", "SNP", "EA", "NEA", "BETA", "SE", "P"]
+CHR_CODES = {"X": 23, "Y": 24, "XY": 25, "MT": 26, "M": 26}
+NULL_SNP_IDS = {"", ".", "NA", "NAN", "NONE"}
 BUILDS = ["37", "38"]
 POPULATIONS = ["EUR", "AFR", "EAS", "AMR", "SAS"]
 REF_PANELS = [f"{pop}_{build}" for pop in POPULATIONS for build in BUILDS]
 REF_PANEL_COLUMNS = ["CHR", "SNP", "POS", "A1", "A2"]
-BUCKET_URL = "https://storage.googleapis.com/genal_files/"
+REF_DATA_VERSION = "v2"
+BUCKET_URL = f"https://storage.googleapis.com/genal_files/{REF_DATA_VERSION}/"
 REF_PANELS_URL = BUCKET_URL + "{panel}.tar.gz"
 REF_PARQUET_URL = BUCKET_URL + "reference_variants_{build}.parquet"
+GENE_INFO_URL = BUCKET_URL + "gene_id_mapping_filtered.parquet"
 CONFIG_DIR = os.path.expanduser("~/.genal/")
 CHECKS_DICT = {
     "CHR": False,
@@ -32,4 +36,5 @@ MR_METHODS_NAMES = {
     "Egger-boot": ("MR Egger bootstrap", "Egger Intercept bootstrap"),
     "Simple-mode": "Simple mode",
     "Weighted-mode": "Weighted mode",
+    "Wald": "Wald ratio",
 }

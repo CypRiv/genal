@@ -18,10 +18,22 @@ Most commonly this is a **build mismatch**.
 Common causes:
 
 - Variant ID mismatch between summary stats and genotype dataset.
-  - If you have `CHR`/`POS`, `genal` can map to genotype IDs before extraction.
+  - If you have `CHR`/`POS`, `genal` can map to genotype IDs before extraction (by position and alleles; keep `NEA` in your data).
   - Otherwise, consider curating SNP IDs or using proxying.
 - Missing variants in genotypes (e.g., limited imputation).
   - Use `proxy=True` with an ancestry-matched LD reference panel.
+
+## My LD reference panel is split by chromosome
+
+Merge the chromosome filesets into one with PLINK 2, then pass the merged prefix as `reference_panel`:
+
+```bash
+plink2 --pmerge-list files.txt --make-pgen --out my_ref_panel  # files.txt: one fileset prefix per line ('bfile' after files.txt for bed/bim/fam)
+```
+
+## `association_test()` stops with `VIF_TOO_HIGH`
+
+Two covariates are collinear (e.g. age and uncentered age²), and rescaling does not help. Center continuous covariates before squaring them or forming interactions, and remove redundant covariates.
 
 ## Clumping returns no SNPs
 
@@ -46,9 +58,10 @@ Control this with `action` in MR/MR-PRESSO:
 ## GWAS Catalog queries fail or time out
 
 - This is expected for many SNPs (catalog coverage is incomplete and rate limits exist).
-- `query_gwas_catalog()` now records per-row outcomes in `ASSOC_STATUS` and details in `ASSOC_ERROR`.
+- `query_gwas_catalog()` records per-row outcomes in `ASSOC_STATUS` and details in `ASSOC_ERROR`.
+- Heavily studied SNPs have many catalog associations and take longer to query.
 - Only canonical dbSNP rsIDs (`rs` + digits) are queried; other identifiers are labeled `invalid_format`.
-- Consider increasing `timeout` or limiting `max_associations`.
+- Consider increasing `timeout`.
 - For very large SNP lists, annotate a subset.
 
 ## `tmp_GENAL/` is large

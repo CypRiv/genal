@@ -7,7 +7,17 @@ import uuid
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from .constants import CHR_CODES
 from .tools import create_tmp, download_file, read_config
+
+# Builds accepted for the start and end arguments (UCSC names) and their aliases
+LIFT_BUILDS = ["hg17", "hg18", "hg19", "hg38"]
+BUILD_ALIASES = {"grch37": "hg19", "grch38": "hg38"}
+# Chain file chromosome names of the numeric codes 23 (X), 24 (Y) and 26 (MT)
+CHAIN_CHR_NAMES = {23: "chrX", 24: "chrY", 26: "chrM"}
+# Primary chromosomes of the target build: mappings to other contigs (alt, random, Un, fix) are treated as unlifted
+PRIMARY_CONTIG_PATTERN = r"chr(\d+|X|Y|M)"
+COMPLEMENT = str.maketrans("ACGTacgt", "TGCAtgca")
 
 
 def lift_data(
@@ -22,12 +32,12 @@ def lift_data(
 ):
     """
     Perform a liftover from one genetic build to another. If the chain file required for the liftover is not present, it will be downloaded. It"s also possible to manually provide the path to the chain file.
-    If the dataset is large, it is suggested to use an alternate method (e.g., `lift_data_liftover`).
+    If the dataset is large, it is suggested to use the liftOver executable (liftover_path argument).
 
     Args:
-        data (pd.DataFrame): The input data containing at least "CHR" and "POS" columns.
-        start (str, optional): The current build of the data. Defaults to "hg19".
-        end (str, optional): The target build for liftover. Defaults to "hg38".
+        data (pd.DataFrame): The input data containing at least "CHR" and "POS" columns (1-based positions).
+        start (str, optional): The current build of the data: "hg17", "hg18", "hg19" or "hg38" ("GRCh37" and "GRCh38" are accepted for "hg19" and "hg38"). Defaults to "hg19".
+        end (str, optional): The target build for liftover (same accepted values as start). Defaults to "hg38".
         extraction_file (bool, optional): If True, also prints a CHR POS SNP space-delimited file for extraction. Defaults to False.
         chain_file (str, optional): Path to a local chain file for the lift. Overrides the start and end arguments if provided.
         name (str, optional): Specify a filename or filepath (without extension) for saving. If not provided, the data is not saved.
@@ -35,13 +45,16 @@ def lift_data(
         object_id (str, optional): Specify the object id for tmp file writing (internal use only)
 
     Raises:
-        ValueError: If required columns are missing or if provided chain file path is incorrect.
+        ValueError: If required columns are missing, if the builds are not valid or if provided chain file path is incorrect.
 
     Returns:
         pd.DataFrame: Lifted data.
 
     Notes:
         Function for the :meth:`Geno.lift` method.
+        Variants lifted to a non-primary contig (alt, random, Un, fix) are removed as unlifted.
+        Chromosomes 23, 24 and 26 are lifted as chrX, chrY and chrM.
+        The EA and NEA alleles of variants lifted to the opposite strand are reverse-complemented.
     """
 
     # Prepare chain file and get its path
@@ -50,25 +63,42 @@ def lift_data(
     # Prepare the data for lifting: handle missing values in CHR, POS columns
     nrows = data.shape[0]
     data.dropna(subset=["CHR", "POS"], inplace=True)
-    # Remove absurd positions
-    data.drop(data[data.POS >= 300_000_000].index, inplace=True)
+    data.reset_index(drop=True, inplace=True)  # unique labels for the label-based operations below
+    # Remove absurd positions (positions are 1-based)
+    data.drop(data[(data.POS < 1) | (data.POS >= 300_000_000)].index, inplace=True)
     data.reset_index(drop=True, inplace=True)
+    data["CHR"] = data["CHR"].astype("int64")
+    data["POS"] = data["POS"].astype("int64")
     n_na = nrows - data.shape[0]
     if n_na:
         print(
-            f"Excluded {n_na} SNPs ({n_na/nrows*100:.3f}%) with NaN values in CHR or POS columns."
+            f"Excluded {n_na} SNPs ({n_na/nrows*100:.3f}%) with NaN values in CHR or POS columns or with a position outside [1, 300,000,000)."
         )
 
     # Perform liftover with the liftover executable or in python
-    if liftover_path:
+    if data.empty:
+        print("No SNPs to lift.")
+    elif liftover_path:
         data = lift_coordinates_liftover(data, object_id, chain_path, liftover_path)
     else:
         data = lift_coordinates_python(data, chain_path)
 
     # Handle post-liftover operations
-    data = post_lift_operations(data, name, extraction_file)
+    data = post_lift_operations(data, name, extraction_file, object_id)
 
     return data
+
+
+def normalize_build(build, argument):
+    """Return the UCSC name of a build ('GRCh37' -> 'hg19', 'GRCh38' -> 'hg38'). Raise a ValueError if it is not supported."""
+    build_name = str(build).strip().lower()
+    build_name = BUILD_ALIASES.get(build_name, build_name)
+    if build_name not in LIFT_BUILDS:
+        raise ValueError(
+            f"Invalid {argument} build: {build!r}. Must be one of {', '.join(LIFT_BUILDS)} "
+            f"('GRCh37' and 'GRCh38' are accepted for 'hg19' and 'hg38'), or provide a chain file with the chain_file argument."
+        )
+    return build_name
 
 
 def prepare_chain_file(chain_file, start, end):
@@ -81,8 +111,12 @@ def prepare_chain_file(chain_file, start, end):
         )
         chain_path = chain_file
     else:  # Use the specified start and end builds to identify chain file
+        start = normalize_build(start, "start")
+        end = normalize_build(end, "end")
+        if start == end:
+            raise ValueError(f"The start and end builds are identical ({start}): there is nothing to lift.")
         # Construct chain filename
-        chain_name = f"{start.lower()}To{end.capitalize()}.over.chain"
+        chain_name = f"{start}To{end.capitalize()}.over.chain"
         config = read_config()
         ref_path = config["paths"]["ref_path"]
         chains_folder_path = os.path.join(ref_path, "chain_files")
@@ -93,7 +127,7 @@ def prepare_chain_file(chain_file, start, end):
                 os.makedirs(chains_folder_path)
             except OSError:
                 raise OSError(
-                    "Unable to create the 'tmp_GENAL' directory. Check permissions."
+                    f"Unable to create the '{chains_folder_path}' directory. Check permissions."
                 )
 
         # Check for the chain file locally or download it if necessary
@@ -103,7 +137,7 @@ def prepare_chain_file(chain_file, start, end):
                 f"The chain file to lift from {start} to {end} was not found. Attempting to download it..."
             )
             # Download the chain file
-            url = f"https://hgdownload.soe.ucsc.edu/goldenPath/{start.lower()}/liftOver/{chain_name}.gz"
+            url = f"https://hgdownload.soe.ucsc.edu/goldenPath/{start}/liftOver/{chain_name}.gz"
             gz_path = f"{chain_path}.gz"
             try:
                 download_file(url, gz_path, description=f"{chain_name}.gz")
@@ -126,6 +160,71 @@ def prepare_chain_file(chain_file, start, end):
     return chain_path
 
 
+def _chain_chromosome(chrom):
+    """Chromosome name used in chain files for a numeric CHR code (e.g. 1 -> 'chr1', 23 -> 'chrX')."""
+    return CHAIN_CHR_NAMES.get(chrom, f"chr{chrom}")
+
+
+def _reverse_complement(alleles):
+    """Reverse-complement the alleles made of A, C, G, T letters (other values are returned unchanged)."""
+    alleles = alleles.copy()
+    is_dna = alleles.astype(str).str.fullmatch(r"[ACGTacgt]+") & alleles.notna()
+    alleles[is_dna] = alleles[is_dna].str.translate(COMPLEMENT).str[::-1]
+    return alleles
+
+
+def _apply_lift(data, contigs, positions, strands):
+    """
+    Update CHR/POS with the lifted coordinates (1-based), remove unlifted variants and variants lifted to non-primary
+    contigs, and reverse-complement the alleles of variants lifted to the opposite strand.
+
+    Args:
+        data (pd.DataFrame): Data being lifted.
+        contigs, positions, strands (array-like): Target contig (None if unlifted), 1-based position and strand of each row.
+    """
+    nrows = data.shape[0]
+    data.reset_index(drop=True, inplace=True)  # unique labels for the label-based operations below
+    contigs = pd.Series(contigs, index=data.index, dtype=object)
+    strands = pd.Series(strands, index=data.index, dtype=object)
+    primary = contigs.str.fullmatch(PRIMARY_CONTIG_PATTERN, na=False).astype(bool)
+    n_unmapped = int(contigs.isna().sum())
+    n_other_contig = int((contigs.notna() & ~primary).sum())
+
+    chr_names = contigs.where(primary).str[3:]
+    chr_numbers = pd.to_numeric(chr_names, errors="coerce").fillna(chr_names.map(CHR_CODES).astype(float))
+    data["CHR"] = chr_numbers.astype("Int64")
+    data["POS"] = pd.to_numeric(pd.Series(positions, index=data.index), errors="coerce").astype("Int64")
+
+    minus = primary & (strands == "-")
+    n_minus = int(minus.sum())
+    allele_columns = [col for col in ["EA", "NEA"] if col in data.columns]
+    for col in allele_columns:
+        data.loc[minus, col] = _reverse_complement(data.loc[minus, col])
+
+    data.drop(index=data.index[~primary], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+
+    n_lost = n_unmapped + n_other_contig
+    if n_lost:
+        print(f"{n_lost} SNPs ({n_lost/nrows*100:.3f}%) could not be lifted and are deleted from the final data.")
+        if n_other_contig:
+            print(
+                f"Of these, {n_other_contig} SNPs were lifted to alternative, unplaced or patch contigs (e.g. chrUn_..., ..._alt, ..._random, ..._fix) and are counted as unlifted."
+            )
+    else:
+        print("All SNPs have been lifted.")
+    if data.empty:
+        print("No SNPs could be lifted.")
+    if n_minus:
+        if allele_columns:
+            print(
+                f"{n_minus} SNPs were lifted to the opposite strand: their {' and '.join(allele_columns)} alleles have been reverse-complemented."
+            )
+        else:
+            print(f"{n_minus} SNPs were lifted to the opposite strand (no EA/NEA columns to reverse-complement).")
+    return data
+
+
 def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
     """Lift data using the liftover executable and a chain file."""
     # Add the executable part if not there
@@ -137,7 +236,7 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
             [liftover_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=5,
+            timeout=60,
             text=True,
         )
         if not process.stderr.startswith("liftOver"):
@@ -148,69 +247,52 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
         raise TypeError(e)
     print("Lifting coordinates using liftOver.")
 
-    # Write data in correct format for liftOver
+    # Write data in BED6 format for liftOver: 0-based half-open interval [POS-1, POS), row number as name, + strand
     create_tmp()
-    data["CHR_liftover"] = "chr" + data.CHR.astype(str)
     to_lift_filename = os.path.join("tmp_GENAL", f"{object_id}.prelift")
     lifted_filename = os.path.join("tmp_GENAL", f"{object_id}.postlift")
     unmapped_filename = os.path.join("tmp_GENAL", f"{object_id}_unMapped")
-    data[["CHR_liftover", "POS", "POS"]].to_csv(
-        to_lift_filename, sep=" ", index=False, header=False
+    bed = pd.DataFrame(
+        {
+            "chrom": data["CHR"].map(_chain_chromosome),
+            "start": data["POS"] - 1,
+            "end": data["POS"],
+            "name": np.arange(data.shape[0]),
+            "score": 0,
+            "strand": "+",
+        }
     )
+    bed.to_csv(to_lift_filename, sep="\t", index=False, header=False)
 
     # Call the liftOver software
-    command = f"{liftover_path} {to_lift_filename} \
-    {chain_path} {lifted_filename} {unmapped_filename}"
     try:
-        output = subprocess.run(
-            command, shell=True, capture_output=True, text=True, check=True
+        subprocess.run(
+            [liftover_path, to_lift_filename, chain_path, lifted_filename, unmapped_filename],
+            capture_output=True, text=True, check=True,
         )
-    except Exception as e:
-        print(f"Error running liftOver: {e}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running liftOver: {e}\n{e.stderr}")
         raise ValueError("Error running liftOver. Check error message for more details.")
 
-    ## Read the output, print the number of unlifted SNPs and remove them from the prelift data.
-    df_post = pd.read_csv(lifted_filename, sep="\t", header=None)
-    unMapped = open(unmapped_filename, "r")
-    Lines = unMapped.readlines()
-    if len(Lines) > 0:
-        print(f"{int(len(Lines)/2)} SNPs could not be lifted and are deleted from the final data.")
+    ## Read the output (the 1-based lifted position is the end of the interval) and match it to the input rows by name
+    if os.path.getsize(lifted_filename) == 0:
+        lifted = pd.DataFrame(columns=["chrom", "start", "end", "name", "score", "strand"])
     else:
-        print(f"All SNPs have been lifted.")
-    indices = list()
-    for i in range(1, len(Lines), 2):
-        c = Lines[i].strip()
-        (chrom, pos, pos) = c.split("\t")
-        indices.append(str(chrom) + ":" + str(pos))
-    drop_indices = data[(data.CHR_liftover.astype(str) + ":" + data.POS.astype(str)).isin(indices)].index
-    data.drop(index=drop_indices, inplace=True)
-    data.reset_index(drop=True, inplace=True)
-
-    # Check the length of files
-    if len(data) != len(df_post):
-        raise ValueError(
-            "There was a problem lifting with liftOver. Try lifting in python (liftover_path = None)."
+        lifted = pd.read_csv(
+            lifted_filename, sep="\t", header=None,
+            names=["chrom", "start", "end", "name", "score", "strand"],
+            dtype={"chrom": str, "strand": str},
         )
+    lifted = lifted.drop_duplicates(subset=["name"], keep="first")
+    rows = lifted["name"].astype(int).to_numpy()
+    contigs = np.full(data.shape[0], None, dtype=object)
+    positions = np.full(data.shape[0], np.nan)
+    strands = np.full(data.shape[0], None, dtype=object)
+    contigs[rows] = lifted["chrom"].to_numpy()
+    positions[rows] = lifted["end"].to_numpy(dtype=float)
+    strands[rows] = lifted["strand"].to_numpy()
 
-    ## Merge prelift and postlift data. Unknown chr from the output of liftOver are assigned the value 99. SNPs mapped to unknown chr are deleted from the final data and their number printed.
-    data["POS"] = df_post[1].astype(int)
-    data["CHR"] = (
-        df_post[0]
-        .str.split("chr", expand=True)[1]
-        .str.split("_", expand=True)[0]
-        .replace({"X": 99, "Y": 99, "Un": 99})
-        .astype(int)
-    )
-    nrow_before = data.shape[0]
-    drop_chr_indices = data[data.CHR == 99].index
-    data.drop(index=drop_chr_indices, inplace=True)
-    nrow_diff = nrow_before - data.shape[0]
-    if nrow_diff > 0:
-        print(
-            f"{nrow_diff} SNPs were lifted to an unknown chromosome and deleted from the final files."
-        )
-    data.drop(columns=["CHR_liftover"], inplace=True)
-    return data
+    return _apply_lift(data, contigs, positions, strands)
 
 
 def lift_coordinates_python(data, chain_path):
@@ -226,38 +308,32 @@ def lift_coordinates_python(data, chain_path):
     # Create a list of tuples and lift
     coordinates = list(zip(data["CHR"], data["POS"]))
 
-    # Perform the lift
+    # Perform the lift: pyliftover uses 0-based positions, POS is 1-based
     def convert_coordinate(args):
-        return lo.convert_coordinate(f"chr{args[0]}", args[1], "-")
+        return lo.convert_coordinate(_chain_chromosome(args[0]), int(args[1]) - 1, "+")
 
     results = list(ThreadPoolExecutor().map(convert_coordinate, coordinates))
 
-    data["POS"] = [res[0][1] if res else np.nan for res in results]
-    data["CHR"] = [res[0][0].split("chr")[1] if res else np.nan for res in results]
-    nrows = data.shape[0]
-    data["POS"] = pd.to_numeric(data["POS"], errors="coerce").astype("Int32")
-    data["CHR"] = pd.to_numeric(data["CHR"], errors="coerce").astype("Int32")
-    data.dropna(subset=["POS", "CHR"], inplace=True)
-    data.reset_index(drop=True, inplace=True)
-    n_na = nrows - data.shape[0]
-    if n_na:
-        print(f"{n_na} SNPs ({n_na/nrows*100:.3f}%) could not be lifted.")
-    else:
-        print("All SNPs have been lifted.")
-    return data
+    # The first mapping (highest chain score) is used
+    contigs = [res[0][0] if res else None for res in results]
+    positions = [res[0][1] + 1 if res else np.nan for res in results]
+    strands = [res[0][2] if res else None for res in results]
+    return _apply_lift(data, contigs, positions, strands)
 
 
-def post_lift_operations(data, name, extraction_file):
+def post_lift_operations(data, name, extraction_file, object_id="tmp_id"):
     """Handle post-liftover operations like reporting, and saving results."""
+    base_name = os.path.splitext(name)[0] if name else None
     if name:
-        filename = os.path.splitext(name)[0] + ".txt"
+        filename = base_name + ".txt"
         data.to_csv(f"{filename}", sep="\t", header=True, index=False)
         print(f"Lifted list of SNPs saved to {filename}")
     if extraction_file:
         if not ("SNP" in data.columns):
             data["SNP"] = data["CHR"].astype(str) + ":" + data["POS"].astype(str)
+        extraction_filename = f"{base_name if base_name else object_id}_lifted_extraction.txt"
         data[["CHR", "POS", "SNP"]].to_csv(
-            f"{name + '_lifted'}_extraction.txt", sep=" ", header=False, index=False
+            extraction_filename, sep=" ", header=False, index=False
         )
-        print(f"Extraction file saved to {name+ '_lifted'}_extraction.txt")
+        print(f"Extraction file saved to {extraction_filename}")
     return data

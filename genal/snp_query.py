@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import aiohttp
 import asyncio
-import heapq
 import nest_asyncio
 import random
 import re
 import threading
 import time
 from collections import Counter, deque
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import urlencode
 
@@ -16,11 +16,12 @@ from tqdm import tqdm
 
 GWAS_V2_ASSOCIATIONS_URL = "https://www.ebi.ac.uk/gwas/rest/api/v2/associations"
 GWAS_V2_SNP_URL = "https://www.ebi.ac.uk/gwas/rest/api/v2/single-nucleotide-polymorphisms/{rs_id}"
-PAGE_SIZE = 500
+# Pages of 100 associations: larger pages time out for heavily studied SNPs
+PAGE_SIZE = 100
 MAX_RETRIES = 3
 CLIENT_RATE_LIMIT_QPS = 14
 MAX_CONCURRENT_REQUESTS = 12
-RETRYABLE_STATUS_CODES = {408, 429, 502, 503, 504}
+RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 SERVER_ERROR_STATUS_CODES = {500, 502, 503, 504}
 STATUS_ORDER = [
     "ok",
@@ -67,6 +68,24 @@ def _coerce_p_value(value: Any) -> float | None:
     if p_value != p_value:
         return None
     return p_value
+
+
+def _exact_p_value(association: dict[str, Any]) -> Decimal | None:
+    """
+    Exact p-value of an association, from its mantissa and exponent when available
+    (the float p_value field underflows to 0 for p-values below ~1e-308).
+    """
+    mantissa = association.get("pvalue_mantissa")
+    exponent = association.get("pvalue_exponent")
+    if mantissa is not None and exponent is not None:
+        try:
+            p_exact = Decimal(f"{mantissa}e{int(exponent)}")
+            if p_exact.is_finite() and p_exact >= 0:
+                return p_exact
+        except (InvalidOperation, TypeError, ValueError):
+            pass
+    p_value = _coerce_p_value(association.get("p_value"))
+    return None if p_value is None else Decimal(repr(p_value))
 
 
 def _make_outcome(
@@ -154,7 +173,13 @@ async def _read_json_response(
     async def _request() -> tuple[int, dict[str, str], Any]:
         response = await session.get(url)
         async with response:
-            payload = await response.json()
+            try:
+                payload = await response.json()
+            except (aiohttp.ContentTypeError, ValueError):
+                # Error responses can have a non-JSON body (e.g. an HTML error page): they are classified by status code
+                if response.status == 200:
+                    raise
+                payload = None
             return response.status, dict(getattr(response, "headers", {})), payload
 
     if timeout is None:
@@ -250,49 +275,42 @@ async def _fetch_json_with_retries(
     }
 
 
-def _association_sort_key(record: dict[str, Any]) -> tuple[float, str, str]:
+def _association_sort_key(entry: tuple[Decimal, dict[str, Any]]) -> tuple[Decimal, str, str]:
+    p_exact, record = entry
     return (
-        record["p_value"],
+        p_exact,
         record["trait"],
         record["study_accession"] or "",
     )
 
 
 def _update_best_association(
-    best_associations: dict[tuple[str, str | None], dict[str, Any]],
+    best_associations: dict[tuple[str, str | None], tuple[Decimal, dict[str, Any]]],
     trait: str,
+    p_exact: Decimal,
     p_value: float,
     study_accession: str | None,
 ) -> None:
+    """Keep, for each (trait, study) pair, the association with the smallest exact p-value."""
     key = (trait, study_accession)
     current = best_associations.get(key)
-    if current is None or p_value < current["p_value"]:
-        best_associations[key] = {
-            "trait": trait,
-            "p_value": p_value,
-            "study_accession": study_accession,
-        }
-
-
-def _current_cutoff(
-    best_associations: dict[tuple[str, str | None], dict[str, Any]],
-    max_associations: int | None,
-) -> float | None:
-    if max_associations is None or len(best_associations) < max_associations:
-        return None
-    top_associations = heapq.nsmallest(
-        max_associations,
-        best_associations.values(),
-        key=_association_sort_key,
-    )
-    return top_associations[-1]["p_value"]
+    if current is None or p_exact < current[0]:
+        best_associations[key] = (
+            p_exact,
+            {
+                "trait": trait,
+                "p_value": p_value,
+                "study_accession": study_accession,
+            },
+        )
 
 
 def _finalize_associations(
-    best_associations: dict[tuple[str, str | None], dict[str, Any]],
+    best_associations: dict[tuple[str, str | None], tuple[Decimal, dict[str, Any]]],
     max_associations: int | None,
 ) -> list[dict[str, Any]]:
-    ordered = sorted(best_associations.values(), key=_association_sort_key)
+    """Sort the associations by exact p-value (then trait and study) and keep the first max_associations."""
+    ordered = [record for _, record in sorted(best_associations.values(), key=_association_sort_key)]
     if max_associations is not None:
         ordered = ordered[:max_associations]
     return ordered
@@ -308,28 +326,36 @@ async def _query_single_rsid(
     rate_limiter: _RateLimiter,
     retry_counts: Counter,
 ) -> dict[str, Any]:
-    next_url = _build_url(
-        GWAS_V2_ASSOCIATIONS_URL,
-        {
-            "rs_id": rs_id,
-            "sort": "p_value",
-            "direction": "asc",
-            "page": 0,
-            "size": PAGE_SIZE,
-        },
-    )
-    best_associations: dict[tuple[str, str | None], dict[str, Any]] = {}
+    # Pages are requested in the default API order (association ID, unique), which keeps the paging deterministic:
+    # sorting by p-value server-side has ties, and associations can then be duplicated or lost at page boundaries.
+    # All pages are read; filtering, deduplication and ranking use the exact p-value (mantissa and exponent).
+    def page_url(page: int) -> str:
+        return _build_url(GWAS_V2_ASSOCIATIONS_URL, {"rs_id": rs_id, "page": page, "size": PAGE_SIZE})
+
+    async def fetch(url: str) -> dict[str, Any]:
+        return await _fetch_json_with_retries(session, url, timeout, semaphore, rate_limiter, retry_counts)
+
+    # Once the number of pages is known from the first page, the other pages are requested concurrently
+    # (through the shared semaphore and rate limiter) and processed in page order.
+    responses = [await fetch(page_url(0))]
+    first_payload = (responses[0]["payload"] or {}) if responses[0]["ok"] else {}
+    total_pages = first_payload.get("page", {}).get("totalPages") if isinstance(first_payload, dict) else None
+    if isinstance(total_pages, int) and total_pages > 1:
+        responses += await asyncio.gather(*(fetch(page_url(page)) for page in range(1, total_pages)))
+    elif responses[0]["ok"] and total_pages is None:
+        # Without page information, the next links are followed
+        next_url = first_payload.get("_links", {}).get("next", {}).get("href")
+        while next_url:
+            responses.append(await fetch(next_url))
+            if not responses[-1]["ok"]:
+                break
+            next_url = (responses[-1]["payload"] or {}).get("_links", {}).get("next", {}).get("href")
+
+    threshold = Decimal(repr(float(p_threshold)))
+    best_associations: dict[tuple[str, str | None], tuple[Decimal, dict[str, Any]]] = {}
     saw_association_rows = False
 
-    while next_url:
-        response = await _fetch_json_with_retries(
-            session,
-            next_url,
-            timeout,
-            semaphore,
-            rate_limiter,
-            retry_counts,
-        )
+    for response in responses:
         if not response["ok"]:
             status = _classify_transport_failure(response["status_code"], response["failure_type"])
             return _make_outcome(rs_id, [], status, response["error"])
@@ -339,14 +365,13 @@ async def _query_single_rsid(
         if page_associations:
             saw_association_rows = True
 
-        stop_for_threshold = False
         for association in page_associations:
+            p_exact = _exact_p_value(association)
+            if p_exact is None or p_exact > threshold:
+                continue
             p_value = _coerce_p_value(association.get("p_value"))
             if p_value is None:
-                continue
-            if p_value > p_threshold:
-                stop_for_threshold = True
-                break
+                p_value = float(p_exact)
 
             study_accession = association.get("accession_id")
             for trait in association.get("efo_traits", []):
@@ -356,20 +381,10 @@ async def _query_single_rsid(
                 _update_best_association(
                     best_associations,
                     trait_name,
+                    p_exact,
                     p_value,
                     study_accession,
                 )
-
-        if stop_for_threshold:
-            break
-
-        if max_associations is not None and best_associations:
-            cutoff = _current_cutoff(best_associations, max_associations)
-            last_page_p_value = _coerce_p_value(page_associations[-1].get("p_value")) if page_associations else None
-            if cutoff is not None and last_page_p_value is not None and last_page_p_value > cutoff:
-                break
-
-        next_url = payload.get("_links", {}).get("next", {}).get("href")
 
     if best_associations:
         return _make_outcome(rs_id, _finalize_associations(best_associations, max_associations), "ok")
@@ -446,8 +461,10 @@ async def query_gwas_catalog_coroutine(
 
     Parameters:
         snps (list): List of SNPs to query.
-        p_threshold (float): Inclusive p-value threshold for filtering associations.
-        max_associations (int): Maximum number of qualifying trait-study associations to return for each SNP.
+        p_threshold (float): Inclusive p-value threshold for filtering associations (compared with the exact
+            p-value given by the mantissa and exponent of each association).
+        max_associations (int): Maximum number of qualifying trait-study associations to return for each SNP
+            (those with the smallest exact p-values).
         timeout (int | None): Timeout for each HTTP request in seconds.
 
     Returns:
