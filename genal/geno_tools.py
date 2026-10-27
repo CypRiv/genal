@@ -5,20 +5,16 @@ import os
 import warnings
 from collections import Counter
 
-from .constants import STANDARD_COLUMNS, CHR_CODES, NULL_SNP_IDS
+from .constants import STANDARD_COLUMNS, CHR_CODES, NULL_SNP_IDS, READ_CSV_NA_VALUES
 from .tools import get_reference_panel_path, run_plink_command, create_tmp, get_plink_path
 
 
 def remove_na(data):
     """Identify the standard columns containing NA values. Delete rows with NA values."""
     nrows = data.shape[0]
-    present_standard_columns = [col for col in STANDARD_COLUMNS if col in data.columns]
-    columns_na = (
-        data[present_standard_columns]
-        .columns[data[present_standard_columns].isna().any()]
-        .tolist()
-    )
-    data.dropna(subset=present_standard_columns, inplace=True)
+    columns_na = [col for col in STANDARD_COLUMNS if col in data.columns and data[col].isna().any()]
+    if columns_na:
+        data.dropna(subset=columns_na, inplace=True)
     n_del = nrows - data.shape[0]
     if n_del > 0:
         print(
@@ -29,7 +25,26 @@ def remove_na(data):
 
 def missing_snp_ids(snp):
     """Boolean mask of missing SNP IDs: NaN or placeholder values such as '', '.', 'NA' (case-insensitive, surrounding spaces ignored)."""
-    return snp.isna() | snp.astype(str).str.strip().str.upper().isin(NULL_SNP_IDS)
+    import pyarrow as pa
+    import pyarrow.compute as pc
+
+    def placeholder_or_nan(values):
+        return values.isna() | values.astype(str).str.strip().str.upper().isin(NULL_SNP_IDS)
+
+    try:
+        ids = pa.array(snp, from_pandas=True)
+    except (pa.ArrowException, TypeError):
+        return placeholder_or_nan(snp)
+    if not (pa.types.is_string(ids.type) or pa.types.is_large_string(ids.type)):
+        return placeholder_or_nan(snp)
+    # IDs of letters, digits, '_', ':', '.' or '-' longer than every placeholder (such as rsIDs or CHR:POS:A1:A2 names)
+    # have no space to strip and are not missing. The other values are checked one by one.
+    min_length = max(len(placeholder) for placeholder in NULL_SNP_IDS) + 1
+    regular = pc.match_substring_regex(ids, r"^[A-Za-z0-9_:.\-]{%d,}$" % min_length)
+    others = np.flatnonzero(~np.asarray(regular.fill_null(False)))
+    missing = np.zeros(len(snp), dtype=bool)
+    missing[others] = placeholder_or_nan(snp.iloc[others]).to_numpy()
+    return pd.Series(missing, index=snp.index, name=snp.name)
 
 
 def check_snp_ids(data):
@@ -86,8 +101,11 @@ def check_allele_column(data, allele_col, keep_indel):
     Set to nan if values are insertions/deletions unless keep_indel=True.
     """
     nrows = data.shape[0]
-    data[allele_col] = data[allele_col].astype(str).str.upper()
-    atcg_condition = data[allele_col].str.contains("^[ATCG]+$", na=False)
+    # The values are checked once per distinct value
+    codes, values = pd.factorize(data[allele_col], use_na_sentinel=False)
+    alleles = pd.Series(values).astype(str).str.upper()
+    data[allele_col] = alleles.array.take(codes)
+    atcg_condition = alleles.str.contains("^[ATCG]+$", na=False).to_numpy()[codes]
     atcg_count = nrows - atcg_condition.sum()
     if atcg_count > 0:
         data.loc[~atcg_condition, allele_col] = np.nan
@@ -96,7 +114,7 @@ def check_allele_column(data, allele_col, keep_indel):
         )
     if not keep_indel:
         nrows = data.shape[0]
-        indel_condition = data[allele_col].str.len() > 1
+        indel_condition = atcg_condition & (alleles.str.len() > 1).to_numpy()[codes]
         indel_count = indel_condition.sum()
         if indel_count > 0:
             data.loc[indel_condition, allele_col] = np.nan
@@ -182,11 +200,11 @@ def fill_fstatistic(data, overwrite=False):
     if "FSTAT" not in data.columns:
         data["FSTAT"] = np.nan
         column_created = True
-        rows_to_compute = pd.Series([True] * nrows, index=data.index)
+        rows_to_compute = pd.Series(True, index=data.index)
     elif overwrite:
         # Clear FSTAT first so non-computable rows become NaN (not stale values)
         data["FSTAT"] = np.nan
-        rows_to_compute = pd.Series([True] * nrows, index=data.index)
+        rows_to_compute = pd.Series(True, index=data.index)
     else:
         # Only compute for rows with missing FSTAT
         rows_to_compute = data["FSTAT"].isna()
@@ -198,7 +216,7 @@ def fill_fstatistic(data, overwrite=False):
     n_assigned = 0
     
     # Primary route: FSTAT = (BETA / SE)² when BETA and SE are available and SE > 0
-    beta_se_computable = pd.Series([False] * nrows, index=data.index)
+    beta_se_computable = pd.Series(False, index=data.index)
     if "BETA" in data.columns and "SE" in data.columns:
         beta_se_computable = (
             rows_to_compute &
@@ -214,7 +232,7 @@ def fill_fstatistic(data, overwrite=False):
     
     # Fallback route: FSTAT = χ²_isf(P, df=1) for remaining rows where P is present
     # Allow P=0 (produces inf for extremely significant variants)
-    p_fallback_computable = pd.Series([False] * nrows, index=data.index)
+    p_fallback_computable = pd.Series(False, index=data.index)
     if "P" in data.columns:
         p_fallback_computable = (
             rows_to_compute &
@@ -399,6 +417,60 @@ def _reference_at_positions(data, reference_panel_df, columns):
     return reference[["CHR", "POS", *columns]].merge(positions, on=["CHR", "POS"], how="inner")
 
 
+def _allele_codes(columns, missing=""):
+    """
+    Codes of the values of several allele columns in a shared vocabulary (equal values get equal codes), computed once
+    per distinct value of each column. Missing values get the code of `missing` (compared as empty strings by default),
+    or -1 if missing is None.
+    """
+    factorized = [pd.factorize(column, use_na_sentinel=True) for column in columns]
+    vocabulary = set().union(*(set(uniques) for _, uniques in factorized))
+    if missing is not None:
+        vocabulary.add(missing)
+    code_of = {value: code for code, value in enumerate(vocabulary)}
+    missing_code = -1 if missing is None else code_of[missing]
+    return [np.array([code_of[value] for value in uniques] + [missing_code], dtype=np.int64)[codes] for codes, uniques in factorized]
+
+
+def _key_codes(left, right, columns):
+    """
+    One integer code per combination of values of the key columns, shared by the rows of left and right (equal keys,
+    with the equality of a pandas merge, get equal codes). Rows with a missing key value get -1.
+    """
+    key = np.zeros(len(left) + len(right), dtype=np.int64)
+    missing = np.zeros(len(key), dtype=bool)
+    for column in columns:
+        codes, uniques = pd.factorize(pd.concat([left[column], right[column]], ignore_index=True))
+        missing |= codes < 0
+        n_values = max(len(uniques), 1)
+        if key.max(initial=0) >= 2**62 // n_values:  # Renumber the combinations so far to avoid an overflow
+            key = pd.factorize(key)[0].astype(np.int64)
+        key = key * n_values + np.maximum(codes, 0)
+    key[missing] = -1
+    return key[: len(left)], key[len(left):]
+
+
+def _reference_ids_by_alleles(data, reference_panel_df):
+    """
+    SNP ID of the reference record at the CHR/POS of each row of data with the same alleles ({EA, NEA} = {A1, A2},
+    missing alleles compared as empty strings), NaN if there is none. Reference records with the same position and
+    alleles are the same variant: the first ID is used. The matching is done on one integer code per (position, alleles).
+    """
+    at_positions = reference_panel_df["POS"].isin(data["POS"].dropna().unique()).to_numpy()
+    reference = reference_panel_df.loc[at_positions, ["CHR", "POS", "SNP", "A1", "A2"]]
+    ea, nea, a1, a2 = _allele_codes([data["EA"], data["NEA"], reference["A1"], reference["A2"]])
+    n_codes = int(max(ea.max(initial=0), nea.max(initial=0), a1.max(initial=0), a2.max(initial=0))) + 1
+    left = pd.DataFrame({"CHR": data["CHR"].array, "POS": data["POS"].array, "alleles": np.minimum(ea, nea) * n_codes + np.maximum(ea, nea)})
+    right = pd.DataFrame({"CHR": reference["CHR"].array, "POS": reference["POS"].array, "alleles": np.minimum(a1, a2) * n_codes + np.maximum(a1, a2)})
+    data_key, reference_key = _key_codes(left, right, ["CHR", "POS", "alleles"])
+    first = np.flatnonzero(~pd.Series(reference_key).duplicated(keep="first").to_numpy())
+    row = pd.Index(reference_key[first]).get_indexer(data_key)
+    matched = (row >= 0) & (data_key >= 0)
+    reference_row = np.full(len(data), -1)
+    reference_row[matched] = first[row[matched]]
+    return reference["SNP"].array.take(reference_row, allow_fill=True)
+
+
 def _count_rows_in(data, keys, key_values):
     """Count the rows of data whose keys are present in the key_values DataFrame."""
     if key_values.empty:
@@ -526,25 +598,10 @@ def fill_snpids_func(data, reference_panel_df, keep_indel):
         check_allele_column(data, "EA", keep_indel=keep_indel)
         check_allele_column(data, "NEA", keep_indel=keep_indel)
         
-        # Create allele_min and allele_max columns (alleles in alphabetical order) for data and reference
-        data['allele_min'] = np.minimum(data['EA'].fillna(""), data['NEA'].fillna(""))
-        data['allele_max'] = np.maximum(data['EA'].fillna(""), data['NEA'].fillna(""))
-        reference = _reference_at_positions(data, reference_panel_df, ["SNP", "A1", "A2"])
-        reference['allele_min'] = np.minimum(reference['A1'].fillna(""), reference['A2'].fillna(""))
-        reference['allele_max'] = np.maximum(reference['A1'].fillna(""), reference['A2'].fillna(""))
-        # Reference records with the same position and alleles are the same variant: keep the first ID
-        reference = reference.drop_duplicates(subset=["CHR", "POS", "allele_min", "allele_max"], keep="first")
-
-        # Merge using position and alleles
-        data = pd.merge(
-            data,
-            reference[["CHR", "POS", "SNP", "allele_min", "allele_max"]],
-            on=["CHR", "POS", "allele_min", "allele_max"],
-            how="left"
-        )
-
-        # Clean up temporary columns
-        data.drop(columns=["allele_min", "allele_max"], inplace=True)
+        # Match on the position and the alleles (in any order)
+        snp = _reference_ids_by_alleles(data, reference_panel_df)
+        data = data.reset_index(drop=True)
+        data["SNP"] = snp
         n_ambiguous = 0
 
     else:
@@ -786,7 +843,7 @@ def save_data(data, name, path="", fmt="parquet", sep="\t", header=True):
     path = os.path.join(path, name)
     if fmt == "parquet":
         data.to_parquet(
-            f"{path}.parquet", engine="pyarrow", compression="brotli", index=True
+            f"{path}.parquet", engine="pyarrow", compression="zstd", index=True
         )
     elif fmt == "csv":
         data.to_csv(f"{path}.csv", sep=sep, header=header, index=False)
@@ -832,6 +889,9 @@ def update_eaf_func(data, reference_panel, object_name, ram=10000, fill=True):
     column is present, EA in {REF, ALT} otherwise. Rows matching several reference variants with different
     frequencies are ambiguous and left unmatched.
     """
+    import pyarrow as pa
+    import pyarrow.csv as pacsv
+
     ref_panel_path, ref_filetype = get_reference_panel_path(reference_panel)
     create_tmp()
 
@@ -855,7 +915,10 @@ def update_eaf_func(data, reference_panel, object_name, ram=10000, fill=True):
         # Write integer coordinates to a temp file for PLINK's --extract range, then run --freq adding POS to the output
         coord_path = os.path.join("tmp_GENAL", f"{object_name}_coord_list.txt")
         coords = query.dropna().drop_duplicates().astype("int64")
-        coords[["CHR", "POS", "POS"]].to_csv(coord_path, sep='\t', index=False, header=False)
+        pacsv.write_csv(
+            pa.table([coords["CHR"].to_numpy(), coords["POS"].to_numpy(), coords["POS"].to_numpy()], names=["CHR", "POS", "END"]),
+            coord_path, write_options=pacsv.WriteOptions(include_header=False, delimiter="\t"),
+        )
         plink_command += ["--extract", "range", coord_path, "--freq", "cols=+pos", "--out", freq_prefix]
 
     else:
@@ -880,9 +943,9 @@ def update_eaf_func(data, reference_panel, object_name, ram=10000, fill=True):
         return data
 
     freqs_df = read_afreq(freq_path)
-    query["EA"] = data["EA"].astype(str).str.upper().to_numpy()
+    query["EA"] = _upper_case(data["EA"])
     if "NEA" in data.columns:
-        query["NEA"] = data["NEA"].astype(str).str.upper().to_numpy()
+        query["NEA"] = _upper_case(data["NEA"])
     eaf_new, n_ambiguous, n_found, n_concordant = match_reference_eaf(query, freqs_df, keys)
 
     # Report the matching: coverage (variants absent from the panel) is informational, while a low allele concordance
@@ -920,19 +983,51 @@ def update_eaf_func(data, reference_panel, object_name, ram=10000, fill=True):
     return data
 
 
+def _upper_case(values):
+    """values.astype(str).str.upper() as an array, computed once per distinct value."""
+    codes, uniques = pd.factorize(values, use_na_sentinel=False)
+    return pd.Series(uniques).astype(str).str.upper().to_numpy()[codes]
+
+
 def read_afreq(freq_path):
     """
     Read a PLINK2 .afreq file into a DataFrame with columns CHR, (POS), SNP, REF, ALT, ALT_FREQ, REF_FREQ.
     Multi-allelic records (ALT "A,T", ALT_FREQS "0.1,0.2") are split into one row per ALT allele,
     REF_FREQ being the frequency of the REF allele (1 - sum of the ALT frequencies).
+    The file is read with pyarrow's multi-threaded CSV reader, with the missing values of pandas' reader.
     """
-    freqs = pd.read_csv(freq_path, sep="\t", dtype={"#CHROM": str, "ID": str, "REF": str, "ALT": str, "ALT_FREQS": str})
-    freqs = freqs.rename(columns={"#CHROM": "CHR", "ID": "SNP"})
-    freqs["CHR"] = parse_int_codes(freqs["CHR"], chromosome=True)[0]
-    freqs["ALT_FREQ"] = pd.to_numeric(freqs["ALT_FREQS"], errors="coerce")
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    import pyarrow.csv as pacsv
+
+    from .tools import arrow_to_pandas
+
+    table = pacsv.read_csv(
+        freq_path,
+        parse_options=pacsv.ParseOptions(delimiter="\t"),
+        convert_options=pacsv.ConvertOptions(
+            column_types={"POS": pa.int64(), **{col: pa.string() for col in ["#CHROM", "ID", "REF", "ALT", "ALT_FREQS"]}},
+            null_values=READ_CSV_NA_VALUES,
+            strings_can_be_null=True,
+        ),
+    )
+    # Frequencies of the records with one ALT allele (pandas' parsing if a value is not a plain number)
+    single = pc.if_else(pc.match_substring(table["ALT_FREQS"], ","), pa.scalar(None, pa.string()), table["ALT_FREQS"])
+    try:
+        alt_freq = np.asarray(pc.fill_null(pc.cast(single, pa.float64()), np.nan))
+    except pa.ArrowInvalid:
+        alt_freq = pd.to_numeric(arrow_to_pandas(pa.table({"f": single}))["f"], errors="coerce").to_numpy(dtype=float)
+    multi_allelic = np.asarray(pc.fill_null(pc.match_substring(table["ALT"], ","), False))
+    freqs = arrow_to_pandas(table).rename(columns={"#CHROM": "CHR", "ID": "SNP"})
+    for col in ["SNP", "REF", "ALT"]:  # Missing strings as NaN, as read by pandas
+        if freqs[col].dtype == object and freqs[col].hasnans:
+            freqs[col] = freqs[col].where(freqs[col].notna())
+    codes, chromosomes = pd.factorize(freqs["CHR"], use_na_sentinel=False)
+    freqs["CHR"] = parse_int_codes(pd.Series(chromosomes), chromosome=True)[0].array.take(codes)
+    freqs["ALT_FREQ"] = alt_freq
     freqs["REF_FREQ"] = 1 - freqs["ALT_FREQ"]
-    multi_allelic = freqs["ALT"].str.contains(",", na=False)
     if multi_allelic.any():
+        multi_allelic = pd.Series(multi_allelic, index=freqs.index)
         split = freqs[multi_allelic].copy()
         split["ALT"] = split["ALT"].str.split(",")
         split["ALT_FREQ"] = split["ALT_FREQS"].str.split(",")
@@ -955,14 +1050,23 @@ def match_reference_eaf(query, freqs, keys):
     """
     rows = query.reset_index(drop=True)
     rows["_row"] = np.arange(len(rows))
-    candidates = rows.dropna(subset=keys).merge(
-        freqs[keys + ["REF", "ALT", "ALT_FREQ", "REF_FREQ"]], on=keys, how="inner"
-    )
-    is_alt = candidates["EA"] == candidates["ALT"]
-    is_ref = candidates["EA"] == candidates["REF"]
-    if "NEA" in candidates.columns:
-        is_alt &= candidates["NEA"] == candidates["REF"]
-        is_ref &= candidates["NEA"] == candidates["ALT"]
+    rows = rows.dropna(subset=keys)
+    reference = freqs.dropna(subset=keys)
+    # Matching on integer codes of the keys and of the alleles (missing alleles match nothing)
+    query_key, reference_key = _key_codes(rows, reference, keys)
+    has_nea = "NEA" in rows.columns
+    alleles = _allele_codes([rows["EA"]] + ([rows["NEA"]] if has_nea else []) + [reference["REF"], reference["ALT"]], missing=None)
+    left = pd.DataFrame({"_key": query_key, "_row": rows["_row"].to_numpy(), "EA": alleles[0]})
+    if has_nea:
+        left["NEA"] = alleles[1]
+    right = pd.DataFrame({"_key": reference_key, "REF": alleles[-2], "ALT": alleles[-1],
+                          "ALT_FREQ": reference["ALT_FREQ"].to_numpy(), "REF_FREQ": reference["REF_FREQ"].to_numpy()})
+    candidates = left.merge(right, on="_key", how="inner")
+    is_alt = (candidates["EA"] == candidates["ALT"]) & (candidates["EA"] >= 0)
+    is_ref = (candidates["EA"] == candidates["REF"]) & (candidates["EA"] >= 0)
+    if has_nea:
+        is_alt &= (candidates["NEA"] == candidates["REF"]) & (candidates["NEA"] >= 0)
+        is_ref &= (candidates["NEA"] == candidates["ALT"]) & (candidates["NEA"] >= 0)
     candidates["EAF"] = np.select([is_alt, is_ref], [candidates["ALT_FREQ"], candidates["REF_FREQ"]], default=np.nan)
     n_found = int(candidates["_row"].nunique())
     candidates = candidates[is_alt | is_ref]
@@ -970,6 +1074,6 @@ def match_reference_eaf(query, freqs, keys):
     n_values = candidates.groupby("_row")["EAF"].nunique()
     unique_rows = n_values.index[n_values == 1]
     values = candidates.groupby("_row")["EAF"].first()
-    eaf = np.full(len(rows), np.nan)
+    eaf = np.full(len(query), np.nan)
     eaf[unique_rows.to_numpy()] = values.loc[unique_rows].to_numpy()
     return eaf, int((n_values > 1).sum()), n_found, n_concordant

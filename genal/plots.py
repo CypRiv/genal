@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import warnings
 
+import matplotlib
 import numpy as np
 import pandas as pd
+from matplotlib.font_manager import FontProperties
+from matplotlib.textpath import TextToPath
 from plotnine import (
     aes,
+    after_scale,
     coord_cartesian,
     element_blank,
     element_line,
@@ -13,7 +17,6 @@ from plotnine import (
     expand_limits,
     guide_legend,
     geom_abline,
-    geom_errorbarh,
     geom_linerange,
     geom_point,
     geom_segment,
@@ -28,6 +31,7 @@ from plotnine import (
     scale_y_reverse,
     theme,
     theme_bw,
+    theme_get,
 )
 
 from .constants import MR_METHODS_NAMES
@@ -74,6 +78,71 @@ def _validate_figure_size(figure_size):
     if fig_width <= 0 or fig_height <= 0:
         raise ValueError("figure_size values must be > 0.")
     return float(fig_width), float(fig_height)
+
+
+# Text sizes are in points, so that they keep their printed size in figures of any size. In figures smaller than the
+# compact size of a plot (the smallest size in which its text fits), text and marker sizes are reduced in proportion to
+# the figure, to at least MIN_TEXT_SCALE times their size and MIN_TEXT_SIZE points (smaller text is hard to read, and
+# macOS's Helvetica fails to render below about 7 pixels with some matplotlib versions) and, in figures narrower than
+# NARROW_FIGURE_WIDTH inches, legends are placed below the plot. Titles that do not fit are wrapped.
+COMPACT_FIGURE_SIZE = (5, 3.5)
+MIN_TEXT_SCALE = 0.6
+MIN_TEXT_SIZE = 6
+NARROW_FIGURE_WIDTH = 4.5
+
+
+def _text_scale(figure_size, compact_size=COMPACT_FIGURE_SIZE):
+    """Text scale of a figure: 1 if it is not smaller than the compact size of the plot, in proportion otherwise."""
+    scale = min(figure_size[0] / compact_size[0], figure_size[1] / compact_size[1])
+    return 1.0 if scale >= 1 else max(MIN_TEXT_SCALE, scale)
+
+
+def _text_size(size, scale):
+    """Size (points) of a text of `size` points in a figure with the given text scale."""
+    return size if scale == 1 else max(MIN_TEXT_SIZE, size * scale)
+
+
+def _text_width(text, size):
+    """Width (inches) of a one-line text of `size` points in the font of the plots (current plotnine theme)."""
+    with matplotlib.rc_context(theme_get().rcParams):
+        width, _, _ = TextToPath().get_text_width_height_descent(text, FontProperties(size=size), ismath=False)
+    return width / 72
+
+
+def _fit_title(title, length, size, sep=" "):
+    """
+    Title wrapped on several lines if it is longer than `length` inches with a font of `size` points: between the
+    parts separated by `sep`, and between words in parts that are too long.
+    """
+    lines = []
+    for part in title.split(sep):
+        if lines and _text_width(lines[-1] + sep + part, size) <= length:
+            lines[-1] += sep + part
+        elif sep != " " and _text_width(part, size) > length:
+            lines += _fit_title(part, length, size).split("\n")
+        else:
+            lines.append(part)
+    return "\n".join(lines)
+
+
+def _figure_size_theme(figure_size, scale):
+    """
+    Line spacing of wrapped titles and, in a figure smaller than the compact size of the plot (scale < 1), text and
+    legend sizes in proportion to the figure, with legends below the plot in narrow figures.
+    """
+    if scale == 1:
+        return theme(axis_title=element_text(linespacing=1.1), plot_subtitle=element_text(linespacing=1.1))
+    elements = dict(
+        axis_title=element_text(size=_text_size(12, scale), linespacing=1.1),
+        axis_text=element_text(size=_text_size(10, scale)),
+        legend_title=element_text(size=_text_size(11, scale)),
+        legend_text=element_text(size=_text_size(8.8, scale)),
+        plot_subtitle=element_text(size=_text_size(10, scale), linespacing=1.1),
+        legend_key_size=15.84 * scale,
+    )
+    if figure_size[0] < NARROW_FIGURE_WIDTH:
+        elements.update(legend_position="bottom", legend_box="vertical")
+    return theme(**elements)
 
 
 def _mrpresso_outlier_ids(mrpresso_outliers) -> set[str]:
@@ -368,7 +437,6 @@ def mr_loo_plot(
         summary_rows.append(corrected_row)
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_df["mrpresso_corrected"] = summary_df["SNP"] == "MR-PRESSO corrected"
     if odds:
         summary_df["CI_lower"] = np.exp(summary_df["Estimate"] - summary_df["crit"] * summary_df["SE"])
         summary_df["CI_upper"] = np.exp(summary_df["Estimate"] + summary_df["crit"] * summary_df["SE"])
@@ -422,7 +490,6 @@ def mr_loo_plot(
             plot_cols.append("mrpresso_status")
         df_plot = df_page.loc[:, plot_cols].copy()
         df_plot["row_type"] = "instrument"
-        df_plot["mrpresso_corrected"] = False
         if "mrpresso_status" not in df_plot.columns:
             df_plot["mrpresso_status"] = np.nan
 
@@ -437,7 +504,6 @@ def mr_loo_plot(
                         "CI_upper": [np.nan],
                         "row_type": ["separator"],
                         "mrpresso_status": [np.nan],
-                        "mrpresso_corrected": [False],
                     }
                 ),
                 summary_df.assign(mrpresso_status=np.nan),
@@ -457,15 +523,8 @@ def mr_loo_plot(
             fig_width, fig_height = 10, height
         else:
             fig_width, fig_height = figure_size_norm
-
-        caption = None
-        caption_parts = []
-        if multi_page:
-            caption_parts.append(f"Page {p}/{total_pages}")
-        elif top_influential:
-            caption_parts.append("Top influential instruments")
-        caption_parts.append("SNPs ordered by estimate")
-        caption = " • ".join(caption_parts)
+        text_scale = _text_scale((fig_width, fig_height), (COMPACT_FIGURE_SIZE[0], min(height, 0.25 * (n_rows_total + 3))))
+        row_label_width = max(_text_width(label, _text_size(10, text_scale)) for label in y_labels)
 
         df_instruments = df_plot[df_plot["row_type"] == "instrument"]
         outlier_present = (
@@ -480,35 +539,24 @@ def mr_loo_plot(
             df_non_outliers = df_instruments
 
         df_overall = df_plot[df_plot["row_type"] == "overall"]
-        df_corrected = df_overall[df_overall["mrpresso_corrected"]]
-        df_overall_other = df_overall[~df_overall["mrpresso_corrected"]]
 
+        # Confidence intervals as plain lines (no caps); overall estimates as diamonds with the same line width
         plot = (
             ggplot(df_plot, aes(x="Estimate", y="y_pos"))
-            + geom_errorbarh(
+            + geom_vline(xintercept=null_line, linetype="dashed", color="#9AA0A6", size=0.6)
+            + geom_segment(
                 data=df_non_outliers,
-                mapping=aes(xmin="CI_lower", xmax="CI_upper"),
-                height=0.9,
+                mapping=aes(x="CI_lower", xend="CI_upper", yend="y_pos"),
                 color="#9AA0A6",
                 size=0.45,
                 alpha=0.9,
             )
-            + (
-                geom_errorbarh(
-                    data=df_outliers,
-                    mapping=aes(xmin="CI_lower", xmax="CI_upper"),
-                    height=0.9,
-                    color="#D62728",
-                    size=0.45,
-                    alpha=0.9,
-                )
-                if outlier_present
-                else geom_errorbarh(
-                    data=df_outliers,
-                    mapping=aes(xmin="CI_lower", xmax="CI_upper"),
-                    height=0.9,
-                    alpha=0.0,
-                )
+            + geom_segment(
+                data=df_outliers,
+                mapping=aes(x="CI_lower", xend="CI_upper", yend="y_pos"),
+                color="#D62728",
+                size=0.45,
+                alpha=0.9 if outlier_present else 0.0,
             )
             + (
                 geom_point(
@@ -517,30 +565,29 @@ def mr_loo_plot(
                     shape="o",
                     color="#111111",
                     stroke=0.5,
-                    size=2.4,
+                    size=2.4 * text_scale,
                     alpha=0.95,
                 )
                 if outlier_present
                 else geom_point(
                     data=df_instruments,
                     color="#111111",
-                    size=2.4,
+                    size=2.4 * text_scale,
                     alpha=0.95,
                 )
             )
-            + geom_errorbarh(
-                data=df_overall_other,
-                mapping=aes(xmin="CI_lower", xmax="CI_upper"),
-                height=0.9,
+            + geom_segment(
+                data=df_overall,
+                mapping=aes(x="CI_lower", xend="CI_upper", yend="y_pos"),
                 color="#111111",
-                size=0.8,
+                size=0.45,
             )
             + geom_point(
-                data=df_overall_other,
+                data=df_overall,
+                shape="D",
                 color="#111111",
-                size=3.0,
+                size=2.6 * text_scale,
             )
-            + geom_vline(xintercept=null_line, linetype="dashed", color="#9AA0A6", size=0.6)
             + scale_y_continuous(
                 breaks=y_breaks,
                 labels=y_labels,
@@ -550,8 +597,7 @@ def mr_loo_plot(
             + labs(
                 x=x_label,
                 y="",
-                subtitle=subtitle,
-                caption=caption,
+                subtitle=_fit_title(subtitle, fig_width - row_label_width - 0.2, _text_size(10, text_scale), sep=" | ") if subtitle else subtitle,
             )
             + scale_x_continuous(**x_scale_kwargs)
             + theme(
@@ -559,7 +605,6 @@ def mr_loo_plot(
                 axis_title=element_text(size=12),
                 axis_text=element_text(size=10),
                 plot_subtitle=element_text(size=10, color="#444", ha="left"),
-                plot_caption=element_text(size=9, color="#666", ha="left"),
                 panel_grid_major_y=element_blank(),
                 panel_grid_minor_y=element_blank(),
                 panel_grid_minor_x=element_blank(),
@@ -567,21 +612,8 @@ def mr_loo_plot(
                 axis_ticks_major_y=element_blank(),
                 axis_ticks_minor_y=element_blank(),
             )
+            + _figure_size_theme((fig_width, fig_height), text_scale)
         )
-
-        if not df_corrected.empty:
-            plot += geom_errorbarh(
-                data=df_corrected,
-                mapping=aes(xmin="CI_lower", xmax="CI_upper"),
-                height=0.9,
-                color="#D62728",
-                size=0.9,
-            )
-            plot += geom_point(
-                data=df_corrected,
-                color="#D62728",
-                size=3.2,
-            )
 
         if (
             use_mrpresso_effective
@@ -595,7 +627,7 @@ def mr_loo_plot(
                 breaks=["outlier", "non-outlier"],
                 name="MR-PRESSO",
             )
-            plot += guides(fill=guide_legend(override_aes={"size": 3, "alpha": 1}))
+            plot += guides(fill=guide_legend(override_aes={"size": 3 * text_scale, "alpha": 1}))
         else:
             plot += theme(legend_position="none")
 
@@ -604,8 +636,8 @@ def mr_loo_plot(
                 xintercept=all_est,
                 linetype="solid",
                 color="#111111",
-                size=0.9,
-                alpha=0.85,
+                size=0.5,
+                alpha=0.8,
             )
 
         if filename is not None:
@@ -654,6 +686,8 @@ def mr_plot(
         "Effect on the outcome" if not outcome_name else f"Effect on {outcome_name}"
     )
     figure_size_norm = _validate_figure_size(figure_size) or (10, 6)
+    text_scale = _text_scale(figure_size_norm)
+    legend_right = figure_size_norm[0] >= NARROW_FIGURE_WIDTH  # Otherwise below the plot, taking height from the y title
 
     # Orient instruments so all SNPs increase the exposure (common MR plotting convention).
     mask_flip = df_mr["BETA_e"] < 0
@@ -688,7 +722,10 @@ def mr_plot(
             size=0.1,
         )
         + geom_abline(slope=0, intercept=0, color="black")
-        + labs(x=exposure_name, y=outcome_name)
+        + labs(
+            x=_fit_title(exposure_name, 0.8 * figure_size_norm[0], _text_size(12, text_scale)),
+            y=_fit_title(outcome_name, (0.85 if legend_right else 0.45) * figure_size_norm[1], _text_size(12, text_scale)),
+        )
         + theme(
             axis_title=element_text(size=12),
             axis_text=element_text(size=10),
@@ -700,21 +737,22 @@ def mr_plot(
     if mrpresso_status is not None:
         non_outliers = df_mr[df_mr["mrpresso_status"] == "non-outlier"]
         outliers = df_mr[df_mr["mrpresso_status"] == "outlier"]
+        # Outline of the fill color, also in the MR-PRESSO legend keys (which both layers draw); not in the methods legend
         plot += geom_point(
             data=non_outliers,
-            mapping=aes(fill="mrpresso_status"),
+            mapping=aes(fill="mrpresso_status", color=after_scale("fill")),
             shape="o",
             size=0.2,
             stroke=0.5,
-            color="#111111",
+            show_legend={"color": False},
         )
         plot += geom_point(
             data=outliers,
-            mapping=aes(fill="mrpresso_status"),
+            mapping=aes(fill="mrpresso_status", color=after_scale("fill")),
             shape="o",
             size=1.8,
             stroke=0.4,
-            color="#D62728",
+            show_legend={"color": False},
         )
     else:
         plot += geom_point(color="black", size=0.2)
@@ -725,7 +763,7 @@ def mr_plot(
             breaks=["outlier", "non-outlier"],
             name="MR-PRESSO",
         )
-        plot += guides(fill=guide_legend(override_aes={"size": 4, "alpha": 1}))
+        plot += guides(fill=guide_legend(override_aes={"size": 4 * text_scale, "alpha": 1}))
 
     lines = []
     for method in _wald_only_methods(methods, res):
@@ -769,6 +807,10 @@ def mr_plot(
         plot += geom_abline(
             aes(slope="slope", intercept="intercept", color="MR Methods"), data=line_data
         )
+        plot += labs(color="MR Methods")  # Otherwise named after the first color mapping (the outline of the points)
+        if not legend_right:
+            plot += guides(color=guide_legend(ncol=2, title=""))  # Method names need no legend title
+    plot += _figure_size_theme(figure_size_norm, text_scale)
 
     if filename:
         plot.save(
@@ -811,6 +853,7 @@ def mr_funnel(
     _ = mr_results[2] if not exposure_name else exposure_name
     _ = mr_results[3] if not outcome_name else outcome_name
     figure_size_norm = _validate_figure_size(figure_size) or (10, 6)
+    text_scale = _text_scale(figure_size_norm)
 
     # Orient instruments so all SNPs increase the exposure (common MR plotting convention).
     mask_flip = df_mr["BETA_e"] < 0
@@ -921,21 +964,22 @@ def mr_funnel(
     if mrpresso_status is not None:
         non_outliers = plot_df[plot_df["mrpresso_status"] == "non-outlier"]
         outliers = plot_df[plot_df["mrpresso_status"] == "outlier"]
+        # Outline of the fill color, also in the MR-PRESSO legend keys (which both layers draw); not in the methods legend
         plot += geom_point(
             data=non_outliers,
-            mapping=aes(fill="mrpresso_status"),
+            mapping=aes(fill="mrpresso_status", color=after_scale("fill")),
             shape="o",
             size=0.4,
             stroke=0.5,
-            color="#111111",
+            show_legend={"color": False},
         )
         plot += geom_point(
             data=outliers,
-            mapping=aes(fill="mrpresso_status"),
+            mapping=aes(fill="mrpresso_status", color=after_scale("fill")),
             shape="o",
             size=2,
             stroke=0.4,
-            color="#D62728",
+            show_legend={"color": False},
         )
     else:
         plot += geom_point(color="black", size=0.4)
@@ -946,7 +990,7 @@ def mr_funnel(
             breaks=["outlier", "non-outlier"],
             name="MR-PRESSO",
         )
-        plot += guides(fill=guide_legend(override_aes={"size": 4, "alpha": 1}))
+        plot += guides(fill=guide_legend(override_aes={"size": 4 * text_scale, "alpha": 1}))
 
     if not vline_df.empty:
         plot += geom_vline(
@@ -956,6 +1000,10 @@ def mr_funnel(
             size=0.8,
             alpha=0.95,
         )
+        plot += labs(color="MR Methods")  # Otherwise named after the first color mapping (the outline of the points)
+        if figure_size_norm[0] < NARROW_FIGURE_WIDTH:
+            plot += guides(color=guide_legend(ncol=2, title=""))  # Method names need no legend title
+    plot += _figure_size_theme(figure_size_norm, text_scale)
 
     if add_null_line:
         plot += geom_vline(xintercept=0, linetype="solid", color="#888888", size=0.5, alpha=0.8)
@@ -1020,7 +1068,7 @@ def mr_forest(
     exposure_name = "Exposure" if not exposure_name else exposure_name
     outcome_name = mr_results[3] if not outcome_name else outcome_name
     outcome_name = "Outcome" if not outcome_name else outcome_name
-    figure_size_norm = _validate_figure_size(figure_size) or (10, 6)
+    figure_size_norm = _validate_figure_size(figure_size)
 
     plot_data = []
     for method in _wald_only_methods(methods, res):
@@ -1074,17 +1122,25 @@ def mr_forest(
         plot_df["Method"], categories=plot_df["Method"].values[::-1], ordered=True
     )
 
+    figure_size_norm = figure_size_norm or (7, max(3.0, 1.4 + 0.5 * len(plot_df)))  # Height depending on the number of methods
+    text_scale = _text_scale(figure_size_norm, (COMPACT_FIGURE_SIZE[0], 3))
+    label_width = max(_text_width(method, _text_size(10, text_scale)) for method in plot_df["Method"])
+    # Confidence intervals as plain lines (no caps) over the null line; no horizontal grid lines
     plot = (
         ggplot(plot_df, aes(x="Estimate", y="Method"))
-        + geom_point(size=3)
-        + geom_errorbarh(aes(xmin="CI_lower", xmax="CI_upper"), height=0.2)
+        + geom_vline(xintercept=null_line, linetype="dashed", color="#9AA0A6", size=0.6)
+        + geom_segment(aes(x="CI_lower", xend="CI_upper", yend="Method"), color="#111111", size=0.6)
+        + geom_point(size=3 * text_scale, color="#111111")
         + theme(
             axis_title=element_text(size=12),
             axis_text=element_text(size=10),
             figure_size=figure_size_norm,
+            panel_grid_major_y=element_blank(),
+            panel_grid_minor_y=element_blank(),
+            axis_ticks_major_y=element_blank(),
         )
-        + labs(x=x_label, y="")
-        + geom_vline(xintercept=null_line, linetype="dashed", color="gray")
+        + labs(x=_fit_title(x_label, figure_size_norm[0] - label_width - 0.2, _text_size(12, text_scale)), y="")
+        + _figure_size_theme(figure_size_norm, text_scale)
     )
 
     if filename:

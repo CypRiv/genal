@@ -23,7 +23,7 @@ genal is built around one main object, `genal.Geno`, which wraps a pandas DataFr
 - **Select independent instruments**: LD clumping (PLINK2).
 - **Compute PRS**: weighted/unweighted scoring from PLINK genotype files, including optional **proxy SNP** support when variants are missing.
 - **Run two-sample MR**: multiple methods + sensitivity analyses (heterogeneity, pleiotropy), with plotting utilities.
-- **MR-PRESSO (parallel implementation)**: detect and correct horizontal pleiotropy.
+- **MR-PRESSO**: detect and correct horizontal pleiotropy, in a fraction of the time of the MR-PRESSO R package (over 99.7% faster: 0.3 s instead of about 1.5 h for 812 instruments and 10,000 iterations).
 - **Colocalization**: approximate Bayes-factor colocalization to assess whether two GWAS signals likely share a causal variant.
 - **Association testing**: single-SNP regression in individual-level data (PLINK2) to recalibrate weights.
 - **Utilities**: liftover between builds, GWAS Catalog querying, and filtering variants around a gene (useful for protein/drug-target analyses).
@@ -149,7 +149,7 @@ Most methods either:
 - **Extract genotype subset**: `Geno.extract_snps(path=...)` → writes extracted files under `tmp_GENAL/`
 - **Two-sample MR pipeline**: `Geno.query_outcome(...)` → `Geno.MR(...)` (+ `MR_plot`)
 - **Leave-one-out MR**: `Geno.MR_loo(...)` → `Geno.MR_loo_plot(...)` (identify influential variants)
-- **MR-PRESSO**: `Geno.MRpresso(...)` (parallel; outlier + distortion tests)
+- **MR-PRESSO**: `Geno.MRpresso(...)` (outlier + distortion tests)
 - **Colocalization**: `Geno.colocalize(...)` (approx Bayes factors; returns posterior probabilities)
 - **Association testing (individual-level)**: `Geno.set_phenotype(...)` → `Geno.association_test(...)`
 - **Liftover builds**: `Geno.lift(...)` (downloads chain files if needed; optional UCSC `liftOver` executable)
@@ -314,13 +314,12 @@ G_clumped.MR_funnel(
 ```
 
 ### 6) Sensitivity: MR-PRESSO
-MR-PRESSO detects potential horizontal pleiotropy (outliers) and recomputes an IVW estimate after removing them.
+MR-PRESSO detects potential horizontal pleiotropy (outliers) and recomputes an IVW estimate after removing them. genal runs the same tests as the MR-PRESSO R package, over 99.7% faster (0.3 s instead of about 1.5 h for 812 instruments and 10,000 iterations, on a single core).
 
 ```python
 mod_table, GlobalTest, OutlierTest, BiasTest = G_clumped.MRpresso(
     action=2,
     n_iterations=10000,
-    cpus=-1,   # use all CPU cores
     seed=42,   # optional: reproducible results
 )
 ```
@@ -409,7 +408,7 @@ lifted = G.lift(start="hg19", end="hg38", replace=False)
 lifted.head()
 ```
 
-For large datasets, you can provide a UCSC LiftOver executable via `liftover_path`.
+The lift runs in Python; a UCSC liftOver executable can be used instead via `liftover_path`.
 
 ### 10) Query the GWAS Catalog
 

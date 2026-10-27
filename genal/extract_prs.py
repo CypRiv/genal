@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import os, subprocess, re, uuid
 from functools import partial
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 from .tools import (
     check_pfiles,
@@ -300,7 +300,7 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
 
     # First attempt with calculated workers
     results = []
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         results = list(
             executor.map(partial_extract_command_parallel, SPLIT_CHROMOSOMES)
         )
@@ -327,7 +327,7 @@ def extract_snps_from_split_data(name, path, output_path, snp_list_path, filetyp
         )
 
         failed_chr_ids = [r['chr'] for r in failed_chrs]
-        with ProcessPoolExecutor(max_workers=retry_workers) as executor:
+        with ThreadPoolExecutor(max_workers=retry_workers) as executor:
             retry_results = list(executor.map(partial_retry, failed_chr_ids))
         failed_chrs = [r for r in retry_results if r is not None and isinstance(r, dict) and r.get('failed')]
 

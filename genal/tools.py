@@ -8,6 +8,7 @@ import tarfile
 import tempfile
 import zipfile
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -403,7 +404,9 @@ def load_reference_panel(reference_panel="38"):
         
         # Load parquet file
         try:
-            reference_panel_df = pd.read_parquet(variants_file, engine="pyarrow")
+            import pyarrow.parquet as pq
+
+            reference_panel_df = arrow_to_pandas(pq.read_table(variants_file))
             print(f"Using reference variants from build {build}.")
         except Exception as e:
             raise RuntimeError(f"Failed to load reference variants: {e}")
@@ -426,6 +429,71 @@ def normalize_chr(chrom):
     numbers = pd.to_numeric(names.replace({code: str(number) for code, number in CHR_CODES.items()}), errors="coerce")
     return chrom.map(pd.Series(numbers.to_numpy(), index=codes)).astype(float)
 
+def _read_variants_arrow(path, n_meta, names, tab_only):
+    """
+    Variant table of :func:`read_variant_file` read with pyarrow's multi-threaded CSV reader (tab delimiter), with the
+    columns and values of the pandas reader: CHR as category, strings as read (no missing values), POS as read.
+    Returns None when the file needs the pandas reader: a pyarrow parsing error, or, for files that pandas splits on
+    any whitespace (tab_only), a field that is empty or contains whitespace or a missing position (pandas would merge
+    consecutive separators or split the field).
+
+    Args:
+        path (str): Path to the .bim or .pvar file.
+        n_meta (int): Number of '##' header lines to skip.
+        names (list or None): Column names of a file without header line (.bim column order), None for a .pvar file
+            with a '#CHROM' header line.
+        tab_only (bool): Whether pandas reads the file with any whitespace as separator.
+    """
+    import pyarrow as pa
+    import pyarrow.csv as pacsv
+    import pyarrow.compute as pc
+
+    if names is None:
+        columns, string_columns, category = ["#CHROM", "POS", "ID", "REF", "ALT"], ["ID", "REF", "ALT"], "#CHROM"
+    else:
+        columns, string_columns, category = names, [c for c in names if c not in ("CHR", "POS")], "CHR"
+    try:
+        table = pacsv.read_csv(
+            path,
+            read_options=pacsv.ReadOptions(skip_rows=n_meta, column_names=names),
+            parse_options=pacsv.ParseOptions(delimiter="\t"),
+            convert_options=pacsv.ConvertOptions(
+                include_columns=columns,
+                # POS as integers (a value that is not an integer, e.g. a date, leaves the file to the pandas reader)
+                column_types={category: pa.dictionary(pa.int32(), pa.string()), "POS": pa.int64(), **{c: pa.string() for c in string_columns}},
+                strings_can_be_null=False,
+            ),
+        )
+    except (pa.ArrowException, KeyError):  # Any pyarrow failure: the pandas reader reads the file (or raises its error)
+        return None
+    if tab_only:
+        for column in [category, *string_columns]:
+            values = table[column]
+            if pa.types.is_dictionary(values.type):
+                values = values.cast(pa.string())
+            if pc.any(pc.or_(pc.equal(values, ""), pc.match_substring_regex(values, r"\s"))).as_py():
+                return None
+        del values
+        if table["POS"].null_count > 0:
+            return None
+    table = table.select([c for c in columns if c != "CM"])
+    return arrow_to_pandas(table)
+
+
+def arrow_to_pandas(table):
+    """
+    Convert a pyarrow table to a DataFrame with the dtypes of pandas' readers (strings: object with pandas 2, str with
+    pandas 3). The conversion is column by column, each Arrow column being freed once converted, and Python strings are
+    not deduplicated: the deduplication is very slow on large tables and saves little, single-character alleles being
+    shared by Python anyway.
+    """
+    import pyarrow as pa
+
+    string_dtype = pd.Series([""], dtype=str).dtype
+    types_mapper = None if string_dtype == object else {pa.string(): string_dtype, pa.large_string(): string_dtype}.get
+    return table.to_pandas(types_mapper=types_mapper, deduplicate_objects=False, self_destruct=True, split_blocks=True)
+
+
 def read_variant_file(path):
     """
     Read the variants of a .bim or .pvar file.
@@ -434,8 +502,8 @@ def read_variant_file(path):
     (QUAL, FILTER, INFO or CM columns are ignored), with A1 = REF and A2 = ALT. A .pvar file without '#CHROM' header line
     is read in .bim column order, as PLINK does.
     .bim files: whitespace-delimited columns CHR, SNP, CM (optional), POS, A1, A2.
-    Chromosome codes are converted to numbers (see :func:`normalize_chr`), variants on other contigs are removed
-    and missing variant IDs ('.') are set to NaN.
+    Chromosome codes are converted to numbers (see :func:`normalize_chr`), variants on other contigs or with a
+    position that is not an integer are removed and missing variant IDs ('.') are set to NaN.
 
     Args:
         path (str): Path to the .bim or .pvar file.
@@ -455,10 +523,13 @@ def read_variant_file(path):
         return pd.DataFrame(columns=["CHR", "POS", "SNP", "A1", "A2"])
 
     if path.endswith(".pvar") and first_line.startswith("#CHROM"):
-        variants = pd.read_csv(
-            path, sep="\t", skiprows=n_meta, usecols=["#CHROM", "POS", "ID", "REF", "ALT"],
-            dtype={"#CHROM": "category", "ID": str, "REF": str, "ALT": str}, keep_default_na=False,
-        ).rename(columns={"#CHROM": "CHR", "ID": "SNP", "REF": "A1", "ALT": "A2"})
+        variants = _read_variants_arrow(path, n_meta, None, tab_only=False)
+        if variants is None:
+            variants = pd.read_csv(
+                path, sep="\t", skiprows=n_meta, usecols=["#CHROM", "POS", "ID", "REF", "ALT"],
+                dtype={"#CHROM": "category", "ID": str, "REF": str, "ALT": str}, keep_default_na=False,
+            )
+        variants = variants.rename(columns={"#CHROM": "CHR", "ID": "SNP", "REF": "A1", "ALT": "A2"})
     else:
         n_columns = len(first_line.split())
         if n_columns == 6:
@@ -467,14 +538,16 @@ def read_variant_file(path):
             names = ["CHR", "SNP", "POS", "A1", "A2"]
         else:
             raise ValueError(f"The variant file {path} should have 5 or 6 columns (.bim format) or a '#CHROM' header line (.pvar format).")
-        variants = pd.read_csv(
-            path, sep=r"\s+", header=None, names=names, skiprows=n_meta,
-            dtype={"CHR": "category", "SNP": str, "A1": str, "A2": str}, keep_default_na=False,
-        )
+        variants = _read_variants_arrow(path, n_meta, names, tab_only=True)
+        if variants is None:
+            variants = pd.read_csv(
+                path, sep=r"\s+", header=None, names=names, skiprows=n_meta,
+                dtype={"CHR": "category", "SNP": str, "A1": str, "A2": str}, keep_default_na=False,
+            )
 
     variants["CHR"] = normalize_chr(variants["CHR"])
     variants["POS"] = pd.to_numeric(variants["POS"], errors="coerce")
-    invalid = variants["CHR"].isna() | variants["POS"].isna()
+    invalid = variants["CHR"].isna() | variants["POS"].isna() | (variants["POS"] != np.floor(variants["POS"]))
     if invalid.any():
         print(f"{invalid.sum()} variants of {path} without a valid chromosome (1-22, X, Y, XY, MT) or position are ignored.")
         variants = variants[~invalid].reset_index(drop=True)

@@ -60,7 +60,7 @@ High-level steps:
    - `action=1`: keep all palindromes (no attempt to resolve strand ambiguity)
    - `action=2`: drop “ambiguous” palindromes (exposure or outcome EAF missing or strictly between `eaf_threshold` and `1 - eaf_threshold`, as in TwoSampleMR) and flip the remaining ones when exposure/outcome frequencies are on opposite sides of 0.5. If either dataset has no `EAF` column, `action=3` is applied (with a warning).
    - `action=3`: drop all palindromes
-5. Remove rows with missing or non-finite `BETA`/`SE`, or `SE ≤ 0`. Then, if the exposure or the outcome contains several rows for the same SNP ID, keep the first remaining allele-compatible row (a warning lists them), so that `MR`, `MR_loo` and `MRpresso` always use the same harmonized table.
+5. Remove rows with missing or non-finite `BETA`/`SE`, or `SE ≤ 0`, and rows with an exposure effect `BETA_e = 0` (not associated with the exposure: their ratio estimate and their orientation on the exposure effect are undefined; `BETA_o = 0` is kept). Then, if the exposure or the outcome contains several rows for the same SNP ID, keep the first remaining allele-compatible row (a warning lists them), so that `MR`, `MR_loo` and `MRpresso` always use the same harmonized table.
 
 ### Proxy SNPs
 
@@ -108,7 +108,7 @@ When exactly one instrument remains after harmonization, `MR()` returns the **Wa
 
 Confidence intervals (odds-ratio intervals with `odds=True`, forest and leave-one-out plots) use the same distribution as each method's p-value: a t-distribution with $nSNP-2$ degrees of freedom for the MR-Egger slope and intercept, with $nSNP-1$ degrees of freedom for the mode estimators, and the normal distribution for the other methods.
 
-Bootstrap-based methods (`Egger-boot`, median and mode estimators) draw their bootstrap samples from a random generator seeded with the `seed` argument of {py:meth}`genal.Geno.MR` / {py:meth}`genal.Geno.MR_loo`: for a given seed, results are identical whatever the number of `cpus`. Bootstrap standard errors are standard deviations (`ddof=1`) of the bootstrap estimates, except for the mode estimators, whose standard error is 1.4826 × the median absolute deviation of the bootstrap estimates (as in TwoSampleMR).
+Bootstrap-based methods (`Egger-boot`, median and mode estimators) draw their bootstrap samples from a random generator seeded with the `seed` argument of {py:meth}`genal.Geno.MR` / {py:meth}`genal.Geno.MR_loo`: for a given seed, results are reproducible. The MR methods run on a single core (the `cpus` argument of `Geno.MR` and `Geno.MR_loo` is ignored). Bootstrap standard errors are standard deviations (`ddof=1`) of the bootstrap estimates, except for the mode estimators, whose standard error is 1.4826 × the median absolute deviation of the bootstrap estimates (as in TwoSampleMR).
 
 ### Common quantities used by ratio-based methods
 
@@ -148,7 +148,7 @@ The three IVW variants share the WLS estimate and differ in the standard error. 
 
 These closed forms stay valid for perfect fits ($\sigma = 0$). MR-Egger uses the same scaling, $\max(1, \sigma)$, of its fixed-effect standard errors.
 
-Practical note: ratio-based methods divide by $\beta_{e,i}$ and become unstable when it is close to 0. Harmonization removes only missing or non-finite `BETA`/`SE` and `SE ≤ 0` (`BETA = 0` is kept), so instruments should be strongly associated with the exposure.
+Practical note: ratio-based methods divide by $\beta_{e,i}$ and become unstable when it is close to 0. Harmonization removes missing or non-finite `BETA`/`SE`, `SE ≤ 0` and exposure effects equal to 0, but keeps exposure effects close to 0, so instruments should be strongly associated with the exposure.
 
 ### MR-Egger (WLS with intercept)
 
@@ -181,7 +181,7 @@ Mode methods estimate the mode of the distribution of $\hat{\theta}_i$ using ker
 - **Simple mode**: unweighted KDE
 - **Weighted mode**: KDE weighted by inverse-variance-like weights
 
-The bandwidth uses a modified Silverman rule multiplied by the user-provided factor `phi`. The estimate is the global maximum of the exact (weighted) Gaussian KDE: the density is evaluated on a fine grid (spacing of a tenth of the bandwidth) covering the regions within 4 bandwidths of the ratio estimates, and every local maximum close to the highest one is refined. Narrow peaks, peaks located between ratio estimates, and data with a few extreme ratio estimates are handled. In ordinary data this agrees with TwoSampleMR (which evaluates R's `density` on a 512-point grid) to within one grid step. `genal` then uses bootstrap sampling (normal sampling with the per-variant ratio SE) to estimate uncertainty.
+The bandwidth uses a modified Silverman rule multiplied by the user-provided factor `phi`. The estimate is the global maximum of the exact (weighted) Gaussian KDE: the density is evaluated on a fine grid (spacing of a tenth of the bandwidth) covering the regions within 4 bandwidths of the ratio estimates, and every local maximum close to the highest one is refined. The grid density is only computed where an upper bound shows that it can come within 0.25% of its highest value, which gives the same estimate as the whole grid. If distinct maxima have the same density (up to rounding errors, e.g. with symmetric ratio estimates), the estimate is ambiguous: the smallest maximum is reported and a warning is printed (TwoSampleMR also reports the first of equal grid maxima). Narrow peaks, peaks located between ratio estimates, and data with a few extreme ratio estimates are handled. In ordinary data this agrees with TwoSampleMR (which evaluates R's `density` on a 512-point grid) to within one grid step. `genal` then uses bootstrap sampling (normal sampling with the per-variant ratio SE) to estimate uncertainty.
 
 ### Sign concordance test
 
@@ -223,6 +223,31 @@ At a high level, `genal`'s MR-PRESSO implementation:
   - an outlier test (per-variant p-values, Bonferroni-corrected),
   - an optional distortion test (whether the causal estimate changes materially after removing outliers).
 
+(mr-presso-computation)=
+### Computation
+
+`genal` computes the same statistics and tests as the MR-PRESSO R package (`getRSS_LOO`, `getRandomData`,
+`getRandomBias`), with simulated datasets drawn from the same distributions, and two differences in how they are
+computed:
+
+- the leave-one-out IVW estimates use their closed form,
+  $\hat{\theta}_{-i} = \sum_{j \neq i} w_j x_j y_j \,/\, \sum_{j \neq i} w_j x_j^2$, instead of one regression per
+  left-out variant (the R package refits $J$ regressions on the observed data for every simulated dataset);
+- the simulated datasets are processed in vectorized chunks, so that memory use does not grow with `n_iterations`.
+
+These changes do not alter the results, which match those of the MR-PRESSO R package.
+
+As a result, `genal` takes over 99.7% less time than the R package, and runs on a single core (its `cpus` argument is
+ignored). Benchmark on one CPU for both, Apple M1 Pro, synthetic data with 3% outliers, outlier and distortion tests
+run:
+
+| Instruments | Iterations | MR-PRESSO R package | `genal` |
+|---|---|---|---|
+| 20 | 10,000 | 112 s | 0.12 s |
+| 200 | 1,000 | 120 s | 0.04 s |
+| 812 | 1,000 | 521 s | 0.06 s |
+| 812 | 10,000 | about 87 min (extrapolated from 1,000 iterations) | 0.34 s |
+
 ### Distortion test
 
 The distortion test assesses whether the $k$ detected outliers change the causal estimate more than removing $k$ ordinary (non-outlier) variants would. `genal` follows the MR-PRESSO R implementation (`getRandomBias`):
@@ -241,7 +266,7 @@ The test is skipped (coefficient and p-value set to `NaN`, with a message) when 
 - `OutlierTest`: per-variant outlier p-values (empty if the outlier test did not run); SNP IDs as row labels,
 - `BiasTest`: distortion test result dictionary containing `"outliers_indices"` (SNP IDs, or a message when no or all SNPs are outliers), `"distortion_test_coefficient"`, and `"distortion_test_p"` (empty if `distortion_test=False` or the outlier test did not run).
 
-MR-PRESSO requires at least 4 instruments after harmonization, and `n_iterations` must exceed their number; with fewer instruments, no MR-PRESSO results are stored, and those of earlier calls are cleared. When {py:func}`genal.MRpresso.mr_presso` is called directly, it also requires a unique row index. The random datasets are drawn from generators seeded with the `seed` argument, so results are reproducible for a given seed whatever the number of `cpus`. Empirical p-values of 0 are reported as 0 with a printed message stating the bound (`< 1/n_iterations`, or `< nSNP/n_iterations` for the Bonferroni-corrected outlier test).
+MR-PRESSO requires at least 4 instruments after harmonization, and `n_iterations` must exceed their number; with fewer instruments, no MR-PRESSO results are stored, and those of earlier calls are cleared. When {py:func}`genal.MRpresso.mr_presso` is called directly, it also requires a unique row index and non-zero exposure effects. The random datasets are drawn from generators seeded with the `seed` argument, so results are reproducible for a given seed. Empirical p-values of 0 are reported as 0 with a printed message stating the bound (`< 1/n_iterations`, or `< nSNP/n_iterations` for the Bonferroni-corrected outlier test).
 
 The SNP IDs flagged by the outlier test are stored in `G.MRpresso_outliers` (used to highlight the outliers on plots). Whenever at least one but not all instruments are flagged (whether or not the distortion test runs), `genal` fills the `Outlier-corrected` row of `mod_table` (IVW on the non-outliers) and stores the outlier-removed harmonized table in `G.MRpresso_subset_data`, which allows rerunning MR with `Geno.MR(use_mrpresso_data=True)`. If all instruments are flagged, the `Outlier-corrected` row is `NaN` and `use_mrpresso_data=True` raises an error. These attributes are cleared when `query_outcome()` is called with a new outcome.
 
@@ -284,6 +309,7 @@ Practical note: colocalization is usually done on a **locus/region**, not genome
 
 Implementation: {py:meth}`genal.Geno.lift` (`genal/lift.py`).
 
+- By default, positions are lifted in Python through the aligned block of the chain file that contains them, in the chain with the highest score (the mappings of `pyliftover`); `liftover_path` lifts with the UCSC `liftOver` executable instead.
 - Positions are 1-based. Variants mapped to the opposite strand (inverted regions) get their `EA`/`NEA` reverse-complemented, and their number is printed.
 - Variants that cannot be lifted, or that map to alternative, unplaced or patch contigs (`chrUn_…`, `…_alt`, `…_random`, `…_fix`), are removed. Chromosomes 23, 24 and 26 are lifted as chrX, chrY and chrM; variants on chromosome 25 (XY) and rows with missing `CHR`/`POS` are removed.
 

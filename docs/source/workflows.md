@@ -199,14 +199,13 @@ G_instruments.MR_funnel(
 
 ## 6a) MR-PRESSO (outlier detection and distortion testing)
 
-{py:meth}`genal.Geno.MRpresso` runs a parallel MR-PRESSO implementation (at least 4 instruments are needed).
+{py:meth}`genal.Geno.MRpresso` runs MR-PRESSO (at least 4 instruments are needed). It computes the same tests as the MR-PRESSO R package, over 99.7% faster: 10,000 iterations take about 0.3 s for 812 instruments, on a single core (see {ref}`mr-presso-computation`).
 
 ```python
 mod_table, GlobalTest, OutlierTest, BiasTest = G_instruments.MRpresso(
     action=2,
     n_iterations=10_000,
     significance_p=0.05,
-    cpus=-1,
 )
 ```
 
@@ -340,7 +339,7 @@ Key arguments:
 - `start` / `end`: `"hg17"`, `"hg18"`, `"hg19"` or `"hg38"` (`"GRCh37"` and `"GRCh38"` are accepted for `"hg19"` and `"hg38"`).
 - `replace=True|False`: whether to overwrite `G.data` (return value is still a DataFrame either way).
 - `chain_file=...`: use a local UCSC chain file (useful for offline/reproducible builds).
-- `liftover_path=...`: use UCSC `liftOver` executable (faster than Python liftover for large datasets).
+- `liftover_path=...`: lift with the UCSC `liftOver` executable instead of the default Python lift (which is faster).
 - `name=...` / `extraction_file=True`: optionally write the lifted table and/or an extraction file.
 
 Variants that cannot be lifted are removed (their number is printed); see [Methods: liftover](methods.md#liftover) for strand and contig handling.

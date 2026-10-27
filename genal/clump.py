@@ -29,6 +29,8 @@ def clump_data_plink2(
         p1 (float, optional): P-value threshold for index SNPs. SNPs with a P-value above this value can't be index SNPs. Default is 5e-8.
         p2 (float, optional): Secondary P-value threshold of PLINK (--clump-p2): the clumped SNPs with a P-value below it are listed in the SP2 column of the PLINK report.
             It does not change the index SNPs, which are the SNPs returned. Default is 0.01.
+            Only the SNPs with a P-value below p1 or p2 are given to PLINK: the TOTAL, NONSIG and S* counts of the
+            PLINK report (.clumps file in the tmp_GENAL folder) are counts of these SNPs.
         name (str, optional): Name used for the files created in the tmp_GENAL folder.
         ram (int, optional): Amount of RAM in MB to be used by plink.
 
@@ -40,9 +42,11 @@ def clump_data_plink2(
     if name is None:
         name = str(uuid.uuid4())[:8]
 
-    # Save the relevant data columns to a temporary file
+    # Save the relevant data columns to a temporary file. SNPs with a P-value above both p1 and p2 cannot be index SNPs
+    # and are not listed in the SP2 column: they do not change the clumped data and are left out (they are then not
+    # counted in the TOTAL, NONSIG and S* columns of the PLINK report)
     to_clump_filename = os.path.join("tmp_GENAL", f"{name}_to_clump.txt")
-    data[["SNP", "P"]].to_csv(to_clump_filename, index=False, sep="\t")
+    data.loc[data["P"] <= max(p1, p2), ["SNP", "P"]].to_csv(to_clump_filename, index=False, sep="\t")
 
     # Get reference panel path and type
     ref_path, filetype = get_reference_panel_path(reference_panel)

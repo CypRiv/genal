@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -5,11 +7,16 @@ from scipy import stats
 from scipy.stats import norm, chi2, binomtest, t
 from scipy.special import log_ndtr
 from scipy.optimize import minimize_scalar
-from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
-from functools import partial
 
 from .constants import MR_METHODS_NAMES
+
+# Maximum number of (bootstrap replicate x SNP) values held in one array: the bootstrap replicates are processed in chunks
+BOOTSTRAP_CHUNK_VALUES = 2**15
+# Grid points per block of the kernel density evaluated on the grid of the mode methods, and per part of a block for
+# the tighter upper bounds (see grid_density)
+KDE_GRID_BLOCK = 64
+KDE_GRID_SUB_BLOCK = 8
 
 
 def _null_result(method_name):
@@ -38,7 +45,7 @@ def mr_simple_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, show_progress=T
     SE_o (numpy array): Standard errors corresponding to `BETA_o`.
     phi (int): Factor for the bandwidth parameter used in the kernel density estimation
     nboot (int): Number of boostrap iterations to obtain the standard error and p-value
-    cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
+    cpus (int): Not used (the bootstrap runs on a single core).
     seed (int, optional): Random seed for the bootstrap draws. Default None (non-reproducible).
 
     Returns:
@@ -82,7 +89,7 @@ def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, show_progress
     SE_o (numpy array): Standard errors corresponding to `BETA_o`.
     phi (int): Factor for the bandwidth parameter used in the kernel density estimation
     nboot (int): Number of boostrap iterations to obtain the standard error and p-value
-    cpus (int): Number of cpu cores to use in parallel for the boostrapping iterations.
+    cpus (int): Not used (the bootstrap runs on a single core).
     seed (int, optional): Random seed for the bootstrap draws. Default None (non-reproducible).
 
     Returns:
@@ -115,46 +122,107 @@ def mr_weighted_mode(BETA_e, SE_e, BETA_o, SE_o, phi, nboot, cpus, show_progress
     }
 ]
 
-def _kde(x, b_sorted, w_sorted, h):
+def _kde(x, b_sorted, w_sorted, h, block=512):
     """
     Unnormalised (weighted) Gaussian kernel density with bandwidth h of the sorted values b_sorted (weights w_sorted),
-    evaluated at the sorted points x. Kernels more than 10 bandwidths away (relative contribution < 2e-22) are skipped.
+    evaluated at the sorted points x, by blocks of `block` points. Kernels more than 10 bandwidths away from a block
+    (relative contribution < 2e-22) are skipped.
     """
     out = np.empty(len(x))
-    for start in range(0, len(x), 512):
-        xs = x[start:start + 512]
+    for start in range(0, len(x), block):
+        xs = x[start:start + block]
         lo = np.searchsorted(b_sorted, xs[0] - 10 * h, side="left")
         hi = np.searchsorted(b_sorted, xs[-1] + 10 * h, side="right")
-        out[start:start + 512] = np.exp(-0.5 * ((xs[:, None] - b_sorted[None, lo:hi]) / h) ** 2) @ w_sorted[lo:hi]
+        out[start:start + block] = np.exp(-0.5 * ((xs[:, None] - b_sorted[None, lo:hi]) / h) ** 2) @ w_sorted[lo:hi]
     return out
 
 
-def beta_mode(BETA_IV, SE_IV, phi, method):
-    """
-    Function to compute the point estimate of mode methods: the global maximum of the Gaussian kernel density of the
-    ratio estimates (unweighted for "Simple", weighted by SE_IV^-2 for "Weighted").
-    The density is evaluated on a grid of spacing h/10 covering the union of the intervals [b - 4h, b + 4h] around the
-    ratio estimates b; every grid local maximum within 0.25% of the highest one (the largest possible grid error) is
-    refined by a bounded scalar maximisation, and the highest refined maximum is returned.
-    """
-    BETA_IV = np.asarray(BETA_IV, dtype=float)
+def _kde_at(x, b_sorted, w_sorted, h):
+    """Kernel density of :func:`_kde` at the single point x (same arithmetic as _kde(np.array([x]), ...)[0])."""
+    lo = np.searchsorted(b_sorted, x - 10 * h, side="left")
+    hi = np.searchsorted(b_sorted, x + 10 * h, side="right")
+    return (np.exp(-0.5 * ((np.array([[x]]) - b_sorted[None, lo:hi]) / h) ** 2) @ w_sorted[lo:hi])[0]
 
-    # Bandwidth rule - modified Silverman's rule proposed by Bickel (2002)
-    s = 0.9 * min(np.std(BETA_IV, ddof=1), stats.median_abs_deviation(BETA_IV, scale=1/1.4826)) / len(BETA_IV) ** (1/5)
-        
-    # Define the actual bandwidth
-    h = max(0.00000001, s * phi)
 
-    if method == "Weighted": #Using weighted KDE
+def _density_bound(first, last, b, w, h):
+    """
+    Upper bound of the kernel density of :func:`_kde` on each interval [first, last]: each kernel within 10 bandwidths
+    of the interval taken at its maximum over the interval (one exponential per kernel and interval).
+    """
+    lo = np.searchsorted(b, first - 10 * h, side="left")
+    hi = np.searchsorted(b, last + 10 * h, side="right")
+    counts = hi - lo
+    interval = np.repeat(np.arange(len(first)), counts)
+    kernel = np.arange(counts.sum()) - np.repeat(np.cumsum(counts) - counts, counts) + np.repeat(lo, counts)
+    distance = np.maximum(0, np.maximum(first[interval] - b[kernel], b[kernel] - last[interval]))
+    return np.bincount(interval, weights=w[kernel] * np.exp(-0.5 * (distance / h) ** 2), minlength=len(first)) * (1 + 1e-9)
+
+
+def grid_density(grid, b, w, h):
+    """
+    Kernel density (see :func:`_kde`) on the sorted grid of :func:`kde_mode`, by blocks of KDE_GRID_BLOCK points, where
+    it can reach (1 - 1/400) of its maximum. Upper bounds of the density (see :func:`_density_bound`) on each block, then
+    on the KDE_GRID_SUB_BLOCK-point parts of the blocks that are not excluded, identify the blocks that cannot: their
+    points are set to -inf. The points that are evaluated get the values of the full evaluation, so the local maxima
+    within (1 - 1/400) of the maximum are the same.
+    """
+    block, sub_block = KDE_GRID_BLOCK, KDE_GRID_SUB_BLOCK
+    starts = np.arange(0, len(grid), block)
+    bound = _density_bound(grid[starts], grid[np.minimum(starts + block, len(grid)) - 1], b, w, h)
+
+    # Block with the highest bound first, then the blocks whose bound reaches (1 - 1/400) of the density found
+    density = np.full(len(grid), -np.inf)
+    point_block = np.arange(len(grid)) // block
+    top = point_block == np.argmax(bound)
+    density[top] = _kde(grid[top], b, w, h, block=block)
+    threshold = (1 - 1 / 400) * density[top].max()
+    candidates = np.flatnonzero(bound >= threshold)
+    candidates = candidates[candidates != np.argmax(bound)]
+    if len(candidates):
+        # Tighter bound of each candidate block: the highest bound of its parts
+        sub_starts = (starts[candidates][:, None] + np.arange(0, block, sub_block)).ravel()
+        in_grid = sub_starts < len(grid)
+        sub_bound = _density_bound(grid[sub_starts[in_grid]], grid[np.minimum(sub_starts[in_grid] + sub_block, len(grid)) - 1], b, w, h)
+        block_bound = np.full(len(candidates), -np.inf)
+        np.maximum.at(block_bound, np.repeat(np.arange(len(candidates)), block // sub_block)[in_grid], sub_bound)
+        rest = np.isin(point_block, candidates[block_bound >= threshold])
+        density[rest] = _kde(grid[rest], b, w, h, block=block)
+    return density
+
+
+def mode_bandwidth(BETA_IV, phi):
+    """
+    Bandwidth of the kernel density of the mode methods, one per row of BETA_IV: modified Silverman's rule proposed by
+    Bickel (2002), 0.9 * min(SD, MAD) / n^(1/5) with MAD = 1.4826 * median absolute deviation, times phi (at least 1e-8).
+    """
+    std = np.std(BETA_IV, axis=-1, ddof=1)
+    mad = np.median(np.abs(BETA_IV - np.median(BETA_IV, axis=-1, keepdims=True)), axis=-1) / (1 / 1.4826)
+    s = 0.9 * np.where(mad < std, mad, std) / BETA_IV.shape[-1] ** (1 / 5)
+    return np.where(s * phi > 0.00000001, s * phi, 0.00000001)
+
+
+def mode_weights(SE_IV, method, n):
+    """Standardised kernel weights of the mode methods: equal ("Simple") or proportional to SE_IV^-2 ("Weighted")."""
+    if method == "Weighted":  # Using weighted KDE
         weights = np.asarray(SE_IV, dtype=float) ** -2
-    elif method == "Simple": #Using unweighted KDE
-        weights = np.ones(len(BETA_IV))
+    elif method == "Simple":  # Using unweighted KDE
+        weights = np.ones(n)
     else:
         raise ValueError("Method should be either 'Simple' or 'Weighted'.")
-    weights = weights / np.sum(weights) # Standardised weights
-    order = np.argsort(BETA_IV)
-    b, w = BETA_IV[order], weights[order]
+    return weights / np.sum(weights)
 
+
+def kde_mode(b, w, h):
+    """
+    Global maximum of the Gaussian kernel density with bandwidth h of the sorted values b (standardised weights w).
+    The density is evaluated on a grid of spacing h/10 covering the union of the intervals [b - 4h, b + 4h] (see
+    :func:`grid_density`); every grid local maximum within 0.25% of the highest one (the largest possible grid error)
+    is refined by a bounded scalar maximisation, and the highest refined maximum is returned. Distinct maxima of equal
+    density (up to rounding errors, e.g. with symmetric data) are ties: the smallest of them is returned.
+
+    Returns:
+        tuple: (mode, other maxima tied with it)
+    """
     # Grid of spacing h/10 on the union of the intervals [b - 4h, b + 4h] (one segment per group of close estimates)
     step = h / 10
     breaks = np.flatnonzero(np.diff(b) > 8 * h) + 1
@@ -163,7 +231,7 @@ def beta_mode(BETA_IV, SE_IV, phi, method):
         for seg in np.split(b, breaks)
     ]
     grid = np.concatenate(segments)
-    density = _kde(grid, b, w, h)
+    density = grid_density(grid, b, w, h)
 
     # Local maxima of the grid density within each segment
     bounds = np.cumsum([0] + [len(seg) for seg in segments])
@@ -177,56 +245,66 @@ def beta_mode(BETA_IV, SE_IV, phi, method):
 
     # Bounded maximisation around each candidate; global maximum among the refined candidates
     mode, best_density = grid[candidates[0]], density[candidates[0]]
+    refined = []
     for i in candidates:
         opt = minimize_scalar(
-            lambda x: -_kde(np.array([x]), b, w, h)[0],
+            lambda x: -_kde_at(x, b, w, h),
             bounds=(grid[i] - step, grid[i] + step),
             method="bounded",
             options={"xatol": 1e-9 * h},
         )
+        refined.append((opt.x, -opt.fun))
         if -opt.fun > best_density:
             mode, best_density = opt.x, -opt.fun
+    # Ties: other maxima (more than a grid step away) whose density equals the highest one up to rounding errors
+    maxima = [mode]
+    for x, value in refined:
+        if value >= best_density * (1 - 1e-12) and all(abs(x - m) > step for m in maxima):
+            maxima.append(x)
+    maxima.sort()
+    return maxima[0], maxima[1:]
 
+
+def beta_mode(BETA_IV, SE_IV, phi, method):
+    """
+    Function to compute the point estimate of mode methods: the global maximum of the Gaussian kernel density of the
+    ratio estimates (unweighted for "Simple", weighted by SE_IV^-2 for "Weighted"), see :func:`kde_mode`.
+    """
+    BETA_IV = np.asarray(BETA_IV, dtype=float)
+    weights = mode_weights(SE_IV, method, len(BETA_IV))
+    order = np.argsort(BETA_IV)
+    mode, tied = kde_mode(BETA_IV[order], weights[order], float(mode_bandwidth(BETA_IV, phi)))
+    if tied:
+        warnings.warn(
+            f"The {method.lower()} mode estimate is ambiguous: the kernel density has maxima of equal height at "
+            f"{', '.join(f'{x:.6g}' for x in [mode] + tied)}. The smallest one ({mode:.6g}) is reported."
+        )
     return np.array([mode])
 
-def bootstrap_mode_iteration(BETA_IV_boot, SE_IV, phi, method):
-    """Helper function computing the mode estimate of one bootstrap replicate (pre-drawn ratio estimates)."""
-    if method=="Simple": #If Simple mode: the kernel density estimation is not weighted (SE vector of 1)
-        return beta_mode(BETA_IV_boot, np.ones(len(BETA_IV_boot)), phi, "Simple")
-    elif method=="Weighted": #If Weighted mode: the kernel density estimation is weighted using the standard errors
-        return beta_mode(BETA_IV_boot, SE_IV, phi, "Weighted")
-    else:
-        raise ValueError("Method should be either 'Simple' or 'Weighted'.")
 
 def bootstrap_mode(BETA_IV, SE_IV, phi, nboot, cpus, method, show_progress=True, seed=None):
     """
     Function to obtain arrays of bootstrapped beta estimates (weighted or unweighted) to estimate SEs of mode methods.
-    All bootstrap draws are generated here from a single seeded generator; the worker processes only compute
-    the mode of each pre-drawn replicate, so the results do not depend on the number of cpus.
+    The bootstrap replicates of the ratio estimates are drawn from a single seeded generator, in chunks (bandwidths and
+    sorting computed for a whole chunk at once). cpus is not used (single core).
     """
-    SE_IV = np.asarray(SE_IV, dtype=float)
-
-    # Draw all bootstrap replicates of the ratio estimates (nboot x nSNP)
+    BETA_IV, SE_IV = np.asarray(BETA_IV, dtype=float), np.asarray(SE_IV, dtype=float)
+    weights = mode_weights(SE_IV, method, len(BETA_IV))
     rng = np.random.default_rng(seed)
-    BETA_IV_boot = rng.normal(np.asarray(BETA_IV, dtype=float), SE_IV, size=(nboot, len(SE_IV)))
-
-    #Wrapper function freezing the bootstrap_iteration for parallel execution
-    partial_bootstrap_iteration = partial(bootstrap_mode_iteration, SE_IV=SE_IV, phi=phi, method=method)
-    progress = dict(total=nboot, desc=f"{method} mode bootstrapping", ncols=100, disable=not show_progress)
-
-    if cpus == 1:
-        results = [partial_bootstrap_iteration(row) for row in tqdm(BETA_IV_boot, **progress)]
-    else:
-        #Parallel execution with progress bar
-        with ProcessPoolExecutor(max_workers=cpus) as executor:
-            results = list(
-                tqdm(
-                    executor.map(partial_bootstrap_iteration, BETA_IV_boot, chunksize=max(1, nboot // (10 * cpus))),
-                    **progress,
-                )
-            )
-
-    return np.array(results)
+    modes = np.empty((nboot, 1))
+    with tqdm(total=nboot, desc=f"{method} mode bootstrapping", ncols=100, disable=not show_progress) as progress:
+        for start, stop in bootstrap_chunks(nboot, len(BETA_IV)):
+            # Replicates drawn as rng.normal(BETA_IV, SE_IV, size=(nboot, nSNP)), chunk by chunk
+            BETA_IV_boot = rng.normal(BETA_IV, SE_IV, size=(stop - start, len(BETA_IV)))
+            h = mode_bandwidth(BETA_IV_boot, phi)
+            order = np.argsort(BETA_IV_boot, axis=1)
+            b_sorted, w_sorted = np.take_along_axis(BETA_IV_boot, order, axis=1), weights[order]
+            for row in range(stop - start):
+                # Fresh arrays (aligned in memory like any new array): some BLAS libraries round the dot products of
+                # the kernel density differently depending on the memory alignment of their inputs
+                modes[start + row, 0] = kde_mode(b_sorted[row].copy(), w_sorted[row].copy(), float(h[row]))[0]
+            progress.update(stop - start)
+    return modes
 
 
 """
@@ -347,13 +425,12 @@ def mr_egger_regression_bootstrap(BETA_e, SE_e, BETA_o, SE_o, nboot, seed=None):
     b, b_i = egger[0]["b"], egger[1]["b"]
 
     rng = np.random.default_rng(seed)
-    res = np.zeros((nboot, 2))
-    for i in range(nboot):
-        xs = rng.normal(BETA_e, SE_e)
-        ys = rng.normal(BETA_o, SE_o)
-        res[i] = egger_wls(xs, ys, weights)
+    intercepts, slopes = np.empty(nboot), np.empty(nboot)
+    for start, stop in bootstrap_chunks(nboot, l):
+        xs, ys = draw_bootstrap_effects(rng, BETA_e, SE_e, BETA_o, SE_o, stop - start)
+        intercepts[start:stop], slopes[start:stop] = egger_wls(xs, ys, weights)
 
-    se, se_i = np.std(res[:, 1], ddof=1), np.std(res[:, 0], ddof=1)
+    se, se_i = np.std(slopes, ddof=1), np.std(intercepts, ddof=1)
 
     return [
         {
@@ -377,14 +454,38 @@ def egger_wls(BETA_e, BETA_o, weights):
     """
     Helper function returning the (intercept, slope) of the MR Egger model fitted by :func:`mr_egger_regression`:
     SNPs oriented to a positive exposure effect, weighted least squares of BETA_o on BETA_e with an intercept.
+    BETA_e and BETA_o can hold one dataset per row (last axis: SNPs), with one intercept and slope per row.
     """
     sign0 = np.where(BETA_e < 0, -1.0, 1.0)  # Sign of the exposure effect (0 counted as positive)
     x = np.abs(BETA_e)
     y = BETA_o * sign0
-    x_mean = np.sum(weights * x) / np.sum(weights)
-    y_mean = np.sum(weights * y) / np.sum(weights)
-    slope = np.sum(weights * (x - x_mean) * (y - y_mean)) / np.sum(weights * (x - x_mean) ** 2)
-    return y_mean - slope * x_mean, slope
+    x_mean = np.sum(weights * x, axis=-1, keepdims=True) / np.sum(weights)
+    y_mean = np.sum(weights * y, axis=-1, keepdims=True) / np.sum(weights)
+    slope = np.sum(weights * (x - x_mean) * (y - y_mean), axis=-1, keepdims=True) / np.sum(
+        weights * (x - x_mean) ** 2, axis=-1, keepdims=True
+    )
+    intercept = y_mean - slope * x_mean
+    if np.ndim(BETA_e) == 1:
+        return intercept[0], slope[0]
+    return intercept[:, 0], slope[:, 0]
+
+
+def bootstrap_chunks(nboot, n_snps):
+    """(start, stop) ranges of bootstrap replicates processed together (at most BOOTSTRAP_CHUNK_VALUES values per array)."""
+    rows = max(1, BOOTSTRAP_CHUNK_VALUES // max(n_snps, 1))
+    return [(start, min(start + rows, nboot)) for start in range(0, nboot, rows)]
+
+
+def draw_bootstrap_effects(rng, BETA_e, SE_e, BETA_o, SE_o, n_rows):
+    """
+    Bootstrap replicates of the SNP effects, one per row: exposure effects ~ N(BETA_e, SE_e) and outcome effects
+    ~ N(BETA_o, SE_o). Each replicate uses the standard normal draws of rng.normal(BETA_e, SE_e) followed by
+    rng.normal(BETA_o, SE_o), so drawing the replicates in chunks gives the same values as drawing them one by one.
+    """
+    if (SE_e < 0).any() or (SE_o < 0).any():
+        raise ValueError("Standard errors (SE_e and SE_o) must be non-negative.")
+    z = rng.standard_normal(size=(n_rows, 2, len(BETA_e)))
+    return BETA_e + SE_e * z[:, 0], BETA_o + SE_o * z[:, 1]
 
 """
 Median methods
@@ -392,35 +493,60 @@ Median methods
 
 def weighted_median(b_iv, weights):
     """Helper function to compute the weighted median estimate (NaN if the weights do not have a finite positive sum)."""
-    order_indices = np.argsort(b_iv)
-    betaIV_order = np.asarray(b_iv, dtype=float)[order_indices]
-    weights_order = np.asarray(weights, dtype=float)[order_indices]
-    total = np.sum(weights_order)
-    if len(weights_order) == 0 or not np.isfinite(total) or total <= 0:
+    b_iv = np.asarray(b_iv, dtype=float)
+    if b_iv.size == 0:
         return np.nan
-    weights_sum = (np.cumsum(weights_order) - 0.5 * weights_order) / total
-    below_indices = np.flatnonzero(weights_sum < 0.5)
-    if len(below_indices) == 0:  # All the weight on the smallest estimate
-        return betaIV_order[0]
-    below = below_indices[-1]
-    if below == len(betaIV_order) - 1:  # All the weight on the largest estimate
-        return betaIV_order[-1]
-    b = betaIV_order[below] + (betaIV_order[below + 1] - betaIV_order[below]) * (
-        0.5 - weights_sum[below]
-    ) / (weights_sum[below + 1] - weights_sum[below])
-    return b
+    return weighted_median_rows(b_iv[np.newaxis], np.asarray(weights, dtype=float))[0]
+
+
+def weighted_median_rows(b_iv, weights):
+    """
+    Weighted medians of the rows of b_iv (one set of ratio estimates per row) with the same weights for every row:
+    linear interpolation of the sorted estimates at half of the cumulative weight (each estimate placed at the middle
+    of its weight), NaN if the weights do not have a finite positive sum.
+    """
+    n = b_iv.shape[1]
+    if n > 1 and np.all(weights == weights[0]):
+        # Equal weights: the cumulative weights do not depend on the order, only two order statistics are needed
+        total = np.sum(weights)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            weights_sum = (np.cumsum(weights) - 0.5 * weights) / total
+        below = np.flatnonzero(weights_sum < 0.5)
+        if not np.isfinite(total) or total <= 0:
+            return np.full(len(b_iv), np.nan)
+        if len(below) == 0:
+            return np.partition(b_iv, 0, axis=1)[:, 0]
+        if below[-1] == n - 1:
+            return np.partition(b_iv, n - 1, axis=1)[:, n - 1]
+        k = below[-1]
+        part = np.partition(b_iv, [k, k + 1], axis=1)
+        return part[:, k] + (part[:, k + 1] - part[:, k]) * (0.5 - weights_sum[k]) / (weights_sum[k + 1] - weights_sum[k])
+
+    order = np.argsort(b_iv, axis=1)
+    b_sorted = np.take_along_axis(b_iv, order, axis=1)
+    w_sorted = weights[order]
+    total = np.sum(w_sorted, axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        weights_sum = (np.cumsum(w_sorted, axis=1) - 0.5 * w_sorted) / total[:, np.newaxis]
+        below_half = weights_sum < 0.5
+        below = n - 1 - np.argmax(below_half[:, ::-1], axis=1)  # Last estimate below half of the weight
+        left = np.minimum(below, n - 2)[:, np.newaxis]
+        b_left, b_right = np.take_along_axis(b_sorted, left, axis=1)[:, 0], np.take_along_axis(b_sorted, left + 1, axis=1)[:, 0]
+        s_left, s_right = np.take_along_axis(weights_sum, left, axis=1)[:, 0], np.take_along_axis(weights_sum, left + 1, axis=1)[:, 0]
+        b = b_left + (b_right - b_left) * (0.5 - s_left) / (s_right - s_left)
+    b = np.where(below == n - 1, b_sorted[:, -1], b)  # All the weight on the largest estimate
+    b = np.where(below_half.any(axis=1), b, b_sorted[:, 0])  # All the weight on the smallest estimate
+    return np.where(np.isfinite(total) & (total > 0), b, np.nan)
 
 
 def weighted_median_bootstrap(BETA_e, SE_e, BETA_o, SE_o, weights, nboot, seed=None):
     """Helper function returning the bootstrap standard error (standard deviation of nboot bootstrap replicates) of the weighted median."""
-    BETA_e, SE_e, BETA_o, SE_o = (np.asarray(x, dtype=float) for x in (BETA_e, SE_e, BETA_o, SE_o))
+    BETA_e, SE_e, BETA_o, SE_o, weights = (np.asarray(x, dtype=float) for x in (BETA_e, SE_e, BETA_o, SE_o, weights))
     rng = np.random.default_rng(seed)
-    med = np.zeros(nboot)
-    for i in range(nboot):
-        BETA_e_boot = rng.normal(loc=BETA_e, scale=SE_e)
-        BETA_o_boot = rng.normal(loc=BETA_o, scale=SE_o)
-        betaIV_boot = BETA_o_boot / BETA_e_boot
-        med[i] = weighted_median(betaIV_boot, weights)
+    med = np.empty(nboot)
+    for start, stop in bootstrap_chunks(nboot, len(BETA_e)):
+        BETA_e_boot, BETA_o_boot = draw_bootstrap_effects(rng, BETA_e, SE_e, BETA_o, SE_o, stop - start)
+        med[start:stop] = weighted_median_rows(BETA_o_boot / BETA_e_boot, weights)
     return np.std(med, ddof=1)
 
 

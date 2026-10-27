@@ -90,7 +90,7 @@ Be aware of these common side effects:
 
 `Geno` sets defaults for:
 
-- `G.cpus`: `os.cpu_count() - 1`
+- `G.cpus`: the number of CPUs available to the process (its CPU affinity, e.g. a SLURM allocation) minus 1, at least 1
 - `G.ram`: 80% of the system RAM (in MB)
 
 You can override them after initialization:

@@ -3,6 +3,9 @@ import os
 STANDARD_COLUMNS = ["CHR", "POS", "SNP", "EA", "NEA", "BETA", "SE", "P"]
 CHR_CODES = {"X": 23, "Y": 24, "XY": 25, "MT": 26, "M": 26}
 NULL_SNP_IDS = {"", ".", "NA", "NAN", "NONE"}
+# Values read as missing by pandas.read_csv (default na_values), used to read PLINK outputs with pyarrow
+READ_CSV_NA_VALUES = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>",
+                      "N/A", "NA", "NULL", "NaN", "None", "n/a", "nan", "null"]
 BUILDS = ["37", "38"]
 POPULATIONS = ["EUR", "AFR", "EAS", "AMR", "SAS"]
 REF_PANELS = [f"{pop}_{build}" for pop in POPULATIONS for build in BUILDS]

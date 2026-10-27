@@ -5,7 +5,8 @@ import gzip
 import shutil
 import uuid
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import pyarrow as pa
+import pyarrow.csv as pacsv
 
 from .constants import CHR_CODES
 from .tools import create_tmp, download_file, read_config
@@ -32,7 +33,6 @@ def lift_data(
 ):
     """
     Perform a liftover from one genetic build to another. If the chain file required for the liftover is not present, it will be downloaded. It"s also possible to manually provide the path to the chain file.
-    If the dataset is large, it is suggested to use the liftOver executable (liftover_path argument).
 
     Args:
         data (pd.DataFrame): The input data containing at least "CHR" and "POS" columns (1-based positions).
@@ -41,7 +41,7 @@ def lift_data(
         extraction_file (bool, optional): If True, also prints a CHR POS SNP space-delimited file for extraction. Defaults to False.
         chain_file (str, optional): Path to a local chain file for the lift. Overrides the start and end arguments if provided.
         name (str, optional): Specify a filename or filepath (without extension) for saving. If not provided, the data is not saved.
-        liftover_path (str, optional): Specify the path to the USCS liftover executable. If not provided, the lift will be done in python (slower for large amount of SNPs).
+        liftover_path (str, optional): Path to the UCSC liftOver executable, to lift with it instead of in python. If not provided (default), the lift is done in python, which is faster.
         object_id (str, optional): Specify the object id for tmp file writing (internal use only)
 
     Raises:
@@ -165,6 +165,12 @@ def _chain_chromosome(chrom):
     return CHAIN_CHR_NAMES.get(chrom, f"chr{chrom}")
 
 
+def _chain_chromosomes(chrom):
+    """Chain file chromosome names (see :func:`_chain_chromosome`) of an array of CHR codes, computed once per distinct code."""
+    codes, values = pd.factorize(chrom)
+    return np.array([_chain_chromosome(value) for value in values], dtype=object)[codes]
+
+
 def _reverse_complement(alleles):
     """Reverse-complement the alleles made of A, C, G, T letters (other values are returned unchanged)."""
     alleles = alleles.copy()
@@ -184,18 +190,24 @@ def _apply_lift(data, contigs, positions, strands):
     """
     nrows = data.shape[0]
     data.reset_index(drop=True, inplace=True)  # unique labels for the label-based operations below
-    contigs = pd.Series(contigs, index=data.index, dtype=object)
-    strands = pd.Series(strands, index=data.index, dtype=object)
-    primary = contigs.str.fullmatch(PRIMARY_CONTIG_PATTERN, na=False).astype(bool)
-    n_unmapped = int(contigs.isna().sum())
-    n_other_contig = int((contigs.notna() & ~primary).sum())
+    # The contig names are processed once per distinct name
+    contig_codes, names = pd.factorize(pd.Series(contigs, dtype=object))
+    names = pd.Series(np.asarray(names, dtype=object), dtype=object)
+    primary_names = names.str.fullmatch(PRIMARY_CONTIG_PATTERN, na=False).astype(bool)
+    chr_names = names.where(primary_names).str[3:]
+    chr_numbers = pd.to_numeric(chr_names, errors="coerce").fillna(chr_names.map(CHR_CODES).astype(float)).to_numpy()
+    lifted = contig_codes >= 0
+    primary = np.zeros(nrows, dtype=bool)
+    primary[lifted] = primary_names.to_numpy()[contig_codes[lifted]]
+    n_unmapped = int((~lifted).sum())
+    n_other_contig = int((lifted & ~primary).sum())
 
-    chr_names = contigs.where(primary).str[3:]
-    chr_numbers = pd.to_numeric(chr_names, errors="coerce").fillna(chr_names.map(CHR_CODES).astype(float))
-    data["CHR"] = chr_numbers.astype("Int64")
+    chromosomes = np.full(nrows, np.nan)
+    chromosomes[primary] = chr_numbers[contig_codes[primary]]
+    data["CHR"] = pd.Series(chromosomes, index=data.index).astype("Int64")
     data["POS"] = pd.to_numeric(pd.Series(positions, index=data.index), errors="coerce").astype("Int64")
 
-    minus = primary & (strands == "-")
+    minus = primary & (pd.Series(strands, index=data.index, dtype=object) == "-").to_numpy()
     n_minus = int(minus.sum())
     allele_columns = [col for col in ["EA", "NEA"] if col in data.columns]
     for col in allele_columns:
@@ -252,17 +264,18 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
     to_lift_filename = os.path.join("tmp_GENAL", f"{object_id}.prelift")
     lifted_filename = os.path.join("tmp_GENAL", f"{object_id}.postlift")
     unmapped_filename = os.path.join("tmp_GENAL", f"{object_id}_unMapped")
-    bed = pd.DataFrame(
+    n = data.shape[0]
+    bed = pa.table(
         {
-            "chrom": data["CHR"].map(_chain_chromosome),
-            "start": data["POS"] - 1,
-            "end": data["POS"],
-            "name": np.arange(data.shape[0]),
-            "score": 0,
-            "strand": "+",
+            "chrom": _chain_chromosomes(data["CHR"]),
+            "start": data["POS"].to_numpy() - 1,
+            "end": data["POS"].to_numpy(),
+            "name": np.arange(n),
+            "score": np.zeros(n, dtype=np.int64),
+            "strand": np.full(n, "+", dtype=object),
         }
     )
-    bed.to_csv(to_lift_filename, sep="\t", index=False, header=False)
+    pacsv.write_csv(bed, to_lift_filename, write_options=pacsv.WriteOptions(include_header=False, delimiter="\t", quoting_style="none"))
 
     # Call the liftOver software
     try:
@@ -295,29 +308,135 @@ def lift_coordinates_liftover(data, object_id, chain_path, liftover_path):
     return _apply_lift(data, contigs, positions, strands)
 
 
+def read_chain(chain_path):
+    """
+    Read the aligned blocks of a UCSC chain file (gzip-compressed if its name ends with .gz).
+
+    Returns:
+        tuple: (blocks, chains). blocks: DataFrame with one row per aligned block of non-zero size: source contig,
+            source interval [start, end) (0-based), start of the target interval and chain (row of chains).
+            chains: DataFrame with the score, target contig, target size and target strand of each chain.
+
+    Raises:
+        ValueError: If the file is not a valid chain file.
+    """
+    opener = gzip.open if str(chain_path).lower().endswith(".gz") else open
+    chains, blocks = [], []
+    source_sizes, target_sizes = {}, {}  # Size of each contig, which must be the same in all chains
+    in_chain = False  # Whether the last chain read has not reached its last block (a line with one number) yet
+    with opener(chain_path, "rt") as f:
+        for line in f:
+            fields = line.split()
+            if not fields or fields[0].startswith("#"):
+                continue
+            if fields[0] == "chain":
+                if in_chain:
+                    raise ValueError(f"A chain of {chain_path} does not end with its last block (a line with one number).")
+                if len(fields) < 12 or fields[4] != "+" or fields[9] not in ("+", "-"):
+                    raise ValueError(f"Invalid chain header in {chain_path}: {line.strip()}")
+                for sizes, contig, size in ((source_sizes, fields[2], int(fields[3])), (target_sizes, fields[7], int(fields[8]))):
+                    if sizes.setdefault(contig, size) != size:
+                        raise ValueError(f"The chains of {chain_path} give different sizes to {contig} ({sizes[contig]} and {size}).")
+                chains.append((int(fields[1]), fields[7], int(fields[8]), fields[9]))
+                source, source_pos, source_end = fields[2], int(fields[5]), int(fields[6])
+                target_pos, target_end = int(fields[10]), int(fields[11])
+                in_chain = True
+                continue
+            if not in_chain or len(fields) not in (1, 3):
+                raise ValueError(f"Invalid alignment line in {chain_path}: {line.strip()}")
+            size = int(fields[0])
+            if size > 0:
+                blocks.append((source, source_pos, source_pos + size, target_pos, len(chains) - 1))
+            if len(fields) == 3:
+                source_pos += size + int(fields[1])
+                target_pos += size + int(fields[2])
+            elif source_pos + size != source_end or target_pos + size != target_end:
+                raise ValueError(f"The alignment blocks of a chain of {chain_path} do not match its interval.")
+            else:
+                in_chain = False
+    if in_chain:
+        raise ValueError(f"A chain of {chain_path} does not end with its last block (a line with one number).")
+    # Integer columns also when the chain file has no aligned blocks (nothing is lifted)
+    blocks = pd.DataFrame(blocks, columns=["source", "start", "end", "target_start", "chain"]).astype(
+        {"start": np.int64, "end": np.int64, "target_start": np.int64, "chain": np.int64}
+    )
+    chains = pd.DataFrame(chains, columns=["score", "target", "target_size", "strand"]).astype(
+        {"score": np.int64, "target_size": np.int64}
+    )
+    return blocks, chains
+
+
+def lift_positions(chrom, pos, chain_path):
+    """
+    Lift CHR/POS coordinates with a chain file, as the first mapping of pyliftover's LiftOver.convert_coordinate: the
+    position is mapped through the aligned block that contains it, in the chain with the highest score. Positions in
+    regions where blocks of several chains overlap (there are none in the UCSC hg19/hg38 chain files) are lifted by
+    pyliftover itself.
+
+    Args:
+        chrom (np.ndarray): Chromosome codes (1-26, see :func:`_chain_chromosome`).
+        pos (np.ndarray): 1-based positions.
+        chain_path (str): Path to the chain file.
+
+    Returns:
+        tuple: Target contig (None if unlifted), 1-based target position (NaN if unlifted) and target strand of each position.
+    """
+    blocks, chains = read_chain(chain_path)
+    n = len(pos)
+    pos0 = np.asarray(pos, dtype=np.int64) - 1
+    block_of_row = np.full(n, -1)
+    overlapping = np.zeros(n, dtype=bool)
+    contigs = _chain_chromosomes(chrom)
+    contig_codes, contig_names = pd.factorize(contigs)
+    blocks_by_contig = dict(tuple(blocks.groupby("source", sort=False)))
+    for code, contig in enumerate(contig_names):
+        contig_blocks = blocks_by_contig.get(contig)
+        if contig_blocks is None:
+            continue
+        contig_blocks = contig_blocks.sort_values("start", kind="stable")
+        start, end = contig_blocks["start"].to_numpy(), contig_blocks["end"].to_numpy()
+        rows = np.flatnonzero(contig_codes == code)
+        p = pos0[rows]
+        i = np.searchsorted(start, p, side="right") - 1
+        inside = (i >= 0) & (p < end[np.maximum(i, 0)])
+        # Groups of overlapping blocks (of different chains): their positions are lifted by pyliftover
+        new_group = np.ones(len(start), dtype=bool)
+        new_group[1:] = start[1:] >= np.maximum.accumulate(end)[:-1]
+        group_size = np.bincount(np.cumsum(new_group) - 1)
+        if (group_size > 1).any():
+            group_end = np.maximum.reduceat(end, np.flatnonzero(new_group))
+            k = np.searchsorted(start[new_group], p, side="right") - 1
+            k0 = np.maximum(k, 0)
+            in_overlap = (k >= 0) & (p < group_end[k0]) & (group_size[k0] > 1)
+            overlapping[rows[in_overlap]] = True
+            inside &= ~in_overlap
+        block_of_row[rows[inside]] = contig_blocks.index.to_numpy()[i[inside]]
+
+    lifted = block_of_row >= 0
+    block = block_of_row[lifted]
+    chain = blocks["chain"].to_numpy()[block]
+    target = blocks["target_start"].to_numpy()[block] + (pos0[lifted] - blocks["start"].to_numpy()[block])
+    strand = chains["strand"].to_numpy()[chain]
+    target = np.where(strand == "-", chains["target_size"].to_numpy()[chain] - 1 - target, target)
+    target_contigs = np.full(n, None, dtype=object)
+    target_positions = np.full(n, np.nan)
+    target_strands = np.full(n, None, dtype=object)
+    target_contigs[lifted] = chains["target"].to_numpy()[chain]
+    target_positions[lifted] = target + 1
+    target_strands[lifted] = strand
+    if overlapping.any():
+        lo = LiftOver(chain_path)
+        for row in np.flatnonzero(overlapping):
+            result = lo.convert_coordinate(contigs[row], int(pos0[row]), "+")
+            if result:  # The first mapping (highest chain score) is used
+                target_contigs[row], target_positions[row], target_strands[row] = result[0][0], result[0][1] + 1, result[0][2]
+    return target_contigs, target_positions, target_strands
+
+
 def lift_coordinates_python(data, chain_path):
-    """Perform liftover on data using the chain passed."""
-    lo = LiftOver(chain_path)
-
-    # Print message
+    """Lift the CHR/POS coordinates of data in python with a chain file (see :func:`lift_positions`)."""
     print("Lifting coordinates in python...")
-    nrows = data.shape[0]
-    if nrows > 500000:
-        print("Your data is large, this can take a few minutes...")
-
-    # Create a list of tuples and lift
-    coordinates = list(zip(data["CHR"], data["POS"]))
-
-    # Perform the lift: pyliftover uses 0-based positions, POS is 1-based
-    def convert_coordinate(args):
-        return lo.convert_coordinate(_chain_chromosome(args[0]), int(args[1]) - 1, "+")
-
-    results = list(ThreadPoolExecutor().map(convert_coordinate, coordinates))
-
-    # The first mapping (highest chain score) is used
-    contigs = [res[0][0] if res else None for res in results]
-    positions = [res[0][1] + 1 if res else np.nan for res in results]
-    strands = [res[0][2] if res else None for res in results]
+    contigs, positions, strands = lift_positions(data["CHR"].to_numpy(), data["POS"].to_numpy(), chain_path)
     return _apply_lift(data, contigs, positions, strands)
 
 

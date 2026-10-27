@@ -6,7 +6,7 @@
 - **Select instruments** via LD clumping (PLINK 2).
 - **Compute PRS** on individual-level genotype data (PLINK 2), with optional **proxy SNP** support.
 - **Run two-sample MR** (multiple estimators + sensitivity analyses), with plotting helpers.
-- **MR-PRESSO** (parallel implementation) for outlier detection and distortion testing.
+- **MR-PRESSO** for outlier detection and distortion testing, over 99.7% faster than the MR-PRESSO R package (see {ref}`mr-presso-computation`).
 - **Colocalization** using approximate Bayes factors (ABF) to assess whether two signals likely share a causal variant.
 - **Utilities**: liftover between builds, GWAS Catalog annotation, gene-window filtering, allele-frequency updates from a reference panel.
 
